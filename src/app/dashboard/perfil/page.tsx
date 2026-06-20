@@ -6,27 +6,31 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import {
-  User, Users, Mail, LogOut, Lock, Save, Check
+  User, Users, Mail, LogOut, Lock, Save, Check, Copy, CheckCheck
 } from 'lucide-react'
 
 export default function PerfilPage() {
-  const [loading, setLoading]     = useState(true)
-  const [userId, setUserId]       = useState('')
-  const [email, setEmail]         = useState('')
-  const [nome, setNome]           = useState('')
-  const [familiaId, setFamiliaId] = useState('')
+  const [loading, setLoading]         = useState(true)
+  const [userId, setUserId]           = useState('')
+  const [email, setEmail]             = useState('')
+  const [nome, setNome]               = useState('')
+  const [familiaId, setFamiliaId]     = useState('')
   const [familiaNome, setFamiliaNome] = useState('')
-  const [membros, setMembros]     = useState<any[]>([])
+  const [codigoConvite, setCodigoConvite] = useState('')
+  const [membros, setMembros]         = useState<any[]>([])
 
   // Salvar nome
   const [salvandoNome, setSalvandoNome] = useState(false)
   const [nomeSalvo, setNomeSalvo]       = useState(false)
 
   // Trocar senha
-  const [novaSenha, setNovaSenha]   = useState('')
+  const [novaSenha, setNovaSenha]         = useState('')
   const [confirmaSenha, setConfirmaSenha] = useState('')
   const [salvandoSenha, setSalvandoSenha] = useState(false)
-  const [senhaMsg, setSenhaMsg]     = useState('')
+  const [senhaMsg, setSenhaMsg]           = useState('')
+
+  // Copiar código
+  const [copiado, setCopiado] = useState(false)
 
   const router   = useRouter()
   const supabase = createClient()
@@ -42,13 +46,16 @@ export default function PerfilPage() {
     setEmail(session.user.email || '')
 
     const { data: profile } = await supabase
-      .from('profiles').select('nome, familia_id, familias(nome)')
-      .eq('id', session.user.id).single()
+      .from('profiles')
+      .select('nome, familia_id, familias(nome, codigo_convite)')
+      .eq('id', session.user.id)
+      .single()
 
     if (profile) {
       setNome(profile.nome || '')
       setFamiliaId(profile.familia_id)
       setFamiliaNome((profile.familias as any)?.nome || '')
+      setCodigoConvite((profile.familias as any)?.codigo_convite || '')
 
       const { data: membrosData } = await supabase
         .from('profiles').select('id, nome').eq('familia_id', profile.familia_id)
@@ -74,14 +81,8 @@ export default function PerfilPage() {
 
   async function handleTrocarSenha() {
     setSenhaMsg('')
-    if (!novaSenha || novaSenha.length < 6) {
-      setSenhaMsg('A senha deve ter no mínimo 6 caracteres.')
-      return
-    }
-    if (novaSenha !== confirmaSenha) {
-      setSenhaMsg('As senhas não coincidem.')
-      return
-    }
+    if (!novaSenha || novaSenha.length < 6) { setSenhaMsg('A senha deve ter no mínimo 6 caracteres.'); return }
+    if (novaSenha !== confirmaSenha)         { setSenhaMsg('As senhas não coincidem.'); return }
     setSalvandoSenha(true)
     const { error } = await supabase.auth.updateUser({ password: novaSenha })
     setSalvandoSenha(false)
@@ -91,6 +92,13 @@ export default function PerfilPage() {
       setSenhaMsg('Senha atualizada com sucesso!')
       setNovaSenha(''); setConfirmaSenha('')
     }
+  }
+
+  async function handleCopiarCodigo() {
+    if (!codigoConvite) return
+    await navigator.clipboard.writeText(codigoConvite)
+    setCopiado(true)
+    setTimeout(() => setCopiado(false), 2500)
   }
 
   async function handleLogout() {
@@ -208,7 +216,55 @@ export default function PerfilPage() {
           {/* COLUNA DIREITA */}
           <div className="flex flex-col gap-5">
 
-            {/* CARD FAMÍLIA */}
+            {/* CARD CÓDIGO DE CONVITE */}
+            <div className="rounded-[20px] border p-6"
+              style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+              <div className="flex items-center gap-2 mb-1">
+                <Users size={18} color="#0F172A" strokeWidth={1.75} />
+                <h2 className="font-semibold" style={{ color: '#0F172A' }}>Código de convite</h2>
+              </div>
+              <p className="text-sm mb-4" style={{ color: '#64748B' }}>
+                Compartilhe com familiares para entrarem no Finify.
+              </p>
+
+              {codigoConvite ? (
+                <>
+                  {/* Código destacado */}
+                  <div className="rounded-2xl p-4 mb-3 text-center"
+                    style={{ backgroundColor: '#F0FDF4', border: '1.5px dashed #10B981' }}>
+                    <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: '#10B981' }}>
+                      Código da família {familiaNome}
+                    </p>
+                    <p className="text-3xl font-bold tracking-[6px]" style={{ color: '#0F172A' }}>
+                      {codigoConvite}
+                    </p>
+                  </div>
+
+                  {/* Botão copiar */}
+                  <button onClick={handleCopiarCodigo}
+                    className="w-full flex items-center justify-center gap-2 h-11 rounded-xl text-sm font-semibold transition-all"
+                    style={{
+                      backgroundColor: copiado ? '#ECFDF5' : '#0F766E',
+                      color: copiado ? '#10B981' : '#fff',
+                    }}>
+                    {copiado ? <CheckCheck size={16} /> : <Copy size={16} />}
+                    {copiado ? 'Copiado!' : 'Copiar código'}
+                  </button>
+
+                  <p className="text-xs text-center mt-3" style={{ color: '#94A3B8' }}>
+                    O familiar usa este código na tela de cadastro em "Entrar com código".
+                  </p>
+                </>
+              ) : (
+                <div className="rounded-2xl p-4 text-center" style={{ backgroundColor: '#FEF2F2' }}>
+                  <p className="text-sm" style={{ color: '#DC2626' }}>
+                    Código não encontrado. Contate o suporte.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* CARD MEMBROS DA FAMÍLIA */}
             <div className="rounded-[20px] border p-6"
               style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
               <div className="flex items-center gap-2 mb-1">
