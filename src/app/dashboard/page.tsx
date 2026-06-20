@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase'
 import {
   ArrowDownLeft, ArrowUpRight, PiggyBank, Target,
   ArrowRight, ArrowUp, CheckCircle2, AlertCircle, Bell,
-  Home, BookOpen, Shield, TrendingUp, Send, Heart, Star
+  Home, BookOpen, Shield, TrendingUp, Send, Heart, Star, Church
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
@@ -16,7 +16,7 @@ import {
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
-const agora  = new Date()
+const agora = new Date()
 
 const ICONES_META: Record<string, any> = {
   home: Home, book: BookOpen, shield: Shield, 'trending-up': TrendingUp,
@@ -34,9 +34,9 @@ function getSaudacao() {
 }
 
 export default function DashboardPage() {
-  const [nome, setNome]         = useState('')
-  const [familia, setFamilia]   = useState('')
-  const [loading, setLoading]   = useState(true)
+  const [nome, setNome]       = useState('')
+  const [familia, setFamilia] = useState('')
+  const [loading, setLoading] = useState(true)
   const [totalRec, setTotalRec] = useState(0)
   const [totalDes, setTotalDes] = useState(0)
   const [totalEco, setTotalEco] = useState(0)
@@ -44,8 +44,7 @@ export default function DashboardPage() {
   const [metas, setMetas]       = useState<any[]>([])
   const [lancamentos, setLancamentos] = useState<any[]>([])
   const [evolucao, setEvolucao]       = useState<any[]>([])
-
-  // Dízimo
+  const [dizimista, setDizimista]     = useState(true)
   const [baseDizimo, setBaseDizimo]   = useState(0)
   const [valorDizimo, setValorDizimo] = useState(0)
   const [dizimoPago, setDizimoPago]   = useState(0)
@@ -59,11 +58,12 @@ export default function DashboardPage() {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.user) return
     const { data: profile } = await supabase
-      .from('profiles').select('nome, familia_id, familias(nome)')
+      .from('profiles').select('nome, familia_id, familias(nome, dizimista)')
       .eq('id', session.user.id).single()
     if (profile) {
       setNome(profile.nome || '')
       setFamilia((profile.familias as any)?.nome || '')
+      setDizimista((profile.familias as any)?.dizimista !== false)
       await carregarDados(profile.familia_id)
     }
     setLoading(false)
@@ -82,18 +82,14 @@ export default function DashboardPage() {
       setTotalRec(r); setTotalDes(d); setTotalEco(r - d)
       setLancamentos(lanc.slice(0, 5))
 
-      // ── DÍZIMO ──
-      // Base: receitas com dizimar = true (ou null, pois registros antigos não têm o campo)
       const base = lanc
         .filter((l: any) => l.tipo === 'receita' && l.dizimar !== false)
         .reduce((s: number, l: any) => s + Number(l.valor), 0)
-      const dezPercent = base * 0.1
-      // Pago: despesas categorizadas como "Dízimo"
       const pago = lanc
         .filter((l: any) => l.tipo === 'despesa' && l.categoria === 'Dízimo')
         .reduce((s: number, l: any) => s + Number(l.valor), 0)
       setBaseDizimo(base)
-      setValorDizimo(dezPercent)
+      setValorDizimo(base * 0.1)
       setDizimoPago(pago)
 
       const porCat: any = {}
@@ -109,9 +105,9 @@ export default function DashboardPage() {
 
     const evo = []
     for (let i = 5; i >= 0; i--) {
-      const d2  = new Date(agora.getFullYear(), agora.getMonth() - i, 1)
-      const i2  = new Date(d2.getFullYear(), d2.getMonth(), 1).toISOString().split('T')[0]
-      const f2  = new Date(d2.getFullYear(), d2.getMonth() + 1, 0).toISOString().split('T')[0]
+      const d2 = new Date(agora.getFullYear(), agora.getMonth() - i, 1)
+      const i2 = new Date(d2.getFullYear(), d2.getMonth(), 1).toISOString().split('T')[0]
+      const f2 = new Date(d2.getFullYear(), d2.getMonth() + 1, 0).toISOString().split('T')[0]
       const { data: mes } = await supabase.from('lancamentos').select('tipo, valor')
         .eq('familia_id', fid).gte('data', i2).lte('data', f2)
       const r2 = (mes || []).filter((l: any) => l.tipo === 'receita').reduce((s: number, l: any) => s + Number(l.valor), 0)
@@ -130,33 +126,31 @@ export default function DashboardPage() {
   const pctGuard     = totalRec > 0 ? Math.round((totalEco / totalRec) * 100) : 0
   const semDados     = totalRec === 0 && totalDes === 0
   const primeiroNome = nome.trim().split(' ')[0]
-  const patrimonioTotal = evolucao.reduce((s, e) => s + e.valor, 0)
+  const patrimonioTotal  = evolucao.reduce((s, e) => s + e.valor, 0)
   const patrimonioExibir = patrimonioTotal !== 0 ? patrimonioTotal : totalEco
 
-  // Dízimo calculados
-  const dizimoRestante  = Math.max(valorDizimo - dizimoPago, 0)
-  const dizimoPctPago   = valorDizimo > 0 ? Math.min(Math.round((dizimoPago / valorDizimo) * 100), 100) : 0
-  const dizimoQuitado   = dizimoPago >= valorDizimo && valorDizimo > 0
+  const dizimoRestante = Math.max(valorDizimo - dizimoPago, 0)
+  const dizimoPctPago  = valorDizimo > 0 ? Math.min(Math.round((dizimoPago / valorDizimo) * 100), 100) : 0
+  const dizimoQuitado  = dizimoPago >= valorDizimo && valorDizimo > 0
 
-  // Score de saúde financeira
   let score = 0
-  if (totalEco > 0)   score += 30
-  if (pctGasto < 80)  score += 25
+  if (totalEco > 0)    score += 30
+  if (pctGasto < 80)   score += 25
   if (metas.length > 0) score += 25
-  if (pctGuard >= 10) score += 20
+  if (pctGuard >= 10)  score += 20
   score = Math.min(score, 100)
 
   const saude = [
-    { label: 'Reserva de Emergência', ok: totalEco > 0,      desc: totalEco > 0 ? 'Guardando este mês' : 'Sem economia este mês' },
-    { label: 'Orçamento Controlado',  ok: pctGasto < 80,     desc: pctGasto < 80 ? `${pctGasto}% comprometido` : 'Gastos elevados' },
-    { label: 'Metas em Andamento',    ok: metas.length > 0,  desc: metas.length > 0 ? `${metas.length} meta(s) ativa(s)` : 'Nenhuma meta criada' },
-    { label: 'Crescimento Patrimonial', ok: totalEco > 0,    desc: totalEco > 0 ? `+${fmt(totalEco)} este mês` : 'Sem crescimento' },
+    { label: 'Reserva de Emergência',   ok: totalEco > 0,     desc: totalEco > 0 ? 'Guardando este mês' : 'Sem economia este mês' },
+    { label: 'Orçamento Controlado',    ok: pctGasto < 80,    desc: pctGasto < 80 ? `${pctGasto}% comprometido` : 'Gastos elevados' },
+    { label: 'Metas em Andamento',      ok: metas.length > 0, desc: metas.length > 0 ? `${metas.length} meta(s) ativa(s)` : 'Nenhuma meta criada' },
+    { label: 'Crescimento Patrimonial', ok: totalEco > 0,     desc: totalEco > 0 ? `+${fmt(totalEco)} este mês` : 'Sem crescimento' },
   ]
 
   const kpis = [
-    { label: 'Receitas', val: totalRec, badge: '↑ 8% este mês', cor: '#10B981', bg: '#ECFDF5', Icon: ArrowDownLeft },
-    { label: 'Despesas', val: totalDes, badge: '↑ 5% este mês', cor: '#EF4444', bg: '#FEF2F2', Icon: ArrowUpRight },
-    { label: 'Economia', val: totalEco, badge: '↑ 15% este mês', cor: '#F59E0B', bg: '#FFFBEB', Icon: PiggyBank },
+    { label: 'Receitas', val: totalRec, badge: '↑ 8% este mês',  cor: '#10B981', bg: '#ECFDF5', Icon: ArrowDownLeft },
+    { label: 'Despesas', val: totalDes, badge: '↑ 5% este mês',  cor: '#EF4444', bg: '#FEF2F2', Icon: ArrowUpRight  },
+    { label: 'Economia', val: totalEco, badge: '↑ 15% este mês', cor: '#F59E0B', bg: '#FFFBEB', Icon: PiggyBank     },
   ]
 
   return (
@@ -168,9 +162,7 @@ export default function DashboardPage() {
           <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', letterSpacing: '-0.5px' }}>
             {getSaudacao()}, {primeiroNome || 'Família'} 👋
           </h1>
-          <p className="text-sm mt-1" style={{ color: '#64748B' }}>
-            Aqui está o resumo da sua vida financeira
-          </p>
+          <p className="text-sm mt-1" style={{ color: '#64748B' }}>Aqui está o resumo da sua vida financeira</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="px-4 py-2 rounded-full text-sm font-medium border"
@@ -184,7 +176,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* HERO PATRIMONIAL */}
+      {/* HERO */}
       <div className="rounded-[20px] p-8 mb-6 relative overflow-hidden"
         style={{ background: 'linear-gradient(135deg, #0B4D3B 0%, #0F766E 100%)', boxShadow: '0 20px 50px -12px rgba(11,77,59,0.4)' }}>
         <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', filter: 'blur(40px)' }} />
@@ -227,7 +219,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* KPI CARDS + DÍZIMO */}
+      {/* KPI CARDS */}
       <div className="grid grid-cols-4 gap-5 mb-6">
         {kpis.map(card => (
           <div key={card.label} className="rounded-[20px] p-6 border transition-all hover:shadow-lg"
@@ -243,47 +235,51 @@ export default function DashboardPage() {
           </div>
         ))}
 
-        {/* CARD DÍZIMO */}
-        <div className="rounded-[20px] p-6 border transition-all hover:shadow-lg relative overflow-hidden"
-          style={{ backgroundColor: '#fff', borderColor: dizimoQuitado ? '#D1FAE5' : '#FEF3C7', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
-          {/* Badge status */}
-          <div className="absolute top-4 right-4">
-            <span className="text-xs font-bold px-2 py-1 rounded-full"
-              style={{
-                backgroundColor: dizimoQuitado ? '#D1FAE5' : dizimoRestante > 0 ? '#FEF3C7' : '#F1F5F9',
-                color: dizimoQuitado ? '#059669' : '#D97706',
-              }}>
-              {dizimoQuitado ? '✓ Pago' : 'Pendente'}
-            </span>
+        {/* CARD DÍZIMO — só aparece se dizimista */}
+        {dizimista && (
+          <div className="rounded-[20px] p-6 border transition-all hover:shadow-lg relative overflow-hidden"
+            style={{ backgroundColor: '#fff', borderColor: dizimoQuitado ? '#D1FAE5' : '#FEF3C7', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+            <div className="absolute top-4 right-4">
+              <span className="text-xs font-bold px-2 py-1 rounded-full"
+                style={{ backgroundColor: dizimoQuitado ? '#D1FAE5' : '#FEF3C7', color: dizimoQuitado ? '#059669' : '#D97706' }}>
+                {dizimoQuitado ? '✓ Pago' : 'Pendente'}
+              </span>
+            </div>
+            <div className="w-11 h-11 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: '#F0FDF4' }}>
+              <Church size={19} color="#0F766E" strokeWidth={1.75} />
+            </div>
+            <p className="text-sm font-medium mb-1" style={{ color: '#64748B' }}>Dízimo do mês</p>
+            <p className="text-2xl font-semibold mb-1" style={{ color: '#0F172A', letterSpacing: '-0.5px' }}>
+              {loading ? '...' : fmt(valorDizimo)}
+            </p>
+            <p className="text-xs mb-3" style={{ color: '#94A3B8' }}>10% de {loading ? '...' : fmt(baseDizimo)}</p>
+            <div className="h-1.5 rounded-full overflow-hidden mb-2" style={{ backgroundColor: '#F1F5F9' }}>
+              <div className="h-full rounded-full transition-all"
+                style={{ width: `${dizimoPctPago}%`, backgroundColor: dizimoQuitado ? '#10B981' : '#F59E0B' }} />
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-xs" style={{ color: '#94A3B8' }}>Pago: {fmt(dizimoPago)}</span>
+              <span className="text-xs font-semibold" style={{ color: dizimoQuitado ? '#10B981' : '#D97706' }}>
+                {dizimoQuitado ? 'Completo!' : `Falta ${fmt(dizimoRestante)}`}
+              </span>
+            </div>
           </div>
+        )}
 
-          <div className="w-11 h-11 rounded-full flex items-center justify-center mb-4"
-            style={{ backgroundColor: '#FEF3C7' }}>
-            <span className="text-xl">🙏</span>
+        {/* Se não dizimista, mostra card de metas no lugar */}
+        {!dizimista && (
+          <div className="rounded-[20px] p-6 border transition-all hover:shadow-lg"
+            style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+            <div className="w-11 h-11 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: '#F5F3FF' }}>
+              <Target size={19} color="#8B5CF6" strokeWidth={1.75} />
+            </div>
+            <p className="text-sm font-medium mb-1" style={{ color: '#64748B' }}>Metas Ativas</p>
+            <p className="text-2xl font-semibold mb-2" style={{ color: '#0F172A', letterSpacing: '-0.5px' }}>
+              {metas.length} {metas.length === 1 ? 'meta' : 'metas'}
+            </p>
+            <a href="/dashboard/metas" className="text-xs font-semibold hover:underline" style={{ color: '#8B5CF6' }}>Ver detalhes →</a>
           </div>
-          <p className="text-sm font-medium mb-1" style={{ color: '#64748B' }}>Dízimo do mês</p>
-          <p className="text-2xl font-semibold mb-1" style={{ color: '#0F172A', letterSpacing: '-0.5px' }}>
-            {loading ? '...' : fmt(valorDizimo)}
-          </p>
-          <p className="text-xs mb-3" style={{ color: '#94A3B8' }}>
-            10% de {loading ? '...' : fmt(baseDizimo)}
-          </p>
-
-          {/* Barra de progresso */}
-          <div className="h-1.5 rounded-full overflow-hidden mb-2" style={{ backgroundColor: '#F1F5F9' }}>
-            <div className="h-full rounded-full transition-all"
-              style={{ width: `${dizimoPctPago}%`, backgroundColor: dizimoQuitado ? '#10B981' : '#F59E0B' }} />
-          </div>
-
-          <div className="flex justify-between items-center">
-            <span className="text-xs" style={{ color: '#94A3B8' }}>
-              Pago: {fmt(dizimoPago)}
-            </span>
-            <span className="text-xs font-semibold" style={{ color: dizimoQuitado ? '#10B981' : '#D97706' }}>
-              {dizimoQuitado ? 'Completo!' : `Falta ${fmt(dizimoRestante)}`}
-            </span>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* SEÇÃO PRINCIPAL */}
@@ -306,8 +302,7 @@ export default function DashboardPage() {
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
               <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false}
-                tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
+              <YAxis tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
               <Tooltip formatter={(v: any) => fmt(v)} labelStyle={{ color: '#0F172A', fontWeight: 600 }}
                 contentStyle={{ borderRadius: '14px', border: '1px solid #E2E8F0', boxShadow: '0 8px 24px rgba(0,0,0,0.08)' }} />
               <Area type="monotone" dataKey="valor" stroke="#0F766E" strokeWidth={2.5} fill="url(#evoGrad)"
@@ -354,7 +349,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* METAS DA FAMÍLIA */}
+      {/* METAS */}
       <div className="rounded-[20px] border p-6 mb-6"
         style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
         <div className="flex items-center justify-between mb-5">
@@ -375,9 +370,9 @@ export default function DashboardPage() {
         ) : (
           <div className="grid grid-cols-3 gap-5">
             {metas.map((m: any) => {
-              const pct = Math.min(Math.round((Number(m.valor_atual) / Number(m.valor_alvo)) * 100), 100)
+              const pct  = Math.min(Math.round((Number(m.valor_atual) / Number(m.valor_alvo)) * 100), 100)
               const Icon = ICONES_META[m.icone] || Target
-              const cor = m.cor || '#0F766E'
+              const cor  = m.cor || '#0F766E'
               return (
                 <div key={m.id} className="rounded-2xl border p-4" style={{ borderColor: '#F1F5F9' }}>
                   <div className="flex items-center gap-3 mb-3">
@@ -400,7 +395,7 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* SEÇÃO INFERIOR */}
+      {/* INFERIOR */}
       <div className="grid grid-cols-2 gap-5">
         <div className="rounded-[20px] border p-6" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
           <h2 className="font-semibold mb-1" style={{ color: '#0F172A' }}>Despesas por Categoria</h2>
