@@ -44,7 +44,7 @@ export default function DashboardPage() {
   const [metas, setMetas]       = useState<any[]>([])
   const [lancamentos, setLancamentos] = useState<any[]>([])
   const [evolucao, setEvolucao]       = useState<any[]>([])
-  const [dizimista, setDizimista]     = useState(true)
+  const [dizimista, setDizimista]     = useState<boolean | null>(null)
   const [baseDizimo, setBaseDizimo]   = useState(0)
   const [valorDizimo, setValorDizimo] = useState(0)
   const [dizimoPago, setDizimoPago]   = useState(0)
@@ -129,6 +129,7 @@ export default function DashboardPage() {
   const patrimonioTotal  = evolucao.reduce((s, e) => s + e.valor, 0)
   const patrimonioExibir = patrimonioTotal !== 0 ? patrimonioTotal : totalEco
 
+  const dizimoAtivo    = dizimista === true
   const dizimoRestante = Math.max(valorDizimo - dizimoPago, 0)
   const dizimoPctPago  = valorDizimo > 0 ? Math.min(Math.round((dizimoPago / valorDizimo) * 100), 100) : 0
   const dizimoQuitado  = dizimoPago >= valorDizimo && valorDizimo > 0
@@ -220,7 +221,7 @@ export default function DashboardPage() {
       </div>
 
       {/* KPI CARDS — 4 fixos, 5º se dizimista */}
-      <div style={{ display: 'grid', gap: '20px', marginBottom: '24px', gridTemplateColumns: dizimista ? 'repeat(5, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))' }}>
+      <div style={{ display: 'grid', gap: '20px', marginBottom: '24px', gridTemplateColumns: dizimoAtivo ? 'repeat(5, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))' }}>
         {kpis.map(card => (
           <div key={card.label} className="rounded-[20px] p-6 border transition-all hover:shadow-lg"
             style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
@@ -249,7 +250,7 @@ export default function DashboardPage() {
         </div>
 
         {/* CARD DÍZIMO — só aparece se dizimista */}
-        {dizimista && (
+        {dizimoAtivo && (
           <div className="rounded-[20px] p-6 border transition-all hover:shadow-lg relative overflow-hidden"
             style={{ backgroundColor: '#fff', borderColor: dizimoQuitado ? '#D1FAE5' : '#FEF3C7', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
             <div className="absolute top-4 right-4">
