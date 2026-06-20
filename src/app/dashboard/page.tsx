@@ -10,7 +10,7 @@ import {
   Home, BookOpen, Shield, TrendingUp, Send, Heart, Star
 } from 'lucide-react'
 import {
-  AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, RadialBarChart, RadialBar
 } from 'recharts'
 
@@ -44,6 +44,12 @@ export default function DashboardPage() {
   const [metas, setMetas]       = useState<any[]>([])
   const [lancamentos, setLancamentos] = useState<any[]>([])
   const [evolucao, setEvolucao]       = useState<any[]>([])
+
+  // Dízimo
+  const [baseDizimo, setBaseDizimo]   = useState(0)
+  const [valorDizimo, setValorDizimo] = useState(0)
+  const [dizimoPago, setDizimoPago]   = useState(0)
+
   const supabase = createClient()
 
   useEffect(() => { carregar() }, [])
@@ -75,6 +81,21 @@ export default function DashboardPage() {
       const d = lanc.filter((l: any) => l.tipo === 'despesa').reduce((s: number, l: any) => s + Number(l.valor), 0)
       setTotalRec(r); setTotalDes(d); setTotalEco(r - d)
       setLancamentos(lanc.slice(0, 5))
+
+      // ── DÍZIMO ──
+      // Base: receitas com dizimar = true (ou null, pois registros antigos não têm o campo)
+      const base = lanc
+        .filter((l: any) => l.tipo === 'receita' && l.dizimar !== false)
+        .reduce((s: number, l: any) => s + Number(l.valor), 0)
+      const dezPercent = base * 0.1
+      // Pago: despesas categorizadas como "Dízimo"
+      const pago = lanc
+        .filter((l: any) => l.tipo === 'despesa' && l.categoria === 'Dízimo')
+        .reduce((s: number, l: any) => s + Number(l.valor), 0)
+      setBaseDizimo(base)
+      setValorDizimo(dezPercent)
+      setDizimoPago(pago)
+
       const porCat: any = {}
       lanc.filter((l: any) => l.tipo === 'despesa').forEach((l: any) => {
         porCat[l.categoria] = (porCat[l.categoria] || 0) + Number(l.valor)
@@ -112,19 +133,24 @@ export default function DashboardPage() {
   const patrimonioTotal = evolucao.reduce((s, e) => s + e.valor, 0)
   const patrimonioExibir = patrimonioTotal !== 0 ? patrimonioTotal : totalEco
 
-  // Score de saúde financeira (0-100)
+  // Dízimo calculados
+  const dizimoRestante  = Math.max(valorDizimo - dizimoPago, 0)
+  const dizimoPctPago   = valorDizimo > 0 ? Math.min(Math.round((dizimoPago / valorDizimo) * 100), 100) : 0
+  const dizimoQuitado   = dizimoPago >= valorDizimo && valorDizimo > 0
+
+  // Score de saúde financeira
   let score = 0
-  if (totalEco > 0) score += 30
-  if (pctGasto < 80) score += 25
+  if (totalEco > 0)   score += 30
+  if (pctGasto < 80)  score += 25
   if (metas.length > 0) score += 25
   if (pctGuard >= 10) score += 20
   score = Math.min(score, 100)
 
   const saude = [
-    { label: 'Reserva de Emergência', ok: totalEco > 0, desc: totalEco > 0 ? 'Guardando este mês' : 'Sem economia este mês' },
-    { label: 'Orçamento Controlado',  ok: pctGasto < 80, desc: pctGasto < 80 ? `${pctGasto}% comprometido` : 'Gastos elevados' },
-    { label: 'Metas em Andamento',    ok: metas.length > 0, desc: metas.length > 0 ? `${metas.length} meta(s) ativa(s)` : 'Nenhuma meta criada' },
-    { label: 'Crescimento Patrimonial', ok: totalEco > 0, desc: totalEco > 0 ? `+${fmt(totalEco)} este mês` : 'Sem crescimento' },
+    { label: 'Reserva de Emergência', ok: totalEco > 0,      desc: totalEco > 0 ? 'Guardando este mês' : 'Sem economia este mês' },
+    { label: 'Orçamento Controlado',  ok: pctGasto < 80,     desc: pctGasto < 80 ? `${pctGasto}% comprometido` : 'Gastos elevados' },
+    { label: 'Metas em Andamento',    ok: metas.length > 0,  desc: metas.length > 0 ? `${metas.length} meta(s) ativa(s)` : 'Nenhuma meta criada' },
+    { label: 'Crescimento Patrimonial', ok: totalEco > 0,    desc: totalEco > 0 ? `+${fmt(totalEco)} este mês` : 'Sem crescimento' },
   ]
 
   const kpis = [
@@ -136,7 +162,7 @@ export default function DashboardPage() {
   return (
     <div className="p-8 max-w-[1440px] mx-auto" style={{ backgroundColor: '#F8FAFC' }}>
 
-      {/* HEADER SUPERIOR */}
+      {/* HEADER */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', letterSpacing: '-0.5px' }}>
@@ -160,20 +186,12 @@ export default function DashboardPage() {
 
       {/* HERO PATRIMONIAL */}
       <div className="rounded-[20px] p-8 mb-6 relative overflow-hidden"
-        style={{
-          background: 'linear-gradient(135deg, #0B4D3B 0%, #0F766E 100%)',
-          boxShadow: '0 20px 50px -12px rgba(11,77,59,0.4)',
-        }}>
-        {/* Glassmorphism blobs */}
-        <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full"
-          style={{ background: 'rgba(255,255,255,0.06)', filter: 'blur(40px)' }} />
-        <div className="absolute -bottom-24 right-40 w-72 h-72 rounded-full"
-          style={{ background: 'rgba(16,185,129,0.15)', filter: 'blur(60px)' }} />
-
+        style={{ background: 'linear-gradient(135deg, #0B4D3B 0%, #0F766E 100%)', boxShadow: '0 20px 50px -12px rgba(11,77,59,0.4)' }}>
+        <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', filter: 'blur(40px)' }} />
+        <div className="absolute -bottom-24 right-40 w-72 h-72 rounded-full" style={{ background: 'rgba(16,185,129,0.15)', filter: 'blur(60px)' }} />
         <div className="relative grid grid-cols-3 gap-8 items-center">
           <div className="col-span-2">
-            <p className="text-xs font-semibold uppercase tracking-widest mb-3"
-              style={{ color: 'rgba(255,255,255,0.5)' }}>Patrimônio Familiar</p>
+            <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: 'rgba(255,255,255,0.5)' }}>Patrimônio Familiar</p>
             <p className="text-5xl font-semibold text-white mb-4" style={{ letterSpacing: '-2px' }}>
               {loading ? '...' : fmt(patrimonioExibir)}
             </p>
@@ -185,16 +203,13 @@ export default function DashboardPage() {
                   <span className="text-xs font-semibold" style={{ color: '#6EE7B7' }}>{pctGuard}% este mês</span>
                 </div>
               )}
-              <div className="px-3.5 py-1.5 rounded-full"
-                style={{ backgroundColor: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
+              <div className="px-3.5 py-1.5 rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
                 <span className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.7)' }}>
                   {familia ? `Família ${familia}` : ''} · {mesAtual}
                 </span>
               </div>
             </div>
           </div>
-
-          {/* Mini gráfico */}
           <div className="rounded-2xl p-4" style={{ backgroundColor: 'rgba(255,255,255,0.06)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.1)' }}>
             <p className="text-xs font-medium mb-2" style={{ color: 'rgba(255,255,255,0.5)' }}>Evolução · 6 meses</p>
             <ResponsiveContainer width="100%" height={90}>
@@ -205,22 +220,19 @@ export default function DashboardPage() {
                     <stop offset="100%" stopColor="#6EE7B7" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <Area type="monotone" dataKey="valor" stroke="#6EE7B7" strokeWidth={2}
-                  fill="url(#heroGrad)" />
+                <Area type="monotone" dataKey="valor" stroke="#6EE7B7" strokeWidth={2} fill="url(#heroGrad)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
       </div>
 
-      {/* KPI CARDS */}
+      {/* KPI CARDS + DÍZIMO */}
       <div className="grid grid-cols-4 gap-5 mb-6">
         {kpis.map(card => (
-          <div key={card.label}
-            className="rounded-[20px] p-6 border transition-all hover:shadow-lg"
+          <div key={card.label} className="rounded-[20px] p-6 border transition-all hover:shadow-lg"
             style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
-            <div className="w-11 h-11 rounded-full flex items-center justify-center mb-4"
-              style={{ backgroundColor: card.bg }}>
+            <div className="w-11 h-11 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: card.bg }}>
               <card.Icon size={19} color={card.cor} strokeWidth={1.75} />
             </div>
             <p className="text-sm font-medium mb-1" style={{ color: '#64748B' }}>{card.label}</p>
@@ -231,27 +243,51 @@ export default function DashboardPage() {
           </div>
         ))}
 
-        {/* Metas card */}
-        <div className="rounded-[20px] p-6 border transition-all hover:shadow-lg"
-          style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
-          <div className="w-11 h-11 rounded-full flex items-center justify-center mb-4"
-            style={{ backgroundColor: '#F5F3FF' }}>
-            <Target size={19} color="#8B5CF6" strokeWidth={1.75} />
+        {/* CARD DÍZIMO */}
+        <div className="rounded-[20px] p-6 border transition-all hover:shadow-lg relative overflow-hidden"
+          style={{ backgroundColor: '#fff', borderColor: dizimoQuitado ? '#D1FAE5' : '#FEF3C7', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+          {/* Badge status */}
+          <div className="absolute top-4 right-4">
+            <span className="text-xs font-bold px-2 py-1 rounded-full"
+              style={{
+                backgroundColor: dizimoQuitado ? '#D1FAE5' : dizimoRestante > 0 ? '#FEF3C7' : '#F1F5F9',
+                color: dizimoQuitado ? '#059669' : '#D97706',
+              }}>
+              {dizimoQuitado ? '✓ Pago' : 'Pendente'}
+            </span>
           </div>
-          <p className="text-sm font-medium mb-1" style={{ color: '#64748B' }}>Metas Ativas</p>
-          <p className="text-2xl font-semibold mb-2" style={{ color: '#0F172A', letterSpacing: '-0.5px' }}>
-            {metas.length} {metas.length === 1 ? 'meta' : 'metas'}
+
+          <div className="w-11 h-11 rounded-full flex items-center justify-center mb-4"
+            style={{ backgroundColor: '#FEF3C7' }}>
+            <span className="text-xl">🙏</span>
+          </div>
+          <p className="text-sm font-medium mb-1" style={{ color: '#64748B' }}>Dízimo do mês</p>
+          <p className="text-2xl font-semibold mb-1" style={{ color: '#0F172A', letterSpacing: '-0.5px' }}>
+            {loading ? '...' : fmt(valorDizimo)}
           </p>
-          <a href="/dashboard/metas" className="text-xs font-semibold hover:underline" style={{ color: '#8B5CF6' }}>
-            Ver detalhes →
-          </a>
+          <p className="text-xs mb-3" style={{ color: '#94A3B8' }}>
+            10% de {loading ? '...' : fmt(baseDizimo)}
+          </p>
+
+          {/* Barra de progresso */}
+          <div className="h-1.5 rounded-full overflow-hidden mb-2" style={{ backgroundColor: '#F1F5F9' }}>
+            <div className="h-full rounded-full transition-all"
+              style={{ width: `${dizimoPctPago}%`, backgroundColor: dizimoQuitado ? '#10B981' : '#F59E0B' }} />
+          </div>
+
+          <div className="flex justify-between items-center">
+            <span className="text-xs" style={{ color: '#94A3B8' }}>
+              Pago: {fmt(dizimoPago)}
+            </span>
+            <span className="text-xs font-semibold" style={{ color: dizimoQuitado ? '#10B981' : '#D97706' }}>
+              {dizimoQuitado ? 'Completo!' : `Falta ${fmt(dizimoRestante)}`}
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* SEÇÃO PRINCIPAL — 65/35 */}
+      {/* SEÇÃO PRINCIPAL */}
       <div className="grid grid-cols-3 gap-5 mb-6">
-
-        {/* Evolução Patrimonial — 2 cols */}
         <div className="col-span-2 rounded-[20px] border p-6"
           style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
           <div className="flex items-center justify-between mb-6">
@@ -274,26 +310,20 @@ export default function DashboardPage() {
                 tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
               <Tooltip formatter={(v: any) => fmt(v)} labelStyle={{ color: '#0F172A', fontWeight: 600 }}
                 contentStyle={{ borderRadius: '14px', border: '1px solid #E2E8F0', boxShadow: '0 8px 24px rgba(0,0,0,0.08)' }} />
-              <Area type="monotone" dataKey="valor" stroke="#0F766E" strokeWidth={2.5}
-                fill="url(#evoGrad)"
+              <Area type="monotone" dataKey="valor" stroke="#0F766E" strokeWidth={2.5} fill="url(#evoGrad)"
                 dot={{ fill: '#fff', stroke: '#0F766E', strokeWidth: 2, r: 4 }}
                 activeDot={{ fill: '#0F766E', r: 6, strokeWidth: 0 }} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
 
-        {/* Saúde Financeira — Score */}
         <div className="rounded-[20px] border p-6 flex flex-col"
           style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
           <h2 className="font-semibold mb-1" style={{ color: '#0F172A' }}>Saúde Financeira</h2>
           <p className="text-sm mb-4" style={{ color: '#64748B' }}>Score geral</p>
-
-          {/* Score circular */}
           <div className="relative flex items-center justify-center mb-5" style={{ height: '140px' }}>
             <ResponsiveContainer width="100%" height="100%">
-              <RadialBarChart
-                innerRadius="75%" outerRadius="100%" data={[{ value: score, fill: '#10B981' }]}
-                startAngle={90} endAngle={-270}>
+              <RadialBarChart innerRadius="75%" outerRadius="100%" data={[{ value: score, fill: '#10B981' }]} startAngle={90} endAngle={-270}>
                 <RadialBar background={{ fill: '#F1F5F9' }} dataKey="value" cornerRadius={20} />
               </RadialBarChart>
             </ResponsiveContainer>
@@ -302,7 +332,6 @@ export default function DashboardPage() {
               <span className="text-xs" style={{ color: '#94A3B8' }}>de 100</span>
             </div>
           </div>
-
           <div className="flex flex-col gap-3 flex-1">
             {saude.map((s, i) => (
               <div key={i} className="flex items-start gap-2.5">
@@ -317,7 +346,6 @@ export default function DashboardPage() {
               </div>
             ))}
           </div>
-
           <a href="/dashboard/movimentos"
             className="mt-4 text-center text-sm font-semibold py-2.5 rounded-xl transition-colors hover:opacity-90"
             style={{ backgroundColor: '#F0FDF4', color: '#0F766E' }}>
@@ -338,14 +366,11 @@ export default function DashboardPage() {
             Ver todas <ArrowRight size={13} strokeWidth={2} />
           </a>
         </div>
-
         {metas.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 gap-3">
             <Target size={28} color="#E2E8F0" strokeWidth={1} />
             <p className="text-sm" style={{ color: '#94A3B8' }}>Nenhuma meta criada ainda.</p>
-            <a href="/dashboard/metas" className="text-sm font-semibold hover:underline" style={{ color: '#0F766E' }}>
-              Criar primeira meta →
-            </a>
+            <a href="/dashboard/metas" className="text-sm font-semibold hover:underline" style={{ color: '#0F766E' }}>Criar primeira meta →</a>
           </div>
         ) : (
           <div className="grid grid-cols-3 gap-5">
@@ -356,15 +381,12 @@ export default function DashboardPage() {
               return (
                 <div key={m.id} className="rounded-2xl border p-4" style={{ borderColor: '#F1F5F9' }}>
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundColor: cor + '18' }}>
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: cor + '18' }}>
                       <Icon size={17} color={cor} strokeWidth={1.75} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold truncate" style={{ color: '#0F172A' }}>{m.nome}</p>
-                      <p className="text-xs" style={{ color: '#94A3B8' }}>
-                        {fmt(Number(m.valor_atual))} de {fmt(Number(m.valor_alvo))}
-                      </p>
+                      <p className="text-xs" style={{ color: '#94A3B8' }}>{fmt(Number(m.valor_atual))} de {fmt(Number(m.valor_alvo))}</p>
                     </div>
                     <span className="text-sm font-bold flex-shrink-0" style={{ color: cor }}>{pct}%</span>
                   </div>
@@ -380,10 +402,7 @@ export default function DashboardPage() {
 
       {/* SEÇÃO INFERIOR */}
       <div className="grid grid-cols-2 gap-5">
-
-        {/* Despesas por categoria — donut grande */}
-        <div className="rounded-[20px] border p-6"
-          style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+        <div className="rounded-[20px] border p-6" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
           <h2 className="font-semibold mb-1" style={{ color: '#0F172A' }}>Despesas por Categoria</h2>
           <p className="text-sm mb-4" style={{ color: '#64748B' }}>Distribuição do mês</p>
           {cats.length === 0 ? (
@@ -392,12 +411,10 @@ export default function DashboardPage() {
             <div className="flex items-center gap-8">
               <ResponsiveContainer width={180} height={180}>
                 <PieChart>
-                  <Pie data={cats} cx="50%" cy="50%" innerRadius={55} outerRadius={85}
-                    dataKey="val" strokeWidth={0} paddingAngle={2}>
+                  <Pie data={cats} cx="50%" cy="50%" innerRadius={55} outerRadius={85} dataKey="val" strokeWidth={0} paddingAngle={2}>
                     {cats.map((c, i) => <Cell key={i} fill={c.cor} />)}
                   </Pie>
-                  <Tooltip formatter={(v: any) => fmt(Number(v))}
-                    contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0' }} />
+                  <Tooltip formatter={(v: any) => fmt(Number(v))} contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0' }} />
                 </PieChart>
               </ResponsiveContainer>
               <div className="flex-1 flex flex-col gap-3">
@@ -418,9 +435,7 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Últimos lançamentos */}
-        <div className="rounded-[20px] border overflow-hidden"
-          style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+        <div className="rounded-[20px] border overflow-hidden" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
           <div className="flex items-center justify-between px-6 pt-6 pb-4">
             <div>
               <h2 className="font-semibold" style={{ color: '#0F172A' }}>Últimos Lançamentos</h2>
@@ -445,8 +460,7 @@ export default function DashboardPage() {
                 <p className="text-sm font-medium truncate" style={{ color: '#0F172A' }}>{l.categoria}</p>
                 <p className="text-xs" style={{ color: '#94A3B8' }}>{l.membro} · {l.hora}</p>
               </div>
-              <p className="font-semibold text-sm flex-shrink-0"
-                style={{ color: l.tipo === 'receita' ? '#10B981' : '#EF4444' }}>
+              <p className="font-semibold text-sm flex-shrink-0" style={{ color: l.tipo === 'receita' ? '#10B981' : '#EF4444' }}>
                 {l.tipo === 'receita' ? '+' : '-'} {fmt(Number(l.valor))}
               </p>
             </div>
