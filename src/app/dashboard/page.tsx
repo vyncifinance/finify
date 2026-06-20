@@ -219,8 +219,8 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* KPI CARDS */}
-      <div className="grid grid-cols-4 gap-5 mb-6">
+      {/* KPI CARDS — 4 fixos, 5º se dizimista */}
+      <div style={{ display: 'grid', gap: '20px', marginBottom: '24px', gridTemplateColumns: dizimista ? 'repeat(5, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))' }}>
         {kpis.map(card => (
           <div key={card.label} className="rounded-[20px] p-6 border transition-all hover:shadow-lg"
             style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
@@ -234,6 +234,19 @@ export default function DashboardPage() {
             <span className="text-xs font-medium" style={{ color: card.cor }}>{card.badge}</span>
           </div>
         ))}
+
+        {/* CARD METAS — sempre visível */}
+        <div className="rounded-[20px] p-6 border transition-all hover:shadow-lg"
+          style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+          <div className="w-11 h-11 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: '#F5F3FF' }}>
+            <Target size={19} color="#8B5CF6" strokeWidth={1.75} />
+          </div>
+          <p className="text-sm font-medium mb-1" style={{ color: '#64748B' }}>Metas Ativas</p>
+          <p className="text-2xl font-semibold mb-2" style={{ color: '#0F172A', letterSpacing: '-0.5px' }}>
+            {metas.length} {metas.length === 1 ? 'meta' : 'metas'}
+          </p>
+          <a href="/dashboard/metas" className="text-xs font-semibold hover:underline" style={{ color: '#8B5CF6' }}>Ver detalhes →</a>
+        </div>
 
         {/* CARD DÍZIMO — só aparece se dizimista */}
         {dizimista && (
@@ -263,21 +276,6 @@ export default function DashboardPage() {
                 {dizimoQuitado ? 'Completo!' : `Falta ${fmt(dizimoRestante)}`}
               </span>
             </div>
-          </div>
-        )}
-
-        {/* Se não dizimista, mostra card de metas no lugar */}
-        {!dizimista && (
-          <div className="rounded-[20px] p-6 border transition-all hover:shadow-lg"
-            style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
-            <div className="w-11 h-11 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: '#F5F3FF' }}>
-              <Target size={19} color="#8B5CF6" strokeWidth={1.75} />
-            </div>
-            <p className="text-sm font-medium mb-1" style={{ color: '#64748B' }}>Metas Ativas</p>
-            <p className="text-2xl font-semibold mb-2" style={{ color: '#0F172A', letterSpacing: '-0.5px' }}>
-              {metas.length} {metas.length === 1 ? 'meta' : 'metas'}
-            </p>
-            <a href="/dashboard/metas" className="text-xs font-semibold hover:underline" style={{ color: '#8B5CF6' }}>Ver detalhes →</a>
           </div>
         )}
       </div>
