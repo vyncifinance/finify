@@ -2,6 +2,9 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname
+  console.log('[middleware] pathname:', pathname)
+
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -21,20 +24,20 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user }, error } = await supabase.auth.getUser()
+  console.log('[middleware] user:', user?.email ?? 'null', '| error:', error?.message ?? 'none')
 
-  const pathname = request.nextUrl.pathname
   const isDashboard = pathname.startsWith('/dashboard')
   const isLogin     = pathname === '/'
   const isCadastro  = pathname === '/cadastro'
 
-  // Não autenticado tentando acessar dashboard → login
   if (!user && isDashboard) {
+    console.log('[middleware] → redirecionando para login')
     return NextResponse.redirect(new URL('/', request.url))
   }
 
-  // Autenticado tentando acessar login ou cadastro → dashboard
   if (user && (isLogin || isCadastro)) {
+    console.log('[middleware] → redirecionando para dashboard')
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
