@@ -55,9 +55,9 @@ export default function PerfilPage() {
       setCodigoConvite((profile.familias as any)?.codigo_convite || '')
       setDizimista((profile.familias as any)?.dizimista !== false)
 
-      const { data: membrosData } = await supabase
-        .from('profiles').select('id, nome').eq('familia_id', profile.familia_id)
-      if (membrosData) setMembros(membrosData)
+      const res = await fetch('/api/membros')
+      const json = await res.json()
+      if (json.membros) setMembros(json.membros)
     }
     setLoading(false)
   }
