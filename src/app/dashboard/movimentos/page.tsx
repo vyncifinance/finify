@@ -410,7 +410,7 @@ export default function MovimentosPage() {
           style={{ backgroundColor: 'rgba(15,23,42,0.5)' }}
           onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}>
           <div className="w-full lg:max-w-md rounded-t-[28px] lg:rounded-[20px] p-6 max-h-[92vh] overflow-y-auto"
-            style={{ backgroundColor: '#fff' }}>
+            style={{ backgroundColor: '#fff', paddingBottom: '100px' }}>
 
             {/* Drag handle mobile */}
             <div className="w-10 h-1 rounded-full mx-auto mb-4 lg:hidden" style={{ backgroundColor: '#E2E8F0' }} />
