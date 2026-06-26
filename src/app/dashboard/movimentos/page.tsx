@@ -270,9 +270,9 @@ export default function MovimentosPage() {
 
         {/* Botão flutuante mobile */}
         <button onClick={abrirModal}
-          className="fixed bottom-6 right-6 w-16 h-16 rounded-full flex items-center justify-center text-white z-40"
-          style={{ backgroundColor: '#0E3B2E', boxShadow: '0 8px 24px rgba(14,59,46,0.4)' }}>
-          <Plus size={28} strokeWidth={2} />
+          className="fixed right-6 w-14 h-14 rounded-full flex items-center justify-center text-white z-40"
+          style={{ bottom: '80px', backgroundColor: '#0E3B2E', boxShadow: '0 8px 24px rgba(14,59,46,0.4)' }}>
+          <Plus size={24} strokeWidth={2} />
         </button>
       </div>
 
