@@ -181,13 +181,13 @@ export default function MovimentosPage() {
           {/* Cards resumo mobile */}
           <div className="grid grid-cols-3 gap-2">
             {[
-              { label: 'Receitas', val: totalRec, cor: '#6EE7B7' },
-              { label: 'Despesas', val: totalDes, cor: '#FCA5A5' },
-              { label: 'Resultado', val: resultado, cor: resultado >= 0 ? '#6EE7B7' : '#FCA5A5' },
+              { label: 'Receitas', val: totalRec, cor: '#10B981', bg: '#ECFDF5' },
+              { label: 'Despesas', val: totalDes, cor: '#EF4444', bg: '#FEF2F2' },
+              { label: 'Resultado', val: resultado, cor: resultado >= 0 ? '#10B981' : '#EF4444', bg: resultado >= 0 ? '#ECFDF5' : '#FEF2F2' },
             ].map(c => (
               <div key={c.label} className="rounded-2xl p-3 text-center"
-                style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
-                <p className="text-xs mb-1" style={{ color: 'rgba(255,255,255,0.5)' }}>{c.label}</p>
+                style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0' }}>
+                <p className="text-xs mb-1 font-medium" style={{ color: '#64748B' }}>{c.label}</p>
                 <p className="text-sm font-semibold" style={{ color: c.cor }}>
                   {loading ? '...' : `R$ ${Math.abs(c.val).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                 </p>
