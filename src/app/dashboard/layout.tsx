@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -47,13 +47,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <>
-      {/* ── MOBILE ── */}
       <div className="lg:hidden flex flex-col min-h-screen" style={{ backgroundColor: '#F8FAFC' }}>
         <main className="flex-1 overflow-y-auto pb-20">
           {children}
         </main>
-
-        {/* Bottom navigation */}
         <nav className="fixed bottom-0 left-0 right-0 z-50 border-t"
           style={{ backgroundColor: '#fff', borderColor: '#E2E8F0' }}>
           <div className="grid grid-cols-4">
@@ -66,9 +63,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   style={{ color: active ? '#0B4D3B' : '#94A3B8' }}>
                   <Icon size={20} strokeWidth={active ? 2 : 1.75} />
                   <span className="text-xs font-medium">{item.label}</span>
-                  {active && (
-                    <div className="absolute bottom-0 w-8 h-0.5 rounded-full" style={{ backgroundColor: '#0B4D3B' }} />
-                  )}
                 </Link>
               )
             })}
@@ -76,13 +70,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </nav>
       </div>
 
-      {/* ── DESKTOP ── */}
       <div className="hidden lg:flex h-screen overflow-hidden" style={{ backgroundColor: '#F8FAFC' }}>
-
-        {/* Sidebar */}
         <aside className="flex flex-col flex-shrink-0 transition-all duration-300"
           style={{ width: collapsed ? '76px' : '224px', backgroundColor: '#0B4D3B' }}>
-
           <div className="flex items-center gap-3 px-5 h-16 flex-shrink-0">
             <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
               style={{ backgroundColor: 'rgba(16,185,129,0.18)', minWidth: '32px' }}>
@@ -90,7 +80,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
             {!collapsed && <span className="text-lg font-semibold text-white tracking-tight">finify</span>}
           </div>
-
           <nav className="flex-1 px-3 pt-2 flex flex-col gap-1 overflow-y-auto">
             {NAV.map(item => {
               const active = pathname === item.href
@@ -108,7 +97,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               )
             })}
           </nav>
-
           <div className="p-3 flex-shrink-0">
             {!collapsed && (
               <div className="flex items-center gap-3 px-3 py-2.5 mb-1 rounded-xl"
@@ -131,8 +119,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </button>
           </div>
         </aside>
-
-        {/* Conteúdo desktop */}
         <div className="flex-1 flex flex-col overflow-hidden">
           <div className="absolute top-6 z-10" style={{ left: collapsed ? '88px' : '236px' }}>
             <button onClick={() => setCollapsed(!collapsed)}
