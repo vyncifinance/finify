@@ -158,8 +158,8 @@ export default function MovimentosPage() {
       <div className="lg:hidden min-h-screen" style={{ backgroundColor: '#F8FAFC', paddingBottom: '100px' }}>
 
         {/* Header mobile */}
-        <div style={{ backgroundColor: '#0E3B2E', padding: '20px 20px 28px' }}>
-          <div className="flex items-center justify-between mb-4">
+        <div style={{ backgroundColor: '#0E3B2E', padding: '20px 20px 36px' }}>
+          <div className="flex items-center justify-between">
             <div>
               <h1 className="text-lg font-semibold text-white">Fluxo Patrimonial</h1>
               <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>{mesLabel}</p>
@@ -177,18 +177,22 @@ export default function MovimentosPage() {
               </button>
             </div>
           </div>
+        </div>
 
-          {/* Cards resumo mobile */}
-          <div className="grid grid-cols-3 gap-2">
+          {/* Cards resumo mobile — mesmo estilo do desktop */}
+          <div className="grid grid-cols-3 gap-3 px-4 -mt-5">
             {[
-              { label: 'Receitas', val: totalRec, cor: '#10B981', bg: '#ECFDF5' },
-              { label: 'Despesas', val: totalDes, cor: '#EF4444', bg: '#FEF2F2' },
-              { label: 'Resultado', val: resultado, cor: resultado >= 0 ? '#10B981' : '#EF4444', bg: resultado >= 0 ? '#ECFDF5' : '#FEF2F2' },
+              { label: 'Receitas',   val: totalRec,  cor: '#10B981', bg: '#ECFDF5', Icon: ArrowDownLeft },
+              { label: 'Despesas',   val: totalDes,  cor: '#EF4444', bg: '#FEF2F2', Icon: ArrowUpRight  },
+              { label: 'Resultado',  val: resultado, cor: resultado >= 0 ? '#10B981' : '#EF4444', bg: resultado >= 0 ? '#ECFDF5' : '#FEF2F2', Icon: Wallet },
             ].map(c => (
-              <div key={c.label} className="rounded-2xl p-3 text-center"
-                style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0' }}>
-                <p className="text-xs mb-1 font-medium" style={{ color: '#64748B' }}>{c.label}</p>
-                <p className="text-sm font-semibold" style={{ color: c.cor }}>
+              <div key={c.label} className="rounded-2xl p-3"
+                style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                <div className="w-8 h-8 rounded-full flex items-center justify-center mb-2" style={{ backgroundColor: c.bg }}>
+                  <c.Icon size={14} color={c.cor} strokeWidth={1.75} />
+                </div>
+                <p className="text-xs font-medium mb-1" style={{ color: '#64748B' }}>{c.label}</p>
+                <p className="text-sm font-semibold leading-tight" style={{ color: c.cor }}>
                   {loading ? '...' : `R$ ${Math.abs(c.val).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                 </p>
               </div>
