@@ -180,7 +180,7 @@ export default function MovimentosPage() {
         </div>
 
           {/* Cards resumo mobile — mesmo estilo do desktop */}
-          <div className="grid grid-cols-3 gap-3 px-4 -mt-5">
+          <div className="grid grid-cols-3 gap-3 px-4 -mt-5 mb-4">
             {[
               { label: 'Receitas',   val: totalRec,  cor: '#10B981', bg: '#ECFDF5', Icon: ArrowDownLeft },
               { label: 'Despesas',   val: totalDes,  cor: '#EF4444', bg: '#FEF2F2', Icon: ArrowUpRight  },
@@ -198,7 +198,6 @@ export default function MovimentosPage() {
               </div>
             ))}
           </div>
-        </div>
 
         {/* Filtros mobile */}
         <div className="px-4 py-3 flex gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
