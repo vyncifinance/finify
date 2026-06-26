@@ -6,7 +6,9 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import {
   ArrowDownLeft, ArrowUpRight, ChevronLeft, ChevronRight,
-  Plus, Wallet, X
+  Plus, Wallet, X, UtensilsCrossed, Home, Car, Smile,
+  Heart, BookOpen, ShoppingBag, Church, MoreHorizontal,
+  Briefcase, TrendingUp, Laptop, DollarSign
 } from 'lucide-react'
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
@@ -15,10 +17,10 @@ const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
 const CATEGORIAS_DESPESA = ['Alimentação','Moradia','Transporte','Lazer','Saúde','Educação','Compras','Dízimo','Outros']
 const CATEGORIAS_RECEITA = ['Salário','Renda Extra','Freelance','Investimento','Outros']
 
-const ICONES_CAT: Record<string, string> = {
-  'Alimentação': '🍽️', 'Moradia': '🏠', 'Transporte': '🚗', 'Lazer': '🎉',
-  'Saúde': '❤️', 'Educação': '📚', 'Compras': '🛍️', 'Dízimo': '⛪', 'Outros': '📦',
-  'Salário': '💼', 'Renda Extra': '💰', 'Freelance': '💻', 'Investimento': '📈',
+const ICONES_CAT: Record<string, any> = {
+  'Alimentação': UtensilsCrossed, 'Moradia': Home, 'Transporte': Car, 'Lazer': Smile,
+  'Saúde': Heart, 'Educação': BookOpen, 'Compras': ShoppingBag, 'Dízimo': Church, 'Outros': MoreHorizontal,
+  'Salário': Briefcase, 'Renda Extra': DollarSign, 'Freelance': Laptop, 'Investimento': TrendingUp,
 }
 
 function fmt(val: number) {
@@ -246,9 +248,9 @@ export default function MovimentosPage() {
                   {itens.map((l: any, i: number) => (
                     <div key={l.id} className="flex items-center gap-3 px-4 py-3.5"
                       style={{ borderTop: i > 0 ? '1px solid #F1F5F9' : 'none' }}>
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-lg"
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
                         style={{ backgroundColor: l.tipo === 'receita' ? '#ECFDF5' : '#FEF2F2' }}>
-                        {ICONES_CAT[l.categoria] || (l.tipo === 'receita' ? '💰' : '💸')}
+                        {(() => { const I = ICONES_CAT[l.categoria] || (l.tipo === 'receita' ? ArrowDownLeft : ArrowUpRight); return <I size={16} color={l.tipo === 'receita' ? '#10B981' : '#EF4444'} strokeWidth={1.75} /> })()}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate" style={{ color: '#0F172A' }}>{l.categoria}</p>
@@ -460,15 +462,18 @@ export default function MovimentosPage() {
 
             {/* Categoria */}
             <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: '#64748B' }}>Categoria</label>
-            <div className="grid grid-cols-3 gap-2 mb-4">
-              {categorias.map(c => (
-                <button key={c} onClick={() => setCategoria(c)}
-                  className="py-3 rounded-xl text-xs font-medium border transition-all flex flex-col items-center gap-1"
-                  style={{ borderColor: categoria === c ? '#0E3B2E' : '#E2E8F0', backgroundColor: categoria === c ? '#F0FDF4' : '#fff', color: categoria === c ? '#0E3B2E' : '#64748B' }}>
-                  <span className="text-xl">{ICONES_CAT[c] || '📦'}</span>
-                  <span>{c}</span>
-                </button>
-              ))}
+              <div className="grid grid-cols-3 gap-2 mb-4">
+              {categorias.map(c => {
+                const Icon = ICONES_CAT[c] || MoreHorizontal
+                return (
+                  <button key={c} onClick={() => setCategoria(c)}
+                    className="py-3 rounded-xl text-xs font-medium border transition-all flex flex-col items-center gap-1.5"
+                    style={{ borderColor: categoria === c ? '#0E3B2E' : '#E2E8F0', backgroundColor: categoria === c ? '#F0FDF4' : '#fff', color: categoria === c ? '#0E3B2E' : '#64748B' }}>
+                    <Icon size={16} strokeWidth={1.75} color={categoria === c ? '#0E3B2E' : '#94A3B8'} />
+                    <span>{c}</span>
+                  </button>
+                )
+              })}
             </div>
 
             {/* Data */}
