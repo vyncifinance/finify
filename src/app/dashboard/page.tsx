@@ -159,7 +159,7 @@ export default function DashboardPage() {
       <div className="lg:hidden min-h-screen" style={{ backgroundColor: '#F8FAFC', paddingBottom: '32px' }}>
 
         {/* Hero mobile */}
-        <div style={{ background: 'linear-gradient(135deg, #0B4D3B 0%, #0F766E 100%)', padding: '24px 20px 32px' }}>
+        <div style={{ background: 'linear-gradient(135deg, #0B4D3B 0%, #0F766E 100%)', padding: '24px 20px 48px' }}>
           <div className="flex items-center justify-between mb-6">
             <div>
               <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'rgba(255,255,255,0.5)' }}>
@@ -185,12 +185,17 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* KPIs mobile */}
-          <div className="grid grid-cols-3 gap-2">
+          {/* KPIs mobile — mesmos cards brancos do desktop */}
+          <div className="grid grid-cols-3 gap-2 px-4 -mb-6">
             {kpis.map(c => (
-              <div key={c.label} className="rounded-2xl p-3" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
-                <p className="text-xs mb-1" style={{ color: 'rgba(255,255,255,0.45)' }}>{c.label}</p>
-                <p className="text-sm font-semibold" style={{ color: c.label === 'Despesas' ? '#FCA5A5' : '#6EE7B7' }}>
+              <div key={c.label} className="rounded-2xl p-3"
+                style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+                <div className="w-8 h-8 rounded-full flex items-center justify-center mb-2"
+                  style={{ backgroundColor: c.bg }}>
+                  <c.Icon size={14} color={c.cor} strokeWidth={1.75} />
+                </div>
+                <p className="text-xs font-medium mb-1" style={{ color: '#64748B' }}>{c.label}</p>
+                <p className="text-sm font-semibold leading-tight" style={{ color: c.cor }}>
                   {loading ? '...' : fmtShort(c.val)}
                 </p>
               </div>
@@ -198,7 +203,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="px-4 -mt-4 flex flex-col gap-4">
+        <div className="px-4 mt-10 flex flex-col gap-4">
 
           {/* Card dízimo mobile */}
           {dizimoAtivo && (
