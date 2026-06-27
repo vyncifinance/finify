@@ -1,7 +1,6 @@
 ﻿'use client'
 
 export const dynamic = 'force-dynamic'
-export const revalidate = 0
 
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
@@ -599,4 +598,5 @@ export default function MovimentosPage() {
     </>
   )
 }
+
 
