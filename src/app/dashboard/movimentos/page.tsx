@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,9 +40,11 @@ function formatDiaLabel(dataStr: string) {
 }
 
 export default function MovimentosPage() {
+  const router = useRouter()
+  const familiaIdRef = useRef('')
+
   const [loading, setLoading]           = useState(true)
   const [familiaId, setFamiliaId]       = useState('')
-  const familiaIdRef = useRef('')
   const [familiaNome, setFamiliaNome]   = useState('')
   const [userId, setUserId]             = useState('')
   const [membroAtual, setMembroAtual]   = useState('')
@@ -53,33 +55,35 @@ export default function MovimentosPage() {
   const [membros, setMembros]           = useState<string[]>([])
   const [membrosFamilia, setMembrosFamilia] = useState<string[]>([])
 
-  // Modal novo/editar
-  const [modalOpen, setModalOpen]     = useState(false)
-  const [editando, setEditando]       = useState<any>(null) // null = novo, objeto = editar
-  const [tipo, setTipo]               = useState<'despesa'|'receita'>('despesa')
-  const [valor, setValor]             = useState('')
-  const [categoria, setCategoria]     = useState('Alimentação')
-  const [membroForm, setMembroForm]   = useState('')
-  const [data, setData]               = useState(new Date().toISOString().split('T')[0])
-  const [dizimar, setDizimar]         = useState(true)
-  const [salvando, setSalvando]       = useState(false)
-  const [deletando, setDeletando]     = useState(false)
+  const [modalOpen, setModalOpen]         = useState(false)
+  const [editando, setEditando]           = useState<any>(null)
+  const [tipo, setTipo]                   = useState<'despesa'|'receita'>('despesa')
+  const [valor, setValor]                 = useState('')
+  const [categoria, setCategoria]         = useState('Alimentação')
+  const [membroForm, setMembroForm]       = useState('')
+  const [data, setData]                   = useState(new Date().toISOString().split('T')[0])
+  const [dizimar, setDizimar]             = useState(true)
+  const [salvando, setSalvando]           = useState(false)
+  const [deletando, setDeletando]         = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
-  const router = useRouter()
   const supabase = createClient()
 
-  useEffect(() => { init() }, [mesRef.getMonth(), mesRef.getFullYear()])
+  useEffect(() => { init() }, [])
   useEffect(() => {
-    const handler = () => { if (!document.hidden && familiaIdRef.current) carregarLancamentos(familiaIdRef.current) }
+    if (familiaIdRef.current) carregarLancamentos(familiaIdRef.current)
+  }, [mesRef])
+
+  // Recarrega quando volta para a tela
+  useEffect(() => {
+    const handler = () => {
+      if (!document.hidden && familiaIdRef.current) {
+        carregarLancamentos(familiaIdRef.current)
+      }
+    }
     document.addEventListener('visibilitychange', handler)
     return () => document.removeEventListener('visibilitychange', handler)
   }, [])
-  useEffect(() => {
-    const handler = () => { if (familiaId) carregarLancamentos(familiaId) }
-    window.addEventListener('focus', handler)
-    return () => window.removeEventListener('focus', handler)
-  }, [familiaId])
 
   async function init() {
     setLoading(true)
@@ -90,15 +94,16 @@ export default function MovimentosPage() {
       .from('profiles').select('nome, familia_id, familias(nome)')
       .eq('id', session.user.id).single()
     if (profile) {
+      const fid = profile.familia_id
       setMembroAtual(profile.nome || '')
-      setFamiliaId(profile.familia_id)
-      familiaIdRef.current = profile.familia_id
+      setFamiliaId(fid)
+      familiaIdRef.current = fid
       setFamiliaNome((profile.familias as any)?.nome || '')
       setMembroForm(profile.nome || '')
       const { data: membrosData } = await supabase
-        .from('profiles').select('nome').eq('familia_id', profile.familia_id)
+        .from('profiles').select('nome').eq('familia_id', fid)
       if (membrosData) setMembrosFamilia(membrosData.map((m: any) => m.nome).filter(Boolean))
-      await carregarLancamentos(profile.familia_id, profile.nome, (profile.familias as any)?.nome)
+      await carregarLancamentos(fid, profile.nome, (profile.familias as any)?.nome)
     }
     setLoading(false)
   }
@@ -135,7 +140,6 @@ export default function MovimentosPage() {
   function abrirModalEditar(l: any) {
     setEditando(l)
     setTipo(l.tipo)
-    // Formata o valor existente com máscara
     const valorFormatado = Number(l.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     setValor(valorFormatado)
     setCategoria(l.categoria)
@@ -155,30 +159,33 @@ export default function MovimentosPage() {
   async function handleSalvar() {
     if (!valor) return
     setSalvando(true)
-    // Converte valor formatado (ex: "1.234,56") para número
     const valorNum = parseFloat(valor.replace(/\./g, '').replace(',', '.'))
     if (isNaN(valorNum) || valorNum <= 0) { setSalvando(false); return }
-
     const agora = new Date()
     const hora  = `${String(agora.getHours()).padStart(2,'0')}:${String(agora.getMinutes()).padStart(2,'0')}`
+    const fid   = familiaIdRef.current
 
     if (editando) {
       const { error } = await supabase.from('lancamentos').update({
-        tipo, valor: valorNum,
-        categoria, membro: membroForm, data,
+        tipo, valor: valorNum, categoria, membro: membroForm, data,
         dizimar: tipo === 'receita' ? dizimar : false,
       }).eq('id', editando.id)
       setSalvando(false)
-      if (!error) { setModalOpen(false); await carregarLancamentos(familiaId); router.refresh() }
+      if (!error) {
+        setModalOpen(false)
+        await carregarLancamentos(fid)
+      }
     } else {
       const { error } = await supabase.from('lancamentos').insert({
-        familia_id: familiaId, user_id: userId, tipo,
-        valor: valorNum,
+        familia_id: fid, user_id: userId, tipo, valor: valorNum,
         categoria, membro: membroForm, data, hora,
         dizimar: tipo === 'receita' ? dizimar : false,
       })
       setSalvando(false)
-      if (!error) { setModalOpen(false); await carregarLancamentos(familiaId); router.refresh() }
+      if (!error) {
+        setModalOpen(false)
+        await carregarLancamentos(fid)
+      }
     }
   }
 
@@ -188,7 +195,11 @@ export default function MovimentosPage() {
     setDeletando(true)
     const { error } = await supabase.from('lancamentos').delete().eq('id', editando.id)
     setDeletando(false)
-    if (!error) { const fid = familiaId || editando.familia_id; setModalOpen(false); setLancamentos(prev => prev.filter(l => l.id !== editando.id)) }
+    if (!error) {
+      // Remove da lista imediatamente
+      setLancamentos(prev => prev.filter((l: any) => l.id !== editando.id))
+      setModalOpen(false)
+    }
   }
 
   const filtrados = lancamentos.filter(l => {
@@ -210,19 +221,16 @@ export default function MovimentosPage() {
   const mesLabel  = `${MESES[mesRef.getMonth()]} ${mesRef.getFullYear()}`
   const categorias = tipo === 'despesa' ? CATEGORIAS_DESPESA : CATEGORIAS_RECEITA
 
-  // Modal compartilhado
   const ModalLancamento = () => !modalOpen ? null : (
     <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center"
       style={{ backgroundColor: 'rgba(15,23,42,0.5)' }}
-      onTouchMove={e => e.stopPropagation()}
       onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}>
-      <div className="w-full lg:max-w-md rounded-t-[28px] lg:rounded-[20px] overflow-hidden flex flex-col"
-        style={{ backgroundColor: '#fff', maxHeight: '75vh', display: 'flex', flexDirection: 'column' }}>
+      <div className="w-full lg:max-w-md rounded-t-[28px] lg:rounded-[20px] flex flex-col"
+        style={{ backgroundColor: '#fff', maxHeight: '80vh' }}>
 
-        {/* Drag handle */}
         <div className="w-10 h-1 rounded-full mx-auto mt-3 mb-1 lg:hidden flex-shrink-0" style={{ backgroundColor: '#E2E8F0' }} />
 
-        {/* Header do modal */}
+        {/* Header fixo */}
         <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0" style={{ borderColor: '#F1F5F9' }}>
           <h2 className="font-semibold text-lg" style={{ color: '#0F172A' }}>
             {editando ? 'Editar lançamento' : 'Novo lançamento'}
@@ -231,10 +239,7 @@ export default function MovimentosPage() {
             {editando && (
               <button onClick={handleDeletar} disabled={deletando}
                 className="flex items-center gap-1.5 px-3 h-8 rounded-lg text-xs font-semibold transition-all"
-                style={{
-                  backgroundColor: confirmDelete ? '#EF4444' : '#FEF2F2',
-                  color: confirmDelete ? '#fff' : '#DC2626',
-                }}>
+                style={{ backgroundColor: confirmDelete ? '#EF4444' : '#FEF2F2', color: confirmDelete ? '#fff' : '#DC2626' }}>
                 <Trash2 size={13} strokeWidth={2} />
                 {deletando ? 'Deletando...' : confirmDelete ? 'Confirmar' : 'Deletar'}
               </button>
@@ -245,79 +250,69 @@ export default function MovimentosPage() {
           </div>
         </div>
 
-        {/* Conteúdo scrollável — sem o botão */}
-        <div className="overflow-y-auto px-6 pt-4 flex-1"
-          onTouchMove={e => e.stopPropagation()}
-          style={{ overscrollBehavior: 'contain' }}>
+        {/* Conteúdo com scroll */}
+        <div className="overflow-y-auto flex-1 px-6 pt-4 pb-2">
 
-          {/* Tipo */}
-          <div className="flex gap-2 mb-5">
+          <div className="flex gap-2 mb-4">
             {[{ key: 'despesa', label: 'Despesa', cor: '#EF4444' }, { key: 'receita', label: 'Receita', cor: '#10B981' }].map(t => (
               <button key={t.key} onClick={() => handleTipo(t.key as any)}
-                className="flex-1 py-3.5 rounded-xl text-sm font-semibold border-2 transition-all"
+                className="flex-1 py-3 rounded-xl text-sm font-semibold border-2 transition-all"
                 style={{ borderColor: tipo === t.key ? t.cor : '#E2E8F0', backgroundColor: tipo === t.key ? t.cor + '12' : '#fff', color: tipo === t.key ? t.cor : '#64748B' }}>
                 {t.label}
               </button>
             ))}
           </div>
 
-          {/* Valor com máscara */}
-          <div className="rounded-2xl p-4 mb-5 text-center" style={{ backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
-            <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#94A3B8' }}>Valor</p>
+          <div className="rounded-2xl p-3 mb-4 text-center" style={{ backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+            <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: '#94A3B8' }}>Valor</p>
             <input
               type="text" inputMode="numeric" value={valor}
               onChange={e => {
-                // Remove tudo que não é dígito
                 const digits = e.target.value.replace(/\D/g, '')
-                // Converte para formato R$ 0,00
                 const num = parseInt(digits || '0', 10)
                 const formatted = (num / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                 setValor(digits === '' ? '' : formatted)
               }}
-              placeholder="R$ 0,00"
+              placeholder="0,00"
               autoFocus={!editando}
-              className="w-full text-center text-4xl font-bold outline-none bg-transparent"
+              className="w-full text-center text-3xl font-bold outline-none bg-transparent"
               style={{ color: tipo === 'despesa' ? '#EF4444' : '#10B981' }}
             />
           </div>
 
-          {/* Quem está lançando */}
           <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: '#64748B' }}>Quem está lançando</label>
           <div className="grid grid-cols-2 gap-2 mb-4">
             {(membrosFamilia.length ? membrosFamilia : [membroAtual]).map(m => (
               <button key={m} onClick={() => setMembroForm(m)}
-                className="py-2.5 rounded-xl text-sm font-medium border transition-all truncate"
+                className="py-2 rounded-xl text-sm font-medium border transition-all truncate"
                 style={{ borderColor: membroForm === m ? '#0E3B2E' : '#E2E8F0', backgroundColor: membroForm === m ? '#F0FDF4' : '#fff', color: membroForm === m ? '#0E3B2E' : '#64748B' }}>
                 {m.split(' ')[0]}
               </button>
             ))}
           </div>
 
-          {/* Categoria */}
           <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: '#64748B' }}>Categoria</label>
           <div className="grid grid-cols-3 gap-2 mb-4">
             {categorias.map(c => {
               const Icon = ICONES_CAT[c] || MoreHorizontal
               return (
                 <button key={c} onClick={() => setCategoria(c)}
-                  className="py-3 rounded-xl text-xs font-medium border transition-all flex flex-col items-center gap-1.5"
+                  className="py-2.5 rounded-xl text-xs font-medium border transition-all flex flex-col items-center gap-1"
                   style={{ borderColor: categoria === c ? '#0E3B2E' : '#E2E8F0', backgroundColor: categoria === c ? '#F0FDF4' : '#fff', color: categoria === c ? '#0E3B2E' : '#64748B' }}>
-                  <Icon size={16} strokeWidth={1.75} color={categoria === c ? '#0E3B2E' : '#94A3B8'} />
+                  <Icon size={15} strokeWidth={1.75} color={categoria === c ? '#0E3B2E' : '#94A3B8'} />
                   <span>{c}</span>
                 </button>
               )
             })}
           </div>
 
-          {/* Data */}
           <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: '#64748B' }}>Data</label>
           <input type="date" value={data} onChange={e => setData(e.target.value)}
-            className="w-full px-4 h-12 rounded-xl border text-sm mb-4 outline-none"
+            className="w-full px-4 h-11 rounded-xl border text-sm mb-4 outline-none"
             style={{ borderColor: '#E2E8F0', color: '#0F172A' }} />
 
-          {/* Toggle dízimo */}
           {tipo === 'receita' && (
-            <div className="flex items-center justify-between p-4 rounded-xl mb-4"
+            <div className="flex items-center justify-between p-3 rounded-xl mb-4"
               style={{ backgroundColor: dizimar ? '#F0FDF4' : '#F8FAFC', border: `1px solid ${dizimar ? '#D1FAE5' : '#E2E8F0'}` }}>
               <div>
                 <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>Contabilizar dízimo?</p>
@@ -335,16 +330,16 @@ export default function MovimentosPage() {
           )}
 
           {confirmDelete && (
-            <p className="text-xs text-center mt-3 mb-2" style={{ color: '#EF4444' }}>
-              Toque em "Confirmar" novamente para deletar permanentemente.
+            <p className="text-xs text-center mb-2" style={{ color: '#EF4444' }}>
+              Toque em "Confirmar" para deletar permanentemente.
             </p>
           )}
         </div>
 
-        {/* Botão fixo no rodapé — sempre visível */}
-        <div className="px-6 py-4 border-t" style={{ borderColor: '#F1F5F9', backgroundColor: '#fff' }}>
+        {/* Botão sempre visível no rodapé */}
+        <div className="px-6 py-4 border-t flex-shrink-0" style={{ borderColor: '#F1F5F9', backgroundColor: '#fff' }}>
           <button onClick={handleSalvar} disabled={salvando || !valor}
-            className="w-full h-14 rounded-xl text-white font-semibold text-base transition-opacity"
+            className="w-full h-12 rounded-xl text-white font-semibold text-base transition-opacity"
             style={{ backgroundColor: '#0E3B2E', opacity: (salvando || !valor) ? 0.6 : 1 }}>
             {salvando ? 'Salvando...' : editando ? 'Salvar alterações' : 'Registrar lançamento'}
           </button>
@@ -358,7 +353,6 @@ export default function MovimentosPage() {
       {/* ── MOBILE ── */}
       <div className="lg:hidden min-h-screen" style={{ backgroundColor: '#F8FAFC', paddingBottom: '100px' }}>
 
-        {/* Header mobile */}
         <div style={{ backgroundColor: '#0E3B2E', padding: '20px 20px 36px' }}>
           <div className="flex items-center justify-between">
             <div>
@@ -380,7 +374,6 @@ export default function MovimentosPage() {
           </div>
         </div>
 
-        {/* Cards resumo mobile */}
         <div className="grid grid-cols-3 gap-2 px-4 -mt-5 mb-4">
           {[
             { label: 'Receitas',  val: totalRec,  cor: '#10B981', bg: '#ECFDF5', Icon: ArrowDownLeft },
@@ -400,7 +393,6 @@ export default function MovimentosPage() {
           ))}
         </div>
 
-        {/* Filtros mobile */}
         <div className="px-4 py-2 flex gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
           {[{ key: 'todos', label: 'Todos' }, { key: 'receita', label: 'Receitas' }, { key: 'despesa', label: 'Despesas' }].map(f => (
             <button key={f.key} onClick={() => setFiltro(f.key as any)}
@@ -418,7 +410,6 @@ export default function MovimentosPage() {
           ))}
         </div>
 
-        {/* Lista mobile */}
         <div className="px-4 mt-2">
           {loading ? (
             <p className="text-center py-16 text-sm" style={{ color: '#94A3B8' }}>Carregando...</p>
@@ -445,7 +436,7 @@ export default function MovimentosPage() {
                     const Icon = ICONES_CAT[l.categoria] || (l.tipo === 'receita' ? ArrowDownLeft : ArrowUpRight)
                     return (
                       <button key={l.id} onClick={() => abrirModalEditar(l)}
-                        className="w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-gray-50 active:bg-gray-100"
+                        className="w-full flex items-center gap-3 px-4 py-3.5 text-left active:bg-gray-50"
                         style={{ borderTop: i > 0 ? '1px solid #F1F5F9' : 'none' }}>
                         <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
                           style={{ backgroundColor: l.tipo === 'receita' ? '#ECFDF5' : '#FEF2F2' }}>
@@ -468,7 +459,6 @@ export default function MovimentosPage() {
           })}
         </div>
 
-        {/* Botão flutuante mobile */}
         <button onClick={abrirModalNovo}
           className="fixed right-6 w-14 h-14 rounded-full flex items-center justify-center text-white z-40"
           style={{ bottom: '80px', backgroundColor: '#0E3B2E', boxShadow: '0 8px 24px rgba(14,59,46,0.4)' }}>
@@ -484,7 +474,7 @@ export default function MovimentosPage() {
               Fluxo Patrimonial
             </h1>
             <p className="text-sm mt-1" style={{ color: '#64748B' }}>
-              Acompanhe receitas e despesas da família{familiaNome ? ` ${familiaNome}` : ''}
+              Acompanhe receitas e despesas{familiaNome ? ` da família ${familiaNome}` : ''}
             </p>
           </div>
           <button onClick={abrirModalNovo}
@@ -495,14 +485,12 @@ export default function MovimentosPage() {
         </div>
 
         <div className="flex items-center justify-center gap-4 mb-6">
-          <button onClick={() => mudarMes(-1)}
-            className="w-9 h-9 rounded-full flex items-center justify-center border"
+          <button onClick={() => mudarMes(-1)} className="w-9 h-9 rounded-full flex items-center justify-center border"
             style={{ borderColor: '#E2E8F0', color: '#64748B' }}>
             <ChevronLeft size={16} strokeWidth={2} />
           </button>
           <span className="text-sm font-semibold min-w-[140px] text-center" style={{ color: '#0F172A' }}>{mesLabel}</span>
-          <button onClick={() => mudarMes(1)}
-            className="w-9 h-9 rounded-full flex items-center justify-center border"
+          <button onClick={() => mudarMes(1)} className="w-9 h-9 rounded-full flex items-center justify-center border"
             style={{ borderColor: '#E2E8F0', color: '#64748B' }}>
             <ChevronRight size={16} strokeWidth={2} />
           </button>
@@ -610,17 +598,3 @@ export default function MovimentosPage() {
     </>
   )
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
