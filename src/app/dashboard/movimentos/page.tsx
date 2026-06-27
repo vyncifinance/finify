@@ -174,11 +174,7 @@ export default function MovimentosPage() {
     setDeletando(true)
     const { error } = await supabase.from('lancamentos').delete().eq('id', editando.id)
     setDeletando(false)
-    if (!error) {
-      setModalOpen(false)
-      const fid = familiaId || editando.familia_id
-      await carregarLancamentos(fid)
-    }
+    if (!error) { const fid = familiaId || editando.familia_id; setModalOpen(false); setLancamentos(prev => prev.filter(l => l.id !== editando.id)) }
   }
 
   const filtrados = lancamentos.filter(l => {
@@ -207,7 +203,7 @@ export default function MovimentosPage() {
       onTouchMove={e => e.stopPropagation()}
       onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}>
       <div className="w-full lg:max-w-md rounded-t-[28px] lg:rounded-[20px] overflow-hidden flex flex-col"
-        style={{ backgroundColor: '#fff', maxHeight: '92vh' }}>
+        style={{ backgroundColor: '#fff', maxHeight: '75vh' }}>
 
         {/* Drag handle */}
         <div className="w-10 h-1 rounded-full mx-auto mt-3 mb-1 lg:hidden flex-shrink-0" style={{ backgroundColor: '#E2E8F0' }} />
@@ -600,4 +596,8 @@ export default function MovimentosPage() {
     </>
   )
 }
+
+
+
+
 
