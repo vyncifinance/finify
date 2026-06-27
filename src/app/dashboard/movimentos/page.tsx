@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import {
@@ -42,6 +42,7 @@ function formatDiaLabel(dataStr: string) {
 export default function MovimentosPage() {
   const [loading, setLoading]           = useState(true)
   const [familiaId, setFamiliaId]       = useState('')
+  const familiaIdRef = useRef('')
   const [familiaNome, setFamiliaNome]   = useState('')
   const [userId, setUserId]             = useState('')
   const [membroAtual, setMembroAtual]   = useState('')
@@ -70,7 +71,7 @@ export default function MovimentosPage() {
 
   useEffect(() => { init() }, [mesRef.getMonth(), mesRef.getFullYear()])
   useEffect(() => {
-    const handler = () => { if (!document.hidden && familiaId) carregarLancamentos(familiaId) }
+    const handler = () => { if (!document.hidden && familiaIdRef.current) carregarLancamentos(familiaIdRef.current) }
     document.addEventListener('visibilitychange', handler)
     return () => document.removeEventListener('visibilitychange', handler)
   }, [])
@@ -91,6 +92,7 @@ export default function MovimentosPage() {
     if (profile) {
       setMembroAtual(profile.nome || '')
       setFamiliaId(profile.familia_id)
+      familiaIdRef.current = profile.familia_id
       setFamiliaNome((profile.familias as any)?.nome || '')
       setMembroForm(profile.nome || '')
       const { data: membrosData } = await supabase
@@ -608,6 +610,7 @@ export default function MovimentosPage() {
     </>
   )
 }
+
 
 
 
