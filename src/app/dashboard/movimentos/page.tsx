@@ -174,7 +174,11 @@ export default function MovimentosPage() {
     setDeletando(true)
     const { error } = await supabase.from('lancamentos').delete().eq('id', editando.id)
     setDeletando(false)
-    if (!error) { setModalOpen(false); await carregarLancamentos(familiaId) }
+    if (!error) {
+      setModalOpen(false)
+      const fid = familiaId || editando.familia_id
+      await carregarLancamentos(fid)
+    }
   }
 
   const filtrados = lancamentos.filter(l => {
@@ -200,15 +204,16 @@ export default function MovimentosPage() {
   const ModalLancamento = () => !modalOpen ? null : (
     <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center"
       style={{ backgroundColor: 'rgba(15,23,42,0.5)' }}
+      onTouchMove={e => e.stopPropagation()}
       onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}>
-      <div className="w-full lg:max-w-md rounded-t-[28px] lg:rounded-[20px] overflow-hidden"
+      <div className="w-full lg:max-w-md rounded-t-[28px] lg:rounded-[20px] overflow-hidden flex flex-col"
         style={{ backgroundColor: '#fff', maxHeight: '92vh' }}>
 
         {/* Drag handle */}
-        <div className="w-10 h-1 rounded-full mx-auto mt-3 mb-1 lg:hidden" style={{ backgroundColor: '#E2E8F0' }} />
+        <div className="w-10 h-1 rounded-full mx-auto mt-3 mb-1 lg:hidden flex-shrink-0" style={{ backgroundColor: '#E2E8F0' }} />
 
         {/* Header do modal */}
-        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: '#F1F5F9' }}>
+        <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0" style={{ borderColor: '#F1F5F9' }}>
           <h2 className="font-semibold text-lg" style={{ color: '#0F172A' }}>
             {editando ? 'Editar lançamento' : 'Novo lançamento'}
           </h2>
@@ -231,7 +236,9 @@ export default function MovimentosPage() {
         </div>
 
         {/* Conteúdo scrollável — sem o botão */}
-        <div className="overflow-y-auto px-6 pt-4" style={{ maxHeight: 'calc(92vh - 160px)' }}>
+        <div className="overflow-y-auto px-6 pt-4 flex-1"
+          onTouchMove={e => e.stopPropagation()}
+          style={{ overscrollBehavior: 'contain' }}>
 
           {/* Tipo */}
           <div className="flex gap-2 mb-5">
