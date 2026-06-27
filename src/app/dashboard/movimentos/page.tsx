@@ -121,7 +121,9 @@ export default function MovimentosPage() {
   function abrirModalEditar(l: any) {
     setEditando(l)
     setTipo(l.tipo)
-    setValor(String(l.valor))
+    // Formata o valor existente com máscara
+    const valorFormatado = Number(l.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    setValor(valorFormatado)
     setCategoria(l.categoria)
     setData(l.data)
     setMembroForm(l.membro)
@@ -139,23 +141,25 @@ export default function MovimentosPage() {
   async function handleSalvar() {
     if (!valor) return
     setSalvando(true)
+    // Converte valor formatado (ex: "1.234,56") para número
+    const valorNum = parseFloat(valor.replace(/\./g, '').replace(',', '.'))
+    if (isNaN(valorNum) || valorNum <= 0) { setSalvando(false); return }
+
     const agora = new Date()
     const hora  = `${String(agora.getHours()).padStart(2,'0')}:${String(agora.getMinutes()).padStart(2,'0')}`
 
     if (editando) {
-      // Editar existente
       const { error } = await supabase.from('lancamentos').update({
-        tipo, valor: parseFloat(valor.replace(',', '.')),
+        tipo, valor: valorNum,
         categoria, membro: membroForm, data,
         dizimar: tipo === 'receita' ? dizimar : false,
       }).eq('id', editando.id)
       setSalvando(false)
       if (!error) { setModalOpen(false); await carregarLancamentos(familiaId) }
     } else {
-      // Novo lançamento
       const { error } = await supabase.from('lancamentos').insert({
         familia_id: familiaId, user_id: userId, tipo,
-        valor: parseFloat(valor.replace(',', '.')),
+        valor: valorNum,
         categoria, membro: membroForm, data, hora,
         dizimar: tipo === 'receita' ? dizimar : false,
       })
@@ -226,8 +230,8 @@ export default function MovimentosPage() {
           </div>
         </div>
 
-        {/* Conteúdo scrollável */}
-        <div className="overflow-y-auto p-6" style={{ maxHeight: 'calc(92vh - 80px)', paddingBottom: '32px' }}>
+        {/* Conteúdo scrollável — sem o botão */}
+        <div className="overflow-y-auto px-6 pt-4" style={{ maxHeight: 'calc(92vh - 160px)' }}>
 
           {/* Tipo */}
           <div className="flex gap-2 mb-5">
@@ -240,12 +244,20 @@ export default function MovimentosPage() {
             ))}
           </div>
 
-          {/* Valor */}
+          {/* Valor com máscara */}
           <div className="rounded-2xl p-4 mb-5 text-center" style={{ backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
-            <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#94A3B8' }}>Valor (R$)</p>
+            <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#94A3B8' }}>Valor</p>
             <input
-              type="number" inputMode="decimal" value={valor}
-              onChange={e => setValor(e.target.value)} placeholder="0,00"
+              type="text" inputMode="numeric" value={valor}
+              onChange={e => {
+                // Remove tudo que não é dígito
+                const digits = e.target.value.replace(/\D/g, '')
+                // Converte para formato R$ 0,00
+                const num = parseInt(digits || '0', 10)
+                const formatted = (num / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                setValor(digits === '' ? '' : formatted)
+              }}
+              placeholder="R$ 0,00"
               autoFocus={!editando}
               className="w-full text-center text-4xl font-bold outline-none bg-transparent"
               style={{ color: tipo === 'despesa' ? '#EF4444' : '#10B981' }}
@@ -305,18 +317,20 @@ export default function MovimentosPage() {
             </div>
           )}
 
-          {/* Botão salvar */}
+          {confirmDelete && (
+            <p className="text-xs text-center mt-3 mb-2" style={{ color: '#EF4444' }}>
+              Toque em "Confirmar" novamente para deletar permanentemente.
+            </p>
+          )}
+        </div>
+
+        {/* Botão fixo no rodapé — sempre visível */}
+        <div className="px-6 py-4 border-t" style={{ borderColor: '#F1F5F9', backgroundColor: '#fff' }}>
           <button onClick={handleSalvar} disabled={salvando || !valor}
             className="w-full h-14 rounded-xl text-white font-semibold text-base transition-opacity"
             style={{ backgroundColor: '#0E3B2E', opacity: (salvando || !valor) ? 0.6 : 1 }}>
             {salvando ? 'Salvando...' : editando ? 'Salvar alterações' : 'Registrar lançamento'}
           </button>
-
-          {confirmDelete && (
-            <p className="text-xs text-center mt-3" style={{ color: '#EF4444' }}>
-              Toque em "Confirmar" novamente para deletar permanentemente.
-            </p>
-          )}
         </div>
       </div>
     </div>
