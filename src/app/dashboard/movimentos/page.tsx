@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 import {
   ArrowDownLeft, ArrowUpRight, ChevronLeft, ChevronRight,
@@ -64,9 +64,15 @@ export default function MovimentosPage() {
   const [deletando, setDeletando]     = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
+  const router = useRouter()
   const supabase = createClient()
 
-  useEffect(() => { init() }, [mesRef])
+  useEffect(() => { init() }, [mesRef.getMonth(), mesRef.getFullYear()])
+  useEffect(() => {
+    const handler = () => { if (familiaId) carregarLancamentos(familiaId) }
+    window.addEventListener('focus', handler)
+    return () => window.removeEventListener('focus', handler)
+  }, [familiaId])
 
   async function init() {
     setLoading(true)
@@ -155,7 +161,7 @@ export default function MovimentosPage() {
         dizimar: tipo === 'receita' ? dizimar : false,
       }).eq('id', editando.id)
       setSalvando(false)
-      if (!error) { setModalOpen(false); await carregarLancamentos(familiaId) }
+      if (!error) { setModalOpen(false); await carregarLancamentos(familiaId); router.refresh() }
     } else {
       const { error } = await supabase.from('lancamentos').insert({
         familia_id: familiaId, user_id: userId, tipo,
@@ -164,7 +170,7 @@ export default function MovimentosPage() {
         dizimar: tipo === 'receita' ? dizimar : false,
       })
       setSalvando(false)
-      if (!error) { setModalOpen(false); await carregarLancamentos(familiaId) }
+      if (!error) { setModalOpen(false); await carregarLancamentos(familiaId); router.refresh() }
     }
   }
 
@@ -203,7 +209,7 @@ export default function MovimentosPage() {
       onTouchMove={e => e.stopPropagation()}
       onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}>
       <div className="w-full lg:max-w-md rounded-t-[28px] lg:rounded-[20px] overflow-hidden flex flex-col"
-        style={{ backgroundColor: '#fff', maxHeight: '75vh' }}>
+        style={{ backgroundColor: '#fff', maxHeight: '75vh', display: 'flex', flexDirection: 'column' }}>
 
         {/* Drag handle */}
         <div className="w-10 h-1 rounded-full mx-auto mt-3 mb-1 lg:hidden flex-shrink-0" style={{ backgroundColor: '#E2E8F0' }} />
@@ -596,6 +602,11 @@ export default function MovimentosPage() {
     </>
   )
 }
+
+
+
+
+
 
 
 
