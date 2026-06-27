@@ -70,7 +70,7 @@ export default function MovimentosPage() {
 
   useEffect(() => { init() }, [mesRef.getMonth(), mesRef.getFullYear()])
   useEffect(() => {
-    const handler = () => { if (!document.hidden) init() }
+    const handler = () => { if (!document.hidden && familiaId) carregarLancamentos(familiaId) }
     document.addEventListener('visibilitychange', handler)
     return () => document.removeEventListener('visibilitychange', handler)
   }, [])
@@ -608,6 +608,7 @@ export default function MovimentosPage() {
     </>
   )
 }
+
 
 
 
