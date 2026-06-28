@@ -189,7 +189,9 @@ export default function MovimentosPage() {
     if (!editando) return
     if (!confirmDelete) { setConfirmDelete(true); return }
     setDeletando(true)
+    console.log('DELETANDO ID:', editando.id)
     const { error } = await supabase.from('lancamentos').delete().eq('id', editando.id)
+    console.log('ERRO DELETE:', error)
     setDeletando(false)
     if (!error) {
       setLancamentos(prev => prev.filter((l: any) => l.id !== editando.id))
@@ -554,6 +556,7 @@ export default function MovimentosPage() {
     </>
   )
 }
+
 
 
 
