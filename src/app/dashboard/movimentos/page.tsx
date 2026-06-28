@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 export const dynamic = 'force-dynamic'
 
@@ -186,7 +186,6 @@ export default function MovimentosPage() {
     if (!error) {
       setLancamentos(prev => prev.filter((l: any) => l.id !== editando.id))
       setModalOpen(false)
-      router.refresh()
     }
   }
 
@@ -512,24 +511,20 @@ export default function MovimentosPage() {
                 })}
               </div>
 
-              {/* Data */}
-              <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Data</p>
-              <input type="date" value={dataLanc} onChange={e => setDataLanc(e.target.value)}
-                style={{ width: '100%', padding: '9px 14px', borderRadius: '12px', border: '1px solid #E2E8F0', fontSize: '14px', color: '#0F172A', outline: 'none', marginBottom: '10px', boxSizing: 'border-box' }} />
-
-              {/* Dízimo */}
-              {tipo === 'receita' && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderRadius: '12px', marginBottom: '10px', backgroundColor: dizimar ? '#F0FDF4' : '#F8FAFC', border: `1px solid ${dizimar ? '#D1FAE5' : '#E2E8F0'}` }}>
-                  <div>
-                    <p style={{ fontSize: '14px', fontWeight: 600, color: '#0F172A' }}>Contabilizar dízimo?</p>
-                    <p style={{ fontSize: '12px', color: '#94A3B8', marginTop: '2px' }}>{dizimar ? '10% será contabilizado' : 'Devolução ou transferência'}</p>
-                  </div>
+              {/* Data + Dízimo em linha */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', alignItems: 'center' }}>
+                <input type="date" value={dataLanc} onChange={e => setDataLanc(e.target.value)}
+                  style={{ flex: 1, padding: '9px 14px', borderRadius: '12px', border: '1px solid #E2E8F0', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box' }} />
+                {tipo === 'receita' && (
                   <button onClick={() => setDizimar(!dizimar)}
-                    style={{ position: 'relative', width: '48px', height: '24px', borderRadius: '12px', border: 'none', cursor: 'pointer', backgroundColor: dizimar ? '#10B981' : '#E2E8F0', flexShrink: 0 }}>
-                    <div style={{ position: 'absolute', top: '2px', left: dizimar ? '26px' : '2px', width: '20px', height: '20px', borderRadius: '50%', backgroundColor: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'left 0.2s' }} />
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 12px', borderRadius: '12px', border: `1px solid ${dizimar ? '#D1FAE5' : '#E2E8F0'}`, backgroundColor: dizimar ? '#F0FDF4' : '#F8FAFC', cursor: 'pointer', flexShrink: 0 }}>
+                    <div style={{ position: 'relative', width: '36px', height: '20px', borderRadius: '10px', backgroundColor: dizimar ? '#10B981' : '#E2E8F0', flexShrink: 0 }}>
+                      <div style={{ position: 'absolute', top: '2px', left: dizimar ? '18px' : '2px', width: '16px', height: '16px', borderRadius: '50%', backgroundColor: '#fff', transition: 'left 0.2s' }} />
+                    </div>
+                    <span style={{ fontSize: '11px', fontWeight: 600, color: dizimar ? '#059669' : '#94A3B8', whiteSpace: 'nowrap' }}>Dízimo</span>
                   </button>
-                </div>
-              )}
+                )}
+              </div>
 
               {confirmDelete && (
                 <p style={{ fontSize: '12px', color: '#EF4444', textAlign: 'center', marginBottom: '8px' }}>
@@ -551,6 +546,3 @@ export default function MovimentosPage() {
     </>
   )
 }
-
-
-
