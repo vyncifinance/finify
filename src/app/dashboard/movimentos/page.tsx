@@ -42,6 +42,7 @@ function formatDiaLabel(dataStr: string) {
 export default function MovimentosPage() {
   const router       = useRouter()
   const pathname     = usePathname()
+  const [tick, setTick] = useState(0)
   const familiaIdRef = useRef('')
 
   const [loading, setLoading]           = useState(true)
@@ -70,7 +71,7 @@ export default function MovimentosPage() {
 
   const supabase = createClient()
 
-  useEffect(() => { init() }, [mesRef.getMonth(), mesRef.getFullYear(), pathname])
+  useEffect(() => { init() }, [mesRef.getMonth(), mesRef.getFullYear(), pathname, tick])
 
   useEffect(() => {
     if (familiaIdRef.current) carregarLancamentos(familiaIdRef.current)
@@ -547,6 +548,8 @@ export default function MovimentosPage() {
     </>
   )
 }
+
+
 
 
 
