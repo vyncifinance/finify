@@ -93,6 +93,7 @@ export default function MovimentosPage() {
   }, [])
 
   async function init() {
+    console.log('INIT CHAMADO', new Date().toISOString())
     setLoading(true)
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.user) return
@@ -553,6 +554,7 @@ export default function MovimentosPage() {
     </>
   )
 }
+
 
 
 
