@@ -43,7 +43,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   function navegar(href: string) {
-    window.location.replace(href)
+    window.location.assign(href + '?reload=' + Date.now())
   }
 
   const inicial = nome ? nome[0].toUpperCase() : 'U'
@@ -140,5 +140,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     </>
   )
 }
+
 
 
