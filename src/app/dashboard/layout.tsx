@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import {
@@ -43,28 +42,32 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     router.push('/')
   }
 
+  function navegar(href: string) {
+    router.push(href + '?t=' + Date.now())
+  }
+
   const inicial = nome ? nome[0].toUpperCase() : 'U'
 
   return (
     <>
       {/* ── MOBILE ── */}
       <div className="lg:hidden flex flex-col min-h-screen" style={{ backgroundColor: '#F8FAFC' }}>
-        <main key={pathname} className="flex-1 overflow-y-auto pb-20">
+        <main className="flex-1 overflow-y-auto pb-20">
           {children}
         </main>
         <nav className="fixed bottom-0 left-0 right-0 z-50 border-t"
           style={{ backgroundColor: '#fff', borderColor: '#E2E8F0' }}>
           <div className="grid grid-cols-4">
             {NAV.map(item => {
-              const active = pathname === item.href
+              const active = pathname.startsWith(item.href) && (item.href === '/dashboard' ? pathname === '/dashboard' : true)
               const Icon   = item.icon
               return (
-                <Link key={item.href} href={item.href}
-                  className="flex flex-col items-center justify-center py-3 gap-1 transition-all"
-                  style={{ color: active ? '#0B4D3B' : '#94A3B8' }}>
+                <button key={item.href} onClick={() => navegar(item.href)}
+                  className="flex flex-col items-center justify-center py-3 gap-1 transition-all w-full"
+                  style={{ color: active ? '#0B4D3B' : '#94A3B8', background: 'none', border: 'none', cursor: 'pointer' }}>
                   <Icon size={20} strokeWidth={active ? 2 : 1.75} />
                   <span className="text-xs font-medium">{item.label}</span>
-                </Link>
+                </button>
               )
             })}
           </div>
@@ -84,18 +87,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
           <nav className="flex-1 px-3 pt-2 flex flex-col gap-1 overflow-y-auto">
             {NAV.map(item => {
-              const active = pathname === item.href
+              const active = pathname.startsWith(item.href) && (item.href === '/dashboard' ? pathname === '/dashboard' : true)
               const Icon   = item.icon
               return (
-                <Link key={item.href} href={item.href}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-sm font-medium"
+                <button key={item.href} onClick={() => navegar(item.href)}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-sm font-medium w-full"
                   style={{
                     backgroundColor: active ? 'rgba(255,255,255,0.1)' : 'transparent',
                     color: active ? '#fff' : 'rgba(255,255,255,0.5)',
+                    border: 'none', cursor: 'pointer',
                   }}>
                   <Icon size={18} className="flex-shrink-0" strokeWidth={1.75} />
-                  {!collapsed && <span>{item.label}</span>}
-                </Link>
+                  {!collapsed && <span>{item.href === '/dashboard' ? 'Dashboard' : item.label}</span>}
+                </button>
               )
             })}
           </nav>
@@ -109,13 +113,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-white truncate">{nome}</p>
-                  <p className="text-xs truncate" style={{ color: 'rgba(255,255,255,0.4)' }}>{familia}</p>
                 </div>
               </div>
             )}
             <button onClick={handleLogout}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all hover:bg-white/5"
-              style={{ color: 'rgba(255,255,255,0.5)' }}>
+              style={{ color: 'rgba(255,255,255,0.5)', border: 'none', cursor: 'pointer', background: 'none' }}>
               <LogOut size={17} strokeWidth={1.75} className="flex-shrink-0" />
               {!collapsed && <span>Sair</span>}
             </button>
@@ -129,7 +132,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               {collapsed ? <Menu size={15} strokeWidth={2} /> : <ChevronLeft size={15} strokeWidth={2} />}
             </button>
           </div>
-          <main key={pathname} className="flex-1 overflow-y-auto">
+          <main className="flex-1 overflow-y-auto">
             {children}
           </main>
         </div>
