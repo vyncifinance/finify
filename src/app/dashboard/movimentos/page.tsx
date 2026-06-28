@@ -546,7 +546,7 @@ export default function MovimentosPage() {
             </div>
 
             {/* Botão fixo no rodapé */}
-            <div style={{ padding: '8px 16px', borderTop: '1px solid #F1F5F9', backgroundColor: '#fff', flexShrink: 0 }}>
+            <div style={{ padding: '8px 16px', borderTop: '1px solid #F1F5F9', backgroundColor: '#fff', flexShrink: 0, position: 'sticky', bottom: 0 }}>
               <button onClick={handleSalvar} disabled={salvando || !valor}
                 style={{ width: '100%', height: '52px', borderRadius: '12px', border: 'none', fontSize: '16px', fontWeight: 600, color: '#fff', cursor: salvando || !valor ? 'not-allowed' : 'pointer', backgroundColor: '#0E3B2E', opacity: salvando || !valor ? 0.6 : 1 }}>
                 {salvando ? 'Salvando...' : editando ? 'Salvar alterações' : 'Registrar lançamento'}
@@ -558,6 +558,7 @@ export default function MovimentosPage() {
     </>
   )
 }
+
 
 
 
