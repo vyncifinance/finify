@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
@@ -43,7 +43,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   function navegar(href: string) {
-    router.push(href + '?t=' + Date.now())
+    window.location.href = href
   }
 
   const inicial = nome ? nome[0].toUpperCase() : 'U'
@@ -140,3 +140,4 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     </>
   )
 }
+
