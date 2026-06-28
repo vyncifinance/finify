@@ -444,7 +444,7 @@ export default function MovimentosPage() {
         <div
           onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}
           style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
-          <div style={{ width: '100%', maxWidth: '480px', backgroundColor: '#fff', borderRadius: '28px 28px 0 0', display: 'flex', flexDirection: 'column', maxHeight: '75vh' }}>
+          <div style={{ width: '100%', maxWidth: '480px', backgroundColor: '#fff', borderRadius: '28px 28px 0 0', display: 'flex', flexDirection: 'column', maxHeight: '70vh' }}>
 
             {/* Drag handle */}
             <div style={{ width: '40px', height: '4px', borderRadius: '2px', backgroundColor: '#E2E8F0', margin: '12px auto 4px' }} />
@@ -546,7 +546,7 @@ export default function MovimentosPage() {
             </div>
 
             {/* Botão fixo no rodapé */}
-            <div style={{ padding: '10px 16px', borderTop: '1px solid #F1F5F9', backgroundColor: '#fff', flexShrink: 0 }}>
+            <div style={{ padding: '8px 16px', borderTop: '1px solid #F1F5F9', backgroundColor: '#fff', flexShrink: 0 }}>
               <button onClick={handleSalvar} disabled={salvando || !valor}
                 style={{ width: '100%', height: '52px', borderRadius: '12px', border: 'none', fontSize: '16px', fontWeight: 600, color: '#fff', cursor: salvando || !valor ? 'not-allowed' : 'pointer', backgroundColor: '#0E3B2E', opacity: salvando || !valor ? 0.6 : 1 }}>
                 {salvando ? 'Salvando...' : editando ? 'Salvar alterações' : 'Registrar lançamento'}
@@ -558,6 +558,7 @@ export default function MovimentosPage() {
     </>
   )
 }
+
 
 
 
