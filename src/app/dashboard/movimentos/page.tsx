@@ -117,6 +117,7 @@ export default function MovimentosPage() {
   }
 
   async function carregarLancamentos(fid: string, nomeUsuario?: string, nomeFamilia?: string) {
+    if (!fid) return
     const ini = new Date(mesRef.getFullYear(), mesRef.getMonth(), 1).toISOString().split('T')[0]
     const fim = new Date(mesRef.getFullYear(), mesRef.getMonth() + 1, 0).toISOString().split('T')[0]
     console.log('BUSCANDO:', fid, ini, fim)
@@ -557,6 +558,7 @@ export default function MovimentosPage() {
     </>
   )
 }
+
 
 
 
