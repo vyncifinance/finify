@@ -444,7 +444,7 @@ export default function MovimentosPage() {
         <div
           onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}
           style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
-          <div style={{ width: '100%', maxWidth: '480px', backgroundColor: '#fff', borderRadius: '28px 28px 0 0', display: 'flex', flexDirection: 'column', maxHeight: '88vh' }}>
+          <div style={{ width: '100%', maxWidth: '480px', backgroundColor: '#fff', borderRadius: '28px 28px 0 0', display: 'flex', flexDirection: 'column', maxHeight: '82vh' }}>
 
             {/* Drag handle */}
             <div style={{ width: '40px', height: '4px', borderRadius: '2px', backgroundColor: '#E2E8F0', margin: '12px auto 4px' }} />
@@ -469,7 +469,7 @@ export default function MovimentosPage() {
             </div>
 
             {/* Scroll area */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px 4px' }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '8px 16px 4px' }}>
 
               {/* Tipo */}
               <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
@@ -482,7 +482,7 @@ export default function MovimentosPage() {
               </div>
 
               {/* Valor */}
-              <div style={{ backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '12px 16px', marginBottom: '10px', textAlign: 'center' }}>
+              <div style={{ backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '6px 16px', marginBottom: '8px', textAlign: 'center' }}>
                 <p style={{ fontSize: '11px', fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Valor</p>
                 <input
                   type="text" inputMode="numeric" value={valor}
@@ -493,13 +493,13 @@ export default function MovimentosPage() {
                     setValor(digits === '' ? '' : formatted)
                   }}
                   placeholder="0,00"
-                  style={{ width: '100%', textAlign: 'center', fontSize: '26px', fontWeight: 700, border: 'none', outline: 'none', backgroundColor: 'transparent', color: tipo === 'despesa' ? '#EF4444' : '#10B981' }}
+                  style={{ width: '100%', textAlign: 'center', fontSize: '22px', fontWeight: 700, border: 'none', outline: 'none', backgroundColor: 'transparent', color: tipo === 'despesa' ? '#EF4444' : '#10B981' }}
                 />
               </div>
 
               {/* Membro */}
               <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Quem está lançando</p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '8px', marginBottom: '10px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '6px', marginBottom: '8px' }}>
                 {(membrosFamilia.length ? membrosFamilia : [membroAtual]).map(m => (
                   <button key={m} onClick={() => setMembroForm(m)}
                     style={{ padding: '8px', borderRadius: '12px', fontSize: '14px', fontWeight: 500, cursor: 'pointer', border: `1px solid ${membroForm === m ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: membroForm === m ? '#F0FDF4' : '#fff', color: membroForm === m ? '#0E3B2E' : '#64748B' }}>
@@ -546,7 +546,7 @@ export default function MovimentosPage() {
             </div>
 
             {/* Botão fixo no rodapé */}
-            <div style={{ padding: '16px 24px', borderTop: '1px solid #F1F5F9', backgroundColor: '#fff', flexShrink: 0 }}>
+            <div style={{ padding: '10px 16px', borderTop: '1px solid #F1F5F9', backgroundColor: '#fff', flexShrink: 0 }}>
               <button onClick={handleSalvar} disabled={salvando || !valor}
                 style={{ width: '100%', height: '52px', borderRadius: '12px', border: 'none', fontSize: '16px', fontWeight: 600, color: '#fff', cursor: salvando || !valor ? 'not-allowed' : 'pointer', backgroundColor: '#0E3B2E', opacity: salvando || !valor ? 0.6 : 1 }}>
                 {salvando ? 'Salvando...' : editando ? 'Salvar alterações' : 'Registrar lançamento'}
@@ -558,6 +558,7 @@ export default function MovimentosPage() {
     </>
   )
 }
+
 
 
 
