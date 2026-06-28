@@ -42,7 +42,12 @@ function formatDiaLabel(dataStr: string) {
 export default function MovimentosPage() {
   const router       = useRouter()
   const pathname     = usePathname()
-  const [tick, setTick] = useState(0)
+  const [tick, setTick] = useState(() => {
+    if (typeof window === 'undefined') return 0
+    const t = parseInt(sessionStorage.getItem('mov_tick') || '0')
+    sessionStorage.setItem('mov_tick', String(t + 1))
+    return t
+  })
   const familiaIdRef = useRef('')
 
   const [loading, setLoading]           = useState(true)
@@ -548,6 +553,7 @@ export default function MovimentosPage() {
     </>
   )
 }
+
 
 
 
