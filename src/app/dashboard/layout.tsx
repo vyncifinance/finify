@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -47,8 +47,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <>
+      {/* ── MOBILE ── */}
       <div className="lg:hidden flex flex-col min-h-screen" style={{ backgroundColor: '#F8FAFC' }}>
-        <main className="flex-1 overflow-y-auto pb-20">
+        <main key={pathname} className="flex-1 overflow-y-auto pb-20">
           {children}
         </main>
         <nav className="fixed bottom-0 left-0 right-0 z-50 border-t"
@@ -70,6 +71,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </nav>
       </div>
 
+      {/* ── DESKTOP ── */}
       <div className="hidden lg:flex h-screen overflow-hidden" style={{ backgroundColor: '#F8FAFC' }}>
         <aside className="flex flex-col flex-shrink-0 transition-all duration-300"
           style={{ width: collapsed ? '76px' : '224px', backgroundColor: '#0B4D3B' }}>
@@ -127,7 +129,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               {collapsed ? <Menu size={15} strokeWidth={2} /> : <ChevronLeft size={15} strokeWidth={2} />}
             </button>
           </div>
-          <main className="flex-1 overflow-y-auto">
+          <main key={pathname} className="flex-1 overflow-y-auto">
             {children}
           </main>
         </div>
