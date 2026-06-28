@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useState, useRef } from 'react'
-import { useRouter, usePathname, useSearchParams } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import {
   ArrowDownLeft, ArrowUpRight, ChevronLeft, ChevronRight,
@@ -42,7 +42,6 @@ function formatDiaLabel(dataStr: string) {
 export default function MovimentosPage() {
   const router       = useRouter()
   const pathname     = usePathname()
-  const searchParams = useSearchParams()
   const [tick, setTick] = useState(() => {
     if (typeof window === 'undefined') return 0
     const t = parseInt(sessionStorage.getItem('mov_tick') || '0')
@@ -77,7 +76,7 @@ export default function MovimentosPage() {
 
   const supabase = createClient()
 
-  useEffect(() => { init() }, [mesRef.getMonth(), mesRef.getFullYear(), searchParams.get('t')])
+  useEffect(() => { init() }, [mesRef.getMonth(), mesRef.getFullYear(), pathname])
 
   useEffect(() => {
     if (familiaIdRef.current) carregarLancamentos(familiaIdRef.current)
@@ -554,6 +553,7 @@ export default function MovimentosPage() {
     </>
   )
 }
+
 
 
 
