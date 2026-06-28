@@ -76,7 +76,7 @@ export default function MovimentosPage() {
 
   const supabase = createClient()
 
-  useEffect(() => { init() }, [mesRef.getMonth(), mesRef.getFullYear(), pathname])
+  useEffect(() => { init() }, [mesRef.getMonth(), mesRef.getFullYear(), typeof window !== 'undefined' ? window.location.search : ''])
 
   useEffect(() => {
     if (familiaIdRef.current) carregarLancamentos(familiaIdRef.current)
@@ -553,6 +553,7 @@ export default function MovimentosPage() {
     </>
   )
 }
+
 
 
 
