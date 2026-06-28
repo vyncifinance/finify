@@ -510,7 +510,6 @@ export default function MovimentosPage() {
                   )
                 })}
               </div>
-              </div>
 
               {/* Data */}
               <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Data</p>
