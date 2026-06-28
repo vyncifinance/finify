@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useState, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import {
   ArrowDownLeft, ArrowUpRight, ChevronLeft, ChevronRight,
@@ -41,6 +41,7 @@ function formatDiaLabel(dataStr: string) {
 
 export default function MovimentosPage() {
   const router       = useRouter()
+  const pathname     = usePathname()
   const familiaIdRef = useRef('')
 
   const [loading, setLoading]           = useState(true)
@@ -69,7 +70,7 @@ export default function MovimentosPage() {
 
   const supabase = createClient()
 
-  useEffect(() => { init() }, [mesRef.getMonth(), mesRef.getFullYear()])
+  useEffect(() => { init() }, [mesRef.getMonth(), mesRef.getFullYear(), pathname])
 
   useEffect(() => {
     if (familiaIdRef.current) carregarLancamentos(familiaIdRef.current)
@@ -546,5 +547,6 @@ export default function MovimentosPage() {
     </>
   )
 }
+
 
 
