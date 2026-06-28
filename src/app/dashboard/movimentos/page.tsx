@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 export const dynamic = 'force-dynamic'
 
@@ -186,6 +186,7 @@ export default function MovimentosPage() {
     if (!error) {
       setLancamentos(prev => prev.filter((l: any) => l.id !== editando.id))
       setModalOpen(false)
+      router.refresh()
     }
   }
 
@@ -550,3 +551,6 @@ export default function MovimentosPage() {
     </>
   )
 }
+
+
+
