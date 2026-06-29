@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,7 +9,7 @@ import {
   ArrowDownLeft, ArrowUpRight, ChevronLeft, ChevronRight,
   Plus, Wallet, X, UtensilsCrossed, Home, Car, Smile,
   Heart, BookOpen, ShoppingBag, Church, MoreHorizontal,
-  Briefcase, TrendingUp, Laptop, DollarSign, Trash2
+  Briefcase, TrendingUp, Laptop, DollarSign, Trash2, Pencil
 } from 'lucide-react'
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
@@ -66,8 +66,6 @@ export default function MovimentosPage() {
   const [salvando, setSalvando]           = useState(false)
   const [deletando, setDeletando]         = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
-  useEffect(() => { setIsMobile(window.innerWidth < 1024) }, [])
 
   const supabase = createClient()
 
@@ -302,6 +300,9 @@ export default function MovimentosPage() {
                         <p style={{ fontSize: '14px', fontWeight: 600, color: l.tipo === 'receita' ? '#10B981' : '#EF4444', flexShrink: 0 }}>
                           {l.tipo === 'receita' ? '+' : '-'} {fmt(Number(l.valor))}
                         </p>
+                        <div style={{ width: '28px', height: '28px', borderRadius: '8px', backgroundColor: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <Pencil size={12} color="#64748B" strokeWidth={1.75} />
+                        </div>
                       </button>
                     )
                   })}
@@ -420,6 +421,10 @@ export default function MovimentosPage() {
                       <p className="font-semibold text-sm flex-shrink-0" style={{ color: l.tipo === 'receita' ? '#10B981' : '#EF4444' }}>
                         {l.tipo === 'receita' ? '+' : '-'} {fmt(Number(l.valor))}
                       </p>
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                        style={{ backgroundColor: '#F1F5F9' }}>
+                        <Pencil size={12} color="#64748B" strokeWidth={1.75} />
+                      </div>
                     </button>
                   )
                 })}
@@ -431,11 +436,11 @@ export default function MovimentosPage() {
 
       {/* ── MODAL — inline style puro, sem Tailwind ── */}
       {/* Modal Mobile */}
-      {modalOpen && isMobile && (
-        <div
+      {modalOpen && (
+        <div className="lg:hidden"
           onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}
           style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
-          <div style={{ width: '100%', backgroundColor: '#fff', borderRadius: '28px 28px 0 0', display: 'flex', flexDirection: 'column', maxHeight: 'calc(71vh - 65px)', marginBottom: '65px' }}>
+          <div style={{ width: '100%', backgroundColor: '#fff', borderRadius: '28px 28px 0 0', display: 'flex', flexDirection: 'column', maxHeight: '85vh' }}>
 
             {/* Drag handle */}
             <div style={{ width: '40px', height: '4px', borderRadius: '2px', backgroundColor: '#E2E8F0', margin: '12px auto 4px', flexShrink: 0 }} />
@@ -537,7 +542,7 @@ export default function MovimentosPage() {
             </div>
 
             {/* Botão fixo no rodapé */}
-            <div style={{ padding: '12px 20px 32px', borderTop: '1px solid #F1F5F9', backgroundColor: '#fff', flexShrink: 0 }}>
+            <div style={{ padding: '12px 20px 20px', borderTop: '1px solid #F1F5F9', backgroundColor: '#fff', flexShrink: 0, position: 'sticky', bottom: 0 }}>
               <button onClick={handleSalvar} disabled={salvando || !valor}
                 style={{ width: '100%', height: '48px', borderRadius: '12px', border: 'none', fontSize: '15px', fontWeight: 600, color: '#fff', cursor: salvando || !valor ? 'not-allowed' : 'pointer', backgroundColor: '#0E3B2E', opacity: salvando || !valor ? 0.6 : 1 }}>
                 {salvando ? 'Salvando...' : editando ? 'Salvar alterações' : 'Registrar lançamento'}
@@ -548,12 +553,12 @@ export default function MovimentosPage() {
       )}
 
       {/* Modal Desktop */}
-      {modalOpen && !isMobile && (
-        <div
+      {modalOpen && (
+        <div className="hidden lg:flex"
           onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}
           style={{ position: 'fixed', inset: 0, zIndex: 50, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
           {/* Desktop: modal centralizado */}
-          <div style={{ width: '520px', backgroundColor: '#fff', borderRadius: '20px', display: 'flex', flexDirection: 'column', maxHeight: '90vh', margin: 'auto' }}>
+          <div style={{ width: '520px', backgroundColor: '#fff', borderRadius: '20px', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px', borderBottom: '1px solid #F1F5F9', flexShrink: 0 }}>
               <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#0F172A' }}>
                 {editando ? 'Editar lançamento' : 'Novo lançamento'}
@@ -639,15 +644,3 @@ export default function MovimentosPage() {
     </>
   )
 }
-
-
-
-
-
-
-
-
-
-
-
-
