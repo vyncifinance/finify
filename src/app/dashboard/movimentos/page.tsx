@@ -1,9 +1,9 @@
-﻿'use client'
+'use client'
 
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useState, useRef } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import {
   ArrowDownLeft, ArrowUpRight, ChevronLeft, ChevronRight,
@@ -41,13 +41,6 @@ function formatDiaLabel(dataStr: string) {
 
 export default function MovimentosPage() {
   const router       = useRouter()
-  const pathname     = usePathname()
-  const [tick, setTick] = useState(() => {
-    if (typeof window === 'undefined') return 0
-    const t = parseInt(sessionStorage.getItem('mov_tick') || '0')
-    sessionStorage.setItem('mov_tick', String(t + 1))
-    return t
-  })
   const familiaIdRef = useRef('')
 
   const [loading, setLoading]           = useState(true)
@@ -93,7 +86,6 @@ export default function MovimentosPage() {
   }, [])
 
   async function init() {
-    console.log('INIT CHAMADO', new Date().toISOString())
     setLoading(true)
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.user) return
@@ -117,10 +109,8 @@ export default function MovimentosPage() {
   }
 
   async function carregarLancamentos(fid: string, nomeUsuario?: string, nomeFamilia?: string) {
-    if (!fid) return
     const ini = new Date(mesRef.getFullYear(), mesRef.getMonth(), 1).toISOString().split('T')[0]
     const fim = new Date(mesRef.getFullYear(), mesRef.getMonth() + 1, 0).toISOString().split('T')[0]
-    console.log('BUSCANDO:', fid, ini, fim)
     const { data: lanc } = await supabase.from('lancamentos').select('*')
       .eq('familia_id', fid).gte('data', ini).lte('data', fim)
       .order('data', { ascending: false }).order('hora', { ascending: false })
@@ -191,9 +181,7 @@ export default function MovimentosPage() {
     if (!editando) return
     if (!confirmDelete) { setConfirmDelete(true); return }
     setDeletando(true)
-    console.log('DELETANDO ID:', editando.id)
     const { error } = await supabase.from('lancamentos').delete().eq('id', editando.id)
-    console.log('ERRO DELETE:', error)
     setDeletando(false)
     if (!error) {
       setLancamentos(prev => prev.filter((l: any) => l.id !== editando.id))
@@ -444,10 +432,11 @@ export default function MovimentosPage() {
         <div
           onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}
           style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
-          <div style={{ width: '100%', maxWidth: '480px', backgroundColor: '#fff', borderRadius: '28px 28px 0 0', display: 'flex', flexDirection: 'column', maxHeight: '70vh' }}>
+          {/* Mobile: bottom sheet */}
+          <div className="lg:hidden" style={{ width: '100%', backgroundColor: '#fff', borderRadius: '28px 28px 0 0', display: 'flex', flexDirection: 'column', maxHeight: '85vh' }}>
 
             {/* Drag handle */}
-            <div style={{ width: '40px', height: '4px', borderRadius: '2px', backgroundColor: '#E2E8F0', margin: '12px auto 4px' }} />
+            <div style={{ width: '40px', height: '4px', borderRadius: '2px', backgroundColor: '#E2E8F0', margin: '12px auto 4px', flexShrink: 0 }} />
 
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 24px', borderBottom: '1px solid #F1F5F9', flexShrink: 0 }}>
@@ -469,7 +458,7 @@ export default function MovimentosPage() {
             </div>
 
             {/* Scroll area */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '8px 16px 4px' }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px 4px' }}>
 
               {/* Tipo */}
               <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
@@ -482,7 +471,7 @@ export default function MovimentosPage() {
               </div>
 
               {/* Valor */}
-              <div style={{ backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '6px 16px', marginBottom: '8px', textAlign: 'center' }}>
+              <div style={{ backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '12px 16px', marginBottom: '10px', textAlign: 'center' }}>
                 <p style={{ fontSize: '11px', fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Valor</p>
                 <input
                   type="text" inputMode="numeric" value={valor}
@@ -493,13 +482,13 @@ export default function MovimentosPage() {
                     setValor(digits === '' ? '' : formatted)
                   }}
                   placeholder="0,00"
-                  style={{ width: '100%', textAlign: 'center', fontSize: '22px', fontWeight: 700, border: 'none', outline: 'none', backgroundColor: 'transparent', color: tipo === 'despesa' ? '#EF4444' : '#10B981' }}
+                  style={{ width: '100%', textAlign: 'center', fontSize: '26px', fontWeight: 700, border: 'none', outline: 'none', backgroundColor: 'transparent', color: tipo === 'despesa' ? '#EF4444' : '#10B981' }}
                 />
               </div>
 
               {/* Membro */}
               <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Quem está lançando</p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '6px', marginBottom: '8px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '8px', marginBottom: '10px' }}>
                 {(membrosFamilia.length ? membrosFamilia : [membroAtual]).map(m => (
                   <button key={m} onClick={() => setMembroForm(m)}
                     style={{ padding: '8px', borderRadius: '12px', fontSize: '14px', fontWeight: 500, cursor: 'pointer', border: `1px solid ${membroForm === m ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: membroForm === m ? '#F0FDF4' : '#fff', color: membroForm === m ? '#0E3B2E' : '#64748B' }}>
@@ -546,7 +535,90 @@ export default function MovimentosPage() {
             </div>
 
             {/* Botão fixo no rodapé */}
-            <div style={{ padding: '8px 16px', borderTop: '1px solid #F1F5F9', backgroundColor: '#fff', flexShrink: 0, position: 'sticky', bottom: 0 }}>
+            <div style={{ padding: '12px 20px 20px', borderTop: '1px solid #F1F5F9', backgroundColor: '#fff', flexShrink: 0, position: 'sticky', bottom: 0 }}>
+              <button onClick={handleSalvar} disabled={salvando || !valor}
+                style={{ width: '100%', height: '48px', borderRadius: '12px', border: 'none', fontSize: '15px', fontWeight: 600, color: '#fff', cursor: salvando || !valor ? 'not-allowed' : 'pointer', backgroundColor: '#0E3B2E', opacity: salvando || !valor ? 0.6 : 1 }}>
+                {salvando ? 'Salvando...' : editando ? 'Salvar alterações' : 'Registrar lançamento'}
+              </button>
+            </div>
+          </div>
+
+          {/* Desktop: modal centralizado */}
+          <div className="hidden lg:flex" style={{ width: '520px', backgroundColor: '#fff', borderRadius: '20px', flexDirection: 'column', maxHeight: '90vh', position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px', borderBottom: '1px solid #F1F5F9', flexShrink: 0 }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#0F172A' }}>
+                {editando ? 'Editar lançamento' : 'Novo lançamento'}
+              </h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {editando && (
+                  <button onClick={handleDeletar} disabled={deletando}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, border: 'none', cursor: 'pointer', backgroundColor: confirmDelete ? '#EF4444' : '#FEF2F2', color: confirmDelete ? '#fff' : '#DC2626' }}>
+                    <Trash2 size={13} strokeWidth={2} />
+                    {deletando ? 'Deletando...' : confirmDelete ? 'Confirmar' : 'Deletar'}
+                  </button>
+                )}
+                <button onClick={() => setModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}>
+                  <X size={20} strokeWidth={2} />
+                </button>
+              </div>
+            </div>
+            <div style={{ overflowY: 'auto', flex: 1, padding: '20px 24px' }}>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                {[{ key: 'despesa', label: 'Despesa', cor: '#EF4444' }, { key: 'receita', label: 'Receita', cor: '#10B981' }].map(t => (
+                  <button key={t.key} onClick={() => handleTipo(t.key as any)}
+                    style={{ flex: 1, padding: '12px', borderRadius: '12px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', border: `2px solid ${tipo === t.key ? t.cor : '#E2E8F0'}`, backgroundColor: tipo === t.key ? t.cor + '12' : '#fff', color: tipo === t.key ? t.cor : '#64748B' }}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              <div style={{ backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '16px', marginBottom: '16px', textAlign: 'center' }}>
+                <p style={{ fontSize: '11px', fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase', marginBottom: '4px' }}>Valor</p>
+                <input type="text" inputMode="numeric" value={valor}
+                  onChange={e => {
+                    const digits = e.target.value.replace(/\D/g, '')
+                    const num = parseInt(digits || '0', 10)
+                    setValor(digits === '' ? '' : (num / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
+                  }}
+                  placeholder="0,00"
+                  style={{ width: '100%', textAlign: 'center', fontSize: '32px', fontWeight: 700, border: 'none', outline: 'none', backgroundColor: 'transparent', color: tipo === 'despesa' ? '#EF4444' : '#10B981' }} />
+              </div>
+              <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '8px' }}>Quem está lançando</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '8px', marginBottom: '16px' }}>
+                {(membrosFamilia.length ? membrosFamilia : [membroAtual]).map(m => (
+                  <button key={m} onClick={() => setMembroForm(m)}
+                    style={{ padding: '10px', borderRadius: '12px', fontSize: '14px', fontWeight: 500, cursor: 'pointer', border: `1px solid ${membroForm === m ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: membroForm === m ? '#F0FDF4' : '#fff', color: membroForm === m ? '#0E3B2E' : '#64748B' }}>
+                    {m.split(' ')[0]}
+                  </button>
+                ))}
+              </div>
+              <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '8px' }}>Categoria</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '8px', marginBottom: '16px' }}>
+                {categorias.map(c => {
+                  const Icon = ICONES_CAT[c] || MoreHorizontal
+                  return (
+                    <button key={c} onClick={() => setCategoria(c)}
+                      style={{ padding: '10px 4px', borderRadius: '12px', fontSize: '11px', fontWeight: 500, cursor: 'pointer', border: `1px solid ${categoria === c ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: categoria === c ? '#F0FDF4' : '#fff', color: categoria === c ? '#0E3B2E' : '#64748B', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                      <Icon size={15} strokeWidth={1.75} color={categoria === c ? '#0E3B2E' : '#94A3B8'} />
+                      {c}
+                    </button>
+                  )
+                })}
+              </div>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', alignItems: 'center' }}>
+                <input type="date" value={dataLanc} onChange={e => setDataLanc(e.target.value)}
+                  style={{ flex: 1, padding: '10px 14px', borderRadius: '12px', border: '1px solid #E2E8F0', fontSize: '14px', color: '#0F172A', outline: 'none' }} />
+                {tipo === 'receita' && (
+                  <button onClick={() => setDizimar(!dizimar)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 12px', borderRadius: '12px', border: `1px solid ${dizimar ? '#D1FAE5' : '#E2E8F0'}`, backgroundColor: dizimar ? '#F0FDF4' : '#F8FAFC', cursor: 'pointer' }}>
+                    <div style={{ position: 'relative', width: '36px', height: '20px', borderRadius: '10px', backgroundColor: dizimar ? '#10B981' : '#E2E8F0' }}>
+                      <div style={{ position: 'absolute', top: '2px', left: dizimar ? '18px' : '2px', width: '16px', height: '16px', borderRadius: '50%', backgroundColor: '#fff', transition: 'left 0.2s' }} />
+                    </div>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: dizimar ? '#059669' : '#94A3B8' }}>Dízimo</span>
+                  </button>
+                )}
+              </div>
+            </div>
+            <div style={{ padding: '16px 24px', borderTop: '1px solid #F1F5F9', backgroundColor: '#fff', flexShrink: 0 }}>
               <button onClick={handleSalvar} disabled={salvando || !valor}
                 style={{ width: '100%', height: '52px', borderRadius: '12px', border: 'none', fontSize: '16px', fontWeight: 600, color: '#fff', cursor: salvando || !valor ? 'not-allowed' : 'pointer', backgroundColor: '#0E3B2E', opacity: salvando || !valor ? 0.6 : 1 }}>
                 {salvando ? 'Salvando...' : editando ? 'Salvar alterações' : 'Registrar lançamento'}
@@ -558,22 +630,3 @@ export default function MovimentosPage() {
     </>
   )
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
