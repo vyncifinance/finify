@@ -2,10 +2,14 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { Eye, EyeOff, Lock, Shield, RefreshCw, Smartphone, Users, TrendingUp, Target, Home, BarChart2, RefreshCcw } from 'lucide-react'
+import {
+  Eye, EyeOff, Lock, Shield, RefreshCw, Smartphone,
+  Users, TrendingUp, Target, Home, BarChart2, FileText,
+  ArrowRight, Check
+} from 'lucide-react'
 
 export default function LoginPage() {
   const [email, setEmail]         = useState('')
@@ -13,8 +17,11 @@ export default function LoginPage() {
   const [loading, setLoading]     = useState(false)
   const [erro, setErro]           = useState('')
   const [showSenha, setShowSenha] = useState(false)
+  const [mounted, setMounted]     = useState(false)
   const router   = useRouter()
   const supabase = createClient()
+
+  useEffect(() => { setMounted(true) }, [])
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -32,191 +39,263 @@ export default function LoginPage() {
     setErro('')
   }
 
+  const Logo = ({ size = 36, textSize = 20 }: { size?: number; textSize?: number }) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <div style={{
+        width: size, height: size, borderRadius: size * 0.28,
+        background: 'linear-gradient(135deg, #145A45 0%, #2FB36A 100%)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        boxShadow: '0 2px 8px rgba(47,179,106,0.35)',
+        flexShrink: 0,
+      }}>
+        <svg width={size * 0.55} height={size * 0.55} viewBox="0 0 20 20" fill="none">
+          <path d="M4 4h12v3H7.5v2.5H13v3H7.5V16H4V4z" fill="white" fillOpacity="0.95"/>
+        </svg>
+      </div>
+      <span style={{ fontSize: textSize, fontWeight: 700, color: '#fff', letterSpacing: '-0.4px', lineHeight: 1 }}>
+        Finify
+      </span>
+    </div>
+  )
+
+  const LogoDark = ({ size = 34, textSize = 19 }: { size?: number; textSize?: number }) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <div style={{
+        width: size, height: size, borderRadius: size * 0.28,
+        background: 'linear-gradient(135deg, #145A45 0%, #2FB36A 100%)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        boxShadow: '0 2px 8px rgba(47,179,106,0.3)',
+        flexShrink: 0,
+      }}>
+        <svg width={size * 0.55} height={size * 0.55} viewBox="0 0 20 20" fill="none">
+          <path d="M4 4h12v3H7.5v2.5H13v3H7.5V16H4V4z" fill="white" fillOpacity="0.95"/>
+        </svg>
+      </div>
+      <span style={{ fontSize: textSize, fontWeight: 700, color: '#0B3B2E', letterSpacing: '-0.4px', lineHeight: 1 }}>
+        Finify
+      </span>
+    </div>
+  )
+
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
+    <div style={{
+      minHeight: '100vh', display: 'flex',
+      fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      opacity: mounted ? 1 : 0, transition: 'opacity 0.4s ease',
+    }}>
 
       {/* ── LADO ESQUERDO ── */}
       <div className="hidden lg:flex" style={{
-        width: '58%', backgroundColor: '#0D2B1F',
-        flexDirection: 'column', padding: '36px 48px 40px',
+        width: '55%',
+        background: 'linear-gradient(180deg, #06261F 0%, #0A342A 50%, #0D3F31 100%)',
+        flexDirection: 'column',
+        padding: '40px 52px 44px',
         position: 'relative', overflow: 'hidden',
       }}>
-        {/* Subtle radial glow top right */}
-        <div style={{ position: 'absolute', top: 0, right: 0, width: '500px', height: '500px', background: 'radial-gradient(ellipse at top right, rgba(16,185,129,0.08) 0%, transparent 65%)', pointerEvents: 'none' }} />
+        {/* Radial glow */}
+        <div style={{ position: 'absolute', top: '-120px', right: '-80px', width: '600px', height: '600px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(47,179,106,0.1) 0%, transparent 65%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: '-80px', left: '-60px', width: '400px', height: '400px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(21,90,69,0.15) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
-        {/* Logo topo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '48px', position: 'relative', zIndex: 1 }}>
-          <div style={{
-            width: '36px', height: '36px', borderRadius: '9px',
-            backgroundColor: '#10B981',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <rect x="3" y="3" width="6" height="6" rx="1.5" fill="white"/>
-              <rect x="3" y="11" width="6" height="6" rx="1.5" fill="white" fillOpacity="0.5"/>
-              <rect x="11" y="3" width="6" height="6" rx="1.5" fill="white" fillOpacity="0.5"/>
-              <rect x="11" y="11" width="6" height="6" rx="1.5" fill="white"/>
-            </svg>
-          </div>
-          <span style={{ fontSize: '20px', fontWeight: 700, color: '#fff', letterSpacing: '-0.3px' }}>Finify</span>
+        {/* Logo */}
+        <div style={{ position: 'relative', zIndex: 2, marginBottom: '48px' }}>
+          <Logo size={38} textSize={21} />
         </div>
 
-        {/* Hero content */}
-        <div style={{ flex: 1, position: 'relative', zIndex: 1 }}>
+        {/* Hero */}
+        <div style={{ position: 'relative', zIndex: 2, flex: 1 }}>
           {/* Badge */}
           <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: '8px',
-            padding: '6px 14px', borderRadius: '999px', marginBottom: '24px',
-            backgroundColor: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)',
+            display: 'inline-flex', alignItems: 'center', gap: '7px',
+            padding: '5px 14px', borderRadius: '999px', marginBottom: '28px',
+            backgroundColor: 'rgba(47,179,106,0.12)',
+            border: '1px solid rgba(47,179,106,0.25)',
           }}>
-            <Users size={13} color="rgba(255,255,255,0.7)" strokeWidth={1.75} />
-            <span style={{ fontSize: '12px', fontWeight: 500, color: 'rgba(255,255,255,0.7)' }}>Gestão Patrimonial Familiar</span>
+            <Users size={12} color="#58D68D" strokeWidth={2} />
+            <span style={{ fontSize: '11.5px', fontWeight: 600, color: '#58D68D', letterSpacing: '0.03em' }}>
+              Gestão Patrimonial Familiar
+            </span>
           </div>
 
-          {/* Título + mockups lado a lado */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', alignItems: 'start', marginBottom: '36px' }}>
+          {/* Título + dashboard grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', alignItems: 'start', marginBottom: '40px' }}>
+
+            {/* Texto esquerdo */}
             <div>
-              <h1 style={{ fontSize: '48px', fontWeight: 800, lineHeight: 1.05, letterSpacing: '-2px', marginBottom: '16px' }}>
-                <span style={{ color: '#fff' }}>Prosperidade</span><br />
-                <span style={{ color: '#10B981' }}>para famílias.</span>
+              <h1 style={{
+                fontSize: '56px', fontWeight: 800, lineHeight: 1.0,
+                letterSpacing: '-2.5px', marginBottom: '18px',
+              }}>
+                <span style={{ color: '#fff', display: 'block' }}>Prosperidade</span>
+                <span style={{ color: '#2FB36A', display: 'block' }}>para famílias.</span>
               </h1>
-              <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.5)', lineHeight: 1.65, marginBottom: '28px' }}>
+              <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.48)', lineHeight: 1.7, marginBottom: '32px', maxWidth: '260px' }}>
                 Organize seu patrimônio, acompanhe seus objetivos e construa um futuro financeiro sólido.
               </p>
 
-              {/* Features */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {/* Benefícios */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {[
-                  { icon: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="5" height="5" rx="1" fill="#10B981"/><rect x="8" y="1" width="5" height="5" rx="1" fill="#10B981" fillOpacity="0.5"/><rect x="1" y="8" width="5" height="5" rx="1" fill="#10B981" fillOpacity="0.5"/><rect x="8" y="8" width="5" height="5" rx="1" fill="#10B981"/></svg>, title: 'Visão completa', desc: 'Tenha todos os seus bens, investimentos e dívidas em um só lugar.' },
-                  { icon: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5" stroke="#10B981" strokeWidth="1.5"/><path d="M7 4v3l2 2" stroke="#10B981" strokeWidth="1.5" strokeLinecap="round"/></svg>, title: 'Planejamento inteligente', desc: 'Defina metas, acompanhe seu progresso e tome decisões melhores.' },
-                  { icon: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2C4.24 2 2 4.24 2 7s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zm0 2c.83 0 1.5.67 1.5 1.5S7.83 7 7 7s-1.5-.67-1.5-1.5S6.17 4 7 4zm0 7c-1.25 0-2.36-.62-3.03-1.57C4.64 8.55 5.76 8 7 8s2.36.55 3.03 1.43C9.36 10.38 8.25 11 7 11z" fill="#10B981"/></svg>, title: 'Para toda a família', desc: 'Compartilhe informações e alinhe objetivos com quem importa.' },
-                ].map(f => (
-                  <div key={f.title} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                  { Icon: BarChart2, title: 'Visão completa', desc: 'Bens, investimentos e dívidas em um único lugar.' },
+                  { Icon: Shield,    title: 'Segurança',      desc: 'Criptografia bancária e autenticação segura.' },
+                  { Icon: Target,    title: 'Planejamento',   desc: 'Metas patrimoniais e acompanhamento em tempo real.' },
+                ].map(({ Icon, title, desc }) => (
+                  <div key={title} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                     <div style={{
-                      width: '32px', height: '32px', borderRadius: '8px', flexShrink: 0,
-                      backgroundColor: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)',
+                      width: '32px', height: '32px', borderRadius: '9px', flexShrink: 0,
+                      backgroundColor: 'rgba(47,179,106,0.12)',
+                      border: '1px solid rgba(47,179,106,0.2)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>
-                      {f.icon}
+                      <Icon size={15} color="#2FB36A" strokeWidth={1.75} />
                     </div>
                     <div>
-                      <p style={{ fontSize: '13px', fontWeight: 600, color: '#fff', marginBottom: '2px' }}>{f.title}</p>
-                      <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>{f.desc}</p>
+                      <p style={{ fontSize: '13px', fontWeight: 600, color: '#fff', marginBottom: '2px' }}>{title}</p>
+                      <p style={{ fontSize: '11.5px', color: 'rgba(255,255,255,0.38)', lineHeight: 1.5 }}>{desc}</p>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Mockups flutuantes */}
-            <div style={{ position: 'relative', height: '340px' }}>
-              {/* Card ícone BarChart topo direito */}
+            {/* Dashboard mockup */}
+            <div style={{ position: 'relative', height: '320px' }}>
+              {/* Linhas pontilhadas */}
+              <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 0 }} viewBox="0 0 280 320">
+                <line x1="240" y1="20" x2="180" y2="100" stroke="rgba(47,179,106,0.2)" strokeWidth="1" strokeDasharray="3 4"/>
+                <line x1="240" y1="200" x2="180" y2="160" stroke="rgba(47,179,106,0.2)" strokeWidth="1" strokeDasharray="3 4"/>
+                <line x1="20" y1="280" x2="80" y2="220" stroke="rgba(47,179,106,0.2)" strokeWidth="1" strokeDasharray="3 4"/>
+                <line x1="20" y1="40" x2="80" y2="100" stroke="rgba(47,179,106,0.2)" strokeWidth="1" strokeDasharray="3 4"/>
+              </svg>
+
+              {/* Mini cards flutuantes */}
+              {/* TL — BarChart */}
               <div style={{
-                position: 'absolute', top: 0, right: 0,
-                width: '64px', height: '64px', borderRadius: '16px',
-                backgroundColor: '#0F766E', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+                position: 'absolute', top: '0px', right: '0px', zIndex: 3,
+                width: '52px', height: '52px', borderRadius: '14px',
+                backgroundColor: 'rgba(255,255,255,0.07)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                backdropFilter: 'blur(12px)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                <BarChart2 size={28} color="#fff" strokeWidth={1.5} />
+                <BarChart2 size={22} color="#2FB36A" strokeWidth={1.5} />
               </div>
 
-              {/* Card Visão Geral */}
+              {/* TR — Home */}
               <div style={{
-                position: 'absolute', top: '48px', left: 0, right: '40px',
-                borderRadius: '16px', padding: '16px',
-                backgroundColor: '#fff', boxShadow: '0 12px 32px rgba(0,0,0,0.25)',
+                position: 'absolute', top: '180px', right: '-8px', zIndex: 3,
+                width: '48px', height: '48px', borderRadius: '13px',
+                backgroundColor: 'rgba(255,255,255,0.07)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                backdropFilter: 'blur(12px)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                <p style={{ fontSize: '12px', fontWeight: 600, color: '#0F172A', marginBottom: '4px' }}>Visão Geral</p>
-                <p style={{ fontSize: '10px', color: '#94A3B8', marginBottom: '6px' }}>Patrimônio total</p>
-                <p style={{ fontSize: '18px', fontWeight: 700, color: '#0F172A', marginBottom: '10px', letterSpacing: '-0.5px' }}>R$ 12.450.000,00</p>
-                <svg width="100%" height="44" viewBox="0 0 200 44" preserveAspectRatio="none">
+                <Home size={20} color="#58D68D" strokeWidth={1.5} />
+              </div>
+
+              {/* BL — Users */}
+              <div style={{
+                position: 'absolute', bottom: '16px', left: '-8px', zIndex: 3,
+                width: '48px', height: '48px', borderRadius: '13px',
+                backgroundColor: 'rgba(255,255,255,0.07)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                backdropFilter: 'blur(12px)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Users size={20} color="#58D68D" strokeWidth={1.5} />
+              </div>
+
+              {/* Card principal Visão Geral */}
+              <div style={{
+                position: 'absolute', top: '32px', left: '16px', right: '16px', zIndex: 2,
+                borderRadius: '18px', padding: '18px',
+                backgroundColor: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                backdropFilter: 'blur(16px)',
+              }}>
+                <p style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>VISÃO GERAL</p>
+                <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', marginBottom: '6px' }}>Patrimônio total</p>
+                <p style={{ fontSize: '22px', fontWeight: 700, color: '#fff', letterSpacing: '-0.8px', marginBottom: '12px' }}>R$ 12.450.000</p>
+                {/* Gráfico linha */}
+                <svg width="100%" height="44" viewBox="0 0 220 44" preserveAspectRatio="none" style={{ marginBottom: '14px' }}>
                   <defs>
-                    <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#10B981" stopOpacity="0.2"/>
-                      <stop offset="100%" stopColor="#10B981" stopOpacity="0"/>
+                    <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#2FB36A" stopOpacity="0.25"/>
+                      <stop offset="100%" stopColor="#2FB36A" stopOpacity="0"/>
                     </linearGradient>
                   </defs>
-                  <path d="M0,34 C20,30 40,24 70,18 C100,12 120,26 140,16 C160,6 180,10 200,4 L200,44 L0,44 Z" fill="url(#g1)"/>
-                  <path d="M0,34 C20,30 40,24 70,18 C100,12 120,26 140,16 C160,6 180,10 200,4" fill="none" stroke="#10B981" strokeWidth="2"/>
+                  <path d="M0,36 C18,32 36,26 60,20 C84,14 100,28 130,18 C160,8 180,12 220,4 L220,44 L0,44 Z" fill="url(#lineGrad)"/>
+                  <path d="M0,36 C18,32 36,26 60,20 C84,14 100,28 130,18 C160,8 180,12 220,4" fill="none" stroke="#2FB36A" strokeWidth="2" strokeLinecap="round"/>
+                  {[[60,20],[130,18],[220,4]].map(([x,y], i) => (
+                    <circle key={i} cx={x} cy={y} r="3" fill="#fff" stroke="#2FB36A" strokeWidth="1.5"/>
+                  ))}
                 </svg>
-              </div>
-
-              {/* Ícone casa */}
-              <div style={{
-                position: 'absolute', top: '200px', right: '8px',
-                width: '52px', height: '52px', borderRadius: '14px',
-                backgroundColor: '#1A3D2E', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 8px 20px rgba(0,0,0,0.3)',
-              }}>
-                <Home size={22} color="#10B981" strokeWidth={1.5} />
-              </div>
-
-              {/* Card Distribuição */}
-              <div style={{
-                position: 'absolute', bottom: 0, left: '16px', right: 0,
-                borderRadius: '16px', padding: '14px',
-                backgroundColor: '#fff', boxShadow: '0 12px 32px rgba(0,0,0,0.25)',
-              }}>
-                <p style={{ fontSize: '11px', fontWeight: 600, color: '#0F172A', marginBottom: '10px' }}>Distribuição</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  {/* Mini pie SVG */}
-                  <svg width="52" height="52" viewBox="0 0 52 52">
-                    <circle cx="26" cy="26" r="20" fill="none" stroke="#3B82F6" strokeWidth="12" strokeDasharray="79 47" strokeDashoffset="0"/>
-                    <circle cx="26" cy="26" r="20" fill="none" stroke="#10B981" strokeWidth="12" strokeDasharray="25 101" strokeDashoffset="-79"/>
-                    <circle cx="26" cy="26" r="20" fill="none" stroke="#F59E0B" strokeWidth="12" strokeDasharray="13 113" strokeDashoffset="-104"/>
-                    <circle cx="26" cy="26" r="20" fill="none" stroke="#E2E8F0" strokeWidth="12" strokeDasharray="9 117" strokeDashoffset="-117"/>
-                    <circle cx="26" cy="26" r="14" fill="#fff"/>
+                {/* Gráfico donut + legenda */}
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <svg width="56" height="56" viewBox="0 0 56 56" style={{ flexShrink: 0 }}>
+                    <circle cx="28" cy="28" r="22" fill="none" stroke="#3B82F6" strokeWidth="10" strokeDasharray="87 51" strokeDashoffset="0" strokeLinecap="round"/>
+                    <circle cx="28" cy="28" r="22" fill="none" stroke="#2FB36A" strokeWidth="10" strokeDasharray="28 110" strokeDashoffset="-87" strokeLinecap="round"/>
+                    <circle cx="28" cy="28" r="22" fill="none" stroke="#F59E0B" strokeWidth="10" strokeDasharray="14 124" strokeDashoffset="-115" strokeLinecap="round"/>
+                    <circle cx="28" cy="28" r="22" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="10" strokeDasharray="9 129" strokeDashoffset="-129" strokeLinecap="round"/>
+                    <circle cx="28" cy="28" r="16" fill="rgba(6,38,31,0.8)"/>
                   </svg>
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     {[
                       { cor: '#3B82F6', label: 'Investimentos', pct: '65%' },
-                      { cor: '#10B981', label: 'Imóveis', pct: '20%' },
-                      { cor: '#F59E0B', label: 'Caixa', pct: '10%' },
-                      { cor: '#E2E8F0', label: 'Outros', pct: '5%' },
-                    ].map(i => (
-                      <div key={i.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      { cor: '#2FB36A', label: 'Imóveis',       pct: '20%' },
+                      { cor: '#F59E0B', label: 'Caixa',         pct: '10%' },
+                      { cor: 'rgba(255,255,255,0.2)', label: 'Outros', pct: '5%' },
+                    ].map(d => (
+                      <div key={d.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                          <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: i.cor, flexShrink: 0 }} />
-                          <span style={{ fontSize: '9px', color: '#64748B' }}>{i.label}</span>
+                          <div style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: d.cor, flexShrink: 0 }} />
+                          <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.45)' }}>{d.label}</span>
                         </div>
-                        <span style={{ fontSize: '9px', fontWeight: 600, color: '#0F172A' }}>{i.pct}</span>
+                        <span style={{ fontSize: '9px', fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>{d.pct}</span>
                       </div>
                     ))}
                   </div>
                 </div>
               </div>
 
-              {/* Ícone pessoas */}
+              {/* FileText card BL */}
               <div style={{
-                position: 'absolute', bottom: '8px', left: '-12px',
-                width: '48px', height: '48px', borderRadius: '14px',
-                backgroundColor: '#1A3D2E', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 8px 20px rgba(0,0,0,0.3)',
+                position: 'absolute', top: '0px', left: '-8px', zIndex: 3,
+                width: '48px', height: '48px', borderRadius: '13px',
+                backgroundColor: 'rgba(255,255,255,0.07)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                backdropFilter: 'blur(12px)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                <Users size={20} color="#10B981" strokeWidth={1.5} />
+                <FileText size={20} color="#58D68D" strokeWidth={1.5} />
               </div>
             </div>
           </div>
 
           {/* Stats */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '10px' }}>
             {[
               { Icon: Users,      val: '1.2K+',  label: 'Famílias ativas' },
               { Icon: TrendingUp, val: 'R$12M+', label: 'Patrimônio gerenciado' },
-              { Icon: Target,     val: '98%',    label: 'Metas concluídas' },
-            ].map(s => (
-              <div key={s.label} style={{
-                display: 'flex', alignItems: 'center', gap: '12px',
-                padding: '14px 16px', borderRadius: '14px',
-                backgroundColor: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.08)',
+              { Icon: Shield,     val: '98%',    label: 'Metas concluídas' },
+            ].map(({ Icon, val, label }) => (
+              <div key={label} style={{
+                display: 'flex', alignItems: 'center', gap: '10px',
+                padding: '14px 14px',
+                borderRadius: '14px',
+                backgroundColor: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.07)',
+                backdropFilter: 'blur(8px)',
               }}>
-                <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: 'rgba(16,185,129,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <s.Icon size={15} color="#10B981" strokeWidth={1.75} />
+                <div style={{
+                  width: '30px', height: '30px', borderRadius: '8px', flexShrink: 0,
+                  backgroundColor: 'rgba(47,179,106,0.12)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Icon size={14} color="#2FB36A" strokeWidth={1.75} />
                 </div>
                 <div>
-                  <p style={{ fontSize: '18px', fontWeight: 700, color: '#fff', letterSpacing: '-0.5px', lineHeight: 1.1 }}>{s.val}</p>
-                  <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>{s.label}</p>
+                  <p style={{ fontSize: '17px', fontWeight: 700, color: '#fff', letterSpacing: '-0.4px', lineHeight: 1.1 }}>{val}</p>
+                  <p style={{ fontSize: '9.5px', color: 'rgba(255,255,255,0.38)', marginTop: '1px' }}>{label}</p>
                 </div>
               </div>
             ))}
@@ -229,83 +308,97 @@ export default function LoginPage() {
         flex: 1, backgroundColor: '#fff',
         display: 'flex', flexDirection: 'column',
       }}>
-        {/* Nav topo */}
+        {/* Nav */}
         <div className="hidden lg:flex" style={{
-          alignItems: 'center', justifyContent: 'flex-end',
-          padding: '20px 40px', gap: '32px',
-          borderBottom: '1px solid #F1F5F9',
+          alignItems: 'center', justifyContent: 'space-between',
+          padding: '22px 40px',
         }}>
-          {['Sobre o Finify', 'Recursos', 'Preços'].map(item => (
-            <a key={item} href="#" style={{ fontSize: '14px', fontWeight: 500, color: '#374151', textDecoration: 'none' }}>{item}</a>
-          ))}
-          <a href="/cadastro" style={{
-            padding: '8px 20px', borderRadius: '8px',
-            backgroundColor: '#0D2B1F', color: '#fff',
-            fontSize: '14px', fontWeight: 600, textDecoration: 'none',
-          }}>Entrar</a>
+          <div className="lg:hidden">
+            <LogoDark />
+          </div>
+          <div style={{ flex: 1 }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '28px' }}>
+            {['Sobre o Finify', 'Recursos', 'Preços'].map(item => (
+              <a key={item} href="#" style={{ fontSize: '14px', fontWeight: 500, color: '#374151', textDecoration: 'none' }}>
+                {item}
+              </a>
+            ))}
+            <a href="/cadastro" style={{
+              padding: '9px 22px', borderRadius: '9px',
+              background: 'linear-gradient(135deg, #07271F 0%, #0F4737 100%)',
+              color: '#fff', fontSize: '14px', fontWeight: 600,
+              textDecoration: 'none', letterSpacing: '-0.1px',
+            }}>
+              Entrar
+            </a>
+          </div>
         </div>
 
-        {/* Form area */}
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
-          <div style={{ width: '100%', maxWidth: '400px' }}>
-
+        {/* Form */}
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div style={{
+            width: '100%', maxWidth: '440px',
+            backgroundColor: '#fff',
+            borderRadius: '28px',
+            padding: '48px 48px 40px',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 12px 40px rgba(0,0,0,0.07)',
+            border: '1px solid #ECEFF3',
+          }}>
             {/* Logo mobile */}
-            <div className="lg:hidden" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '32px' }}>
-              <div style={{
-                width: '34px', height: '34px', borderRadius: '8px', backgroundColor: '#10B981',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-                  <rect x="3" y="3" width="6" height="6" rx="1.5" fill="white"/>
-                  <rect x="3" y="11" width="6" height="6" rx="1.5" fill="white" fillOpacity="0.5"/>
-                  <rect x="11" y="3" width="6" height="6" rx="1.5" fill="white" fillOpacity="0.5"/>
-                  <rect x="11" y="11" width="6" height="6" rx="1.5" fill="white"/>
-                </svg>
-              </div>
-              <span style={{ fontSize: '18px', fontWeight: 700, color: '#0D2B1F' }}>Finify</span>
+            <div className="lg:hidden" style={{ marginBottom: '28px' }}>
+              <LogoDark />
             </div>
 
             {/* Ícone cadeado */}
             <div style={{ marginBottom: '24px' }}>
               <div style={{
                 width: '56px', height: '56px', borderRadius: '50%',
-                backgroundColor: '#F0FDF4', border: '1px solid #D1FAE5',
+                backgroundColor: '#F0FDF4', border: '1.5px solid #D1FAE5',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                <Lock size={22} color="#0F766E" strokeWidth={1.75} />
+                <Lock size={22} color="#0F4737" strokeWidth={1.75} />
               </div>
             </div>
 
-            <h2 style={{ fontSize: '28px', fontWeight: 700, color: '#0F172A', letterSpacing: '-0.5px', marginBottom: '6px' }}>
+            <h2 style={{ fontSize: '28px', fontWeight: 700, color: '#0B3B2E', letterSpacing: '-0.7px', marginBottom: '6px' }}>
               Acesse sua conta
             </h2>
-            <p style={{ fontSize: '15px', color: '#6B7280', marginBottom: '32px' }}>
+            <p style={{ fontSize: '14.5px', color: '#6B7280', marginBottom: '32px', lineHeight: 1.5 }}>
               Patrimônio e planejamento ao alcance da família
             </p>
 
-            <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {/* Email */}
               <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#374151', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '10.5px', fontWeight: 700, color: '#374151', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: '7px' }}>
                   E-mail
                 </label>
                 <input
                   type="email" value={email} onChange={e => setEmail(e.target.value)}
                   placeholder="seu@email.com" required
                   style={{
-                    width: '100%', height: '48px', padding: '0 16px',
-                    borderRadius: '10px', border: '1px solid #E5E7EB',
-                    fontSize: '15px', color: '#111827', outline: 'none',
-                    backgroundColor: '#fff', boxSizing: 'border-box',
+                    width: '100%', height: '52px', padding: '0 16px',
+                    borderRadius: '13px', border: '1.5px solid #E5E7EB',
+                    fontSize: '14.5px', color: '#111827', outline: 'none',
+                    backgroundColor: '#FAFAFA', boxSizing: 'border-box',
+                    transition: 'border-color 0.15s, box-shadow 0.15s',
                   }}
-                  onFocus={e => e.target.style.borderColor = '#0F766E'}
-                  onBlur={e => e.target.style.borderColor = '#E5E7EB'}
+                  onFocus={e => {
+                    e.target.style.borderColor = '#2FB36A'
+                    e.target.style.boxShadow = '0 0 0 3px rgba(47,179,106,0.12)'
+                    e.target.style.backgroundColor = '#fff'
+                  }}
+                  onBlur={e => {
+                    e.target.style.borderColor = '#E5E7EB'
+                    e.target.style.boxShadow = 'none'
+                    e.target.style.backgroundColor = '#FAFAFA'
+                  }}
                 />
               </div>
 
               {/* Senha */}
               <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#374151', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '10.5px', fontWeight: 700, color: '#374151', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: '7px' }}>
                   Senha
                 </label>
                 <div style={{ position: 'relative' }}>
@@ -313,18 +406,27 @@ export default function LoginPage() {
                     type={showSenha ? 'text' : 'password'} value={senha} onChange={e => setSenha(e.target.value)}
                     placeholder="Sua senha" required
                     style={{
-                      width: '100%', height: '48px', padding: '0 48px 0 16px',
-                      borderRadius: '10px', border: '1px solid #E5E7EB',
-                      fontSize: '15px', color: '#111827', outline: 'none',
-                      backgroundColor: '#fff', boxSizing: 'border-box',
+                      width: '100%', height: '52px', padding: '0 48px 0 16px',
+                      borderRadius: '13px', border: '1.5px solid #E5E7EB',
+                      fontSize: '14.5px', color: '#111827', outline: 'none',
+                      backgroundColor: '#FAFAFA', boxSizing: 'border-box',
+                      transition: 'border-color 0.15s, box-shadow 0.15s',
                     }}
-                    onFocus={e => e.target.style.borderColor = '#0F766E'}
-                    onBlur={e => e.target.style.borderColor = '#E5E7EB'}
+                    onFocus={e => {
+                      e.target.style.borderColor = '#2FB36A'
+                      e.target.style.boxShadow = '0 0 0 3px rgba(47,179,106,0.12)'
+                      e.target.style.backgroundColor = '#fff'
+                    }}
+                    onBlur={e => {
+                      e.target.style.borderColor = '#E5E7EB'
+                      e.target.style.boxShadow = 'none'
+                      e.target.style.backgroundColor = '#FAFAFA'
+                    }}
                   />
                   <button type="button" onClick={() => setShowSenha(!showSenha)} style={{
                     position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)',
                     background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF',
-                    display: 'flex', alignItems: 'center',
+                    display: 'flex', alignItems: 'center', padding: 0,
                   }}>
                     {showSenha ? <EyeOff size={17} strokeWidth={1.75} /> : <Eye size={17} strokeWidth={1.75} />}
                   </button>
@@ -332,10 +434,10 @@ export default function LoginPage() {
               </div>
 
               {/* Esqueceu */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-4px' }}>
                 <button type="button" onClick={handleEsqueceuSenha} style={{
                   background: 'none', border: 'none', cursor: 'pointer',
-                  fontSize: '14px', fontWeight: 500, color: '#0F766E',
+                  fontSize: '13.5px', fontWeight: 500, color: '#0F4737',
                 }}>
                   Esqueci minha senha
                 </button>
@@ -343,61 +445,85 @@ export default function LoginPage() {
 
               {/* Erro */}
               {erro && (
-                <div style={{ backgroundColor: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: '#DC2626' }}>
+                <div style={{
+                  backgroundColor: '#FEF2F2', border: '1px solid #FECACA',
+                  borderRadius: '10px', padding: '10px 14px',
+                  fontSize: '13px', color: '#DC2626',
+                }}>
                   {erro}
                 </div>
               )}
 
-              {/* Botão acessar */}
-              <button type="submit" disabled={loading} style={{
-                width: '100%', height: '52px', borderRadius: '10px', border: 'none',
-                backgroundColor: '#0D2B1F',
-                color: '#fff', fontSize: '15px', fontWeight: 600,
-                cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.7 : 1,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-              }}>
-                <Lock size={15} strokeWidth={2} />
+              {/* Botão principal */}
+              <button
+                type="submit" disabled={loading}
+                style={{
+                  width: '100%', height: '54px', borderRadius: '14px', border: 'none',
+                  background: loading ? '#6B7280' : 'linear-gradient(135deg, #07271F 0%, #145A45 100%)',
+                  color: '#fff', fontSize: '15px', fontWeight: 600,
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                  boxShadow: loading ? 'none' : '0 4px 16px rgba(11,59,46,0.3)',
+                  transition: 'all 0.2s',
+                  letterSpacing: '-0.1px',
+                }}
+                onMouseEnter={e => { if (!loading) { (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 6px 24px rgba(11,59,46,0.45)'; (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)' } }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 16px rgba(11,59,46,0.3)'; (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)' }}
+              >
+                <Lock size={15} strokeWidth={2.5} />
                 {loading ? 'Acessando...' : 'Acessar plataforma'}
               </button>
 
               {/* Divider */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ flex: 1, height: '1px', backgroundColor: '#E5E7EB' }} />
-                <span style={{ fontSize: '13px', color: '#9CA3AF' }}>ou</span>
-                <div style={{ flex: 1, height: '1px', backgroundColor: '#E5E7EB' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '2px 0' }}>
+                <div style={{ flex: 1, height: '1px', backgroundColor: '#ECEFF3' }} />
+                <span style={{ fontSize: '12px', color: '#9CA3AF', fontWeight: 500 }}>ou</span>
+                <div style={{ flex: 1, height: '1px', backgroundColor: '#ECEFF3' }} />
               </div>
 
               {/* Botão criar conta */}
-              <a href="/cadastro" style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                height: '52px', borderRadius: '10px', border: '1px solid #E5E7EB',
-                backgroundColor: '#fff', color: '#0F172A',
-                fontSize: '15px', fontWeight: 600, textDecoration: 'none',
-              }}>
-                <RefreshCcw size={15} color="#0F766E" strokeWidth={2} />
+              <a
+                href="/cadastro"
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                  height: '52px', borderRadius: '13px',
+                  border: '1.5px solid #E5E7EB',
+                  backgroundColor: '#fff', color: '#0B3B2E',
+                  fontSize: '14.5px', fontWeight: 600, textDecoration: 'none',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLAnchorElement).style.borderColor = '#2FB36A'
+                  ;(e.currentTarget as HTMLAnchorElement).style.backgroundColor = '#F0FDF4'
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLAnchorElement).style.borderColor = '#E5E7EB'
+                  ;(e.currentTarget as HTMLAnchorElement).style.backgroundColor = '#fff'
+                }}
+              >
+                <ArrowRight size={15} color="#0F4737" strokeWidth={2.5} />
                 Criar conta gratuita
               </a>
             </form>
 
             {/* Trust badges */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '16px', marginTop: '32px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px', marginTop: '28px', paddingTop: '24px', borderTop: '1px solid #F7F8FA' }}>
               {[
-                { Icon: Shield,     label: 'Seus dados',    sub: 'sempre protegidos' },
-                { Icon: RefreshCw,  label: 'Sincronização', sub: 'automática' },
-                { Icon: Smartphone, label: 'Acesso em',     sub: 'qualquer lugar' },
+                { Icon: Shield,     label: 'Dados protegidos',      sub: 'Criptografia bancária' },
+                { Icon: RefreshCw,  label: 'Sincronização',          sub: 'Automática' },
+                { Icon: Smartphone, label: 'Acesso em',              sub: 'qualquer lugar' },
               ].map(({ Icon, label, sub }) => (
-                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div key={label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', textAlign: 'center' }}>
                   <div style={{
-                    width: '30px', height: '30px', borderRadius: '8px',
+                    width: '32px', height: '32px', borderRadius: '9px',
                     backgroundColor: '#F0FDF4', border: '1px solid #D1FAE5',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
-                    <Icon size={13} color="#0F766E" strokeWidth={1.75} />
+                    <Icon size={14} color="#0F4737" strokeWidth={1.75} />
                   </div>
                   <div>
-                    <p style={{ fontSize: '11px', fontWeight: 600, color: '#374151', lineHeight: 1.2 }}>{label}</p>
-                    <p style={{ fontSize: '10px', color: '#9CA3AF', lineHeight: 1.2 }}>{sub}</p>
+                    <p style={{ fontSize: '10.5px', fontWeight: 600, color: '#374151', lineHeight: 1.2 }}>{label}</p>
+                    <p style={{ fontSize: '9.5px', color: '#9CA3AF', lineHeight: 1.3, marginTop: '1px' }}>{sub}</p>
                   </div>
                 </div>
               ))}
