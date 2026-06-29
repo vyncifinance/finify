@@ -553,7 +553,7 @@ export default function MovimentosPage() {
           onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}
           style={{ position: 'fixed', inset: 0, zIndex: 50, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
           {/* Desktop: modal centralizado */}
-          <div style={{ width: '520px', backgroundColor: '#fff', borderRadius: '20px', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
+          <div style={{ width: '520px', backgroundColor: '#fff', borderRadius: '20px', display: 'flex', flexDirection: 'column', maxHeight: '90vh', margin: 'auto' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px', borderBottom: '1px solid #F1F5F9', flexShrink: 0 }}>
               <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#0F172A' }}>
                 {editando ? 'Editar lançamento' : 'Novo lançamento'}
@@ -639,4 +639,5 @@ export default function MovimentosPage() {
     </>
   )
 }
+
 
