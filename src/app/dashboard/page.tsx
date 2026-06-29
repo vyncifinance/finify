@@ -361,7 +361,7 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', letterSpacing: '-0.5px' }}>
-              {getSaudacao()}, {primeiroNome || 'Família'} 👋
+              {getSaudacao()}, {primeiroNome || 'Família'}
             </h1>
             <p className="text-sm mt-1" style={{ color: '#64748B' }}>Aqui está o resumo da sua vida financeira</p>
           </div>
