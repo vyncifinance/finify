@@ -428,12 +428,12 @@ export default function MovimentosPage() {
       </div>
 
       {/* ── MODAL — inline style puro, sem Tailwind ── */}
+      {/* Modal Mobile */}
       {modalOpen && (
-        <div
+        <div className="lg:hidden"
           onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}
           style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
-          {/* Mobile: bottom sheet */}
-          <div className="lg:hidden" style={{ width: '100%', backgroundColor: '#fff', borderRadius: '28px 28px 0 0', display: 'flex', flexDirection: 'column', maxHeight: '85vh' }}>
+          <div style={{ width: '100%', backgroundColor: '#fff', borderRadius: '28px 28px 0 0', display: 'flex', flexDirection: 'column', maxHeight: '85vh' }}>
 
             {/* Drag handle */}
             <div style={{ width: '40px', height: '4px', borderRadius: '2px', backgroundColor: '#E2E8F0', margin: '12px auto 4px', flexShrink: 0 }} />
@@ -542,9 +542,16 @@ export default function MovimentosPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
 
+      {/* Modal Desktop */}
+      {modalOpen && (
+        <div className="hidden lg:flex"
+          onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}
+          style={{ position: 'fixed', inset: 0, zIndex: 50, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
           {/* Desktop: modal centralizado */}
-          <div className="hidden lg:flex" style={{ width: '520px', backgroundColor: '#fff', borderRadius: '20px', flexDirection: 'column', maxHeight: '90vh', position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
+          <div style={{ width: '520px', backgroundColor: '#fff', borderRadius: '20px', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px', borderBottom: '1px solid #F1F5F9', flexShrink: 0 }}>
               <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#0F172A' }}>
                 {editando ? 'Editar lançamento' : 'Novo lançamento'}
