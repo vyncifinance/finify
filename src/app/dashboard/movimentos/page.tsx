@@ -66,6 +66,14 @@ export default function MovimentosPage() {
   const [salvando, setSalvando]           = useState(false)
   const [deletando, setDeletando]         = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [isMobile, setIsMobile]           = useState(true)
+
+  useEffect(() => {
+    setIsMobile(window.innerWidth < 1024)
+    const handler = () => setIsMobile(window.innerWidth < 1024)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
 
   const supabase = createClient()
 
@@ -436,8 +444,8 @@ export default function MovimentosPage() {
 
       {/* ── MODAL — inline style puro, sem Tailwind ── */}
       {/* Modal Mobile */}
-      {modalOpen && (
-        <div className="lg:hidden"
+      {modalOpen && isMobile && (
+        <div
           onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}
           style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
           <div style={{ width: '100%', backgroundColor: '#fff', borderRadius: '28px 28px 0 0', display: 'flex', flexDirection: 'column', maxHeight: '85vh' }}>
@@ -553,10 +561,10 @@ export default function MovimentosPage() {
       )}
 
       {/* Modal Desktop */}
-      {modalOpen && (
-        <div className="hidden lg:flex"
+      {modalOpen && !isMobile && (
+        <div
           onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}
-          style={{ position: 'fixed', inset: 0, zIndex: 50, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
+          style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
           {/* Desktop: modal centralizado */}
           <div style={{ width: '520px', backgroundColor: '#fff', borderRadius: '20px', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px', borderBottom: '1px solid #F1F5F9', flexShrink: 0 }}>
