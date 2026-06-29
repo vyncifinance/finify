@@ -1,6 +1,5 @@
 @AGENTS.md
 
-
 # Finify — Regras do Projeto
 
 ## Visão Geral
@@ -159,3 +158,41 @@ Investimento → TrendingUp
 - ❌ RLS recursiva na tabela profiles (causa loop infinito)
 - ❌ Hardcode de valores que mudam (usar variáveis de estado)
 - ❌ `position: fixed` sem considerar a bottom nav no mobile
+
+---
+
+## UI Premium — Regras de Aparência
+
+O Finify é um produto financeiro premium. Cada elemento visual deve transmitir confiança, sofisticação e qualidade.
+
+### Ícones — REGRA CRÍTICA
+- **NUNCA usar emojis** em nenhum lugar da interface — nem em botões, inputs, labels ou mensagens
+- **SEMPRE usar Lucide React outline** — é a única biblioteca de ícones permitida
+- Exemplos de substituições obrigatórias:
+  - 👁️ / 🙈 (mostrar/ocultar senha) → `Eye` / `EyeOff` do Lucide
+  - ✓ (confirmação) → `Check` ou `CheckCircle2` do Lucide
+  - ✕ (fechar) → `X` do Lucide
+  - 🗑️ (deletar) → `Trash2` do Lucide
+  - ✏️ (editar) → `Pencil` do Lucide
+  - 📋 (copiar) → `Copy` do Lucide
+  - 🔔 (notificação) → `Bell` do Lucide
+  - 📊 (gráfico) → `TrendingUp` do Lucide
+  - 💰 (dinheiro) → `DollarSign` ou `Wallet` do Lucide
+
+### Padrão de qualidade visual
+- Inputs com `height: 52px`, `border-radius: 16px`, borda verde ao focar
+- Botões principais: fundo `#0E3B2E`, `height: 52-56px`, `border-radius: 16px`, sombra sutil
+- Botões secundários: fundo transparente com borda, nunca cinza genérico
+- Mensagens de erro: fundo `#FEF2F2`, texto `#DC2626`, `border-radius: 12px`
+- Nunca usar `alert()` nativo do browser — usar componentes visuais no próprio layout
+- Transições suaves em hover: `hover:opacity-90` ou `transition-all`
+- Textos de suporte: `#6B7280` ou `#94A3B8`, nunca preto puro
+
+### O que torna um app genérico (PROIBIDO)
+- Emojis como ícones funcionais
+- Botões quadrados sem border-radius
+- Inputs sem estilo de foco
+- Cores padrão do browser (azul de link, cinza de botão)
+- Alertas nativos do browser (`alert()`, `confirm()`)
+- Ícones de fontes externas (Font Awesome, Material Icons)
+- Gradientes excessivos ou cores neon

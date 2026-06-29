@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import { Eye, EyeOff } from 'lucide-react'
 
 export default function LoginPage() {
   const [email, setEmail]         = useState('')
@@ -115,12 +116,16 @@ export default function LoginPage() {
                 <input type={showSenha ? 'text' : 'password'} value={senha} onChange={e => setSenha(e.target.value)}
                   placeholder="Sua senha" required
                   className="w-full px-4 rounded-2xl border text-sm outline-none transition-all"
-                  style={{ backgroundColor: '#fff', borderColor: '#E5E7EB', color: '#111827', height: '52px' }}
+                  style={{ backgroundColor: '#fff', borderColor: '#E5E7EB', color: '#111827', height: '52px', paddingRight: '48px' }}
                   onFocus={e => e.target.style.borderColor = '#0E3B2E'}
                   onBlur={e => e.target.style.borderColor = '#E5E7EB'} />
                 <button type="button" onClick={() => setShowSenha(!showSenha)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-sm" style={{ color: '#6B7280' }}>
-                  {showSenha ? '🙈' : '👁️'}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center justify-center"
+                  style={{ color: '#9CA3AF', background: 'none', border: 'none', cursor: 'pointer' }}>
+                  {showSenha
+                    ? <EyeOff size={18} strokeWidth={1.75} />
+                    : <Eye size={18} strokeWidth={1.75} />
+                  }
                 </button>
               </div>
             </div>
@@ -132,7 +137,7 @@ export default function LoginPage() {
             )}
 
             <button type="button" onClick={handleEsqueceuSenha}
-              className="self-end text-sm font-semibold -mt-2 hover:underline" style={{ color: '#0E3B2E' }}>
+              className="self-end text-sm font-semibold -mt-2 hover:underline" style={{ color: '#0E3B2E', background: 'none', border: 'none', cursor: 'pointer' }}>
               Recuperar acesso
             </button>
 
