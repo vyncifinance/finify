@@ -24,7 +24,7 @@ const ICONES = [
 ]
 
 const CORES = [
-  '#0F766E', '#C7A15A', '#10B981', '#3B82F6',
+  '#145A45', '#C7A15A', '#10B981', '#3B82F6',
   '#8B5CF6', '#EC4899', '#EF4444', '#64748B',
 ]
 
@@ -71,7 +71,7 @@ export default function MetasPage() {
   const [valorAlvo, setValorAlvo]     = useState('')
   const [prazo, setPrazo]             = useState('')
   const [icone, setIcone]             = useState('target')
-  const [cor, setCor]                 = useState('#0F766E')
+  const [cor, setCor]                 = useState('#145A45')
   const [salvando, setSalvando]       = useState(false)
   const [deletando, setDeletando]     = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -111,7 +111,7 @@ export default function MetasPage() {
 
   function abrirModalNova() {
     setEditandoMeta(null)
-    setNome(''); setValorAlvo(''); setPrazo(''); setIcone('target'); setCor('#0F766E')
+    setNome(''); setValorAlvo(''); setPrazo(''); setIcone('target'); setCor('#145A45')
     setConfirmDelete(false)
     setModalOpen(true)
   }
@@ -122,7 +122,7 @@ export default function MetasPage() {
     setValorAlvo(String(m.valor_alvo))
     setPrazo(m.prazo ? m.prazo.substring(0, 7) : '')
     setIcone(m.icone || 'target')
-    setCor(m.cor || '#0F766E')
+    setCor(m.cor || '#145A45')
     setConfirmDelete(false)
     setModalOpen(true)
   }
@@ -280,7 +280,7 @@ export default function MetasPage() {
         <div className="px-6 py-4 border-t flex-shrink-0" style={{ borderColor: '#F1F5F9', backgroundColor: '#fff' }}>
           <button onClick={handleSalvarMeta} disabled={salvando || !nome.trim() || !valorAlvo}
             className="w-full h-12 rounded-xl text-white font-semibold text-base transition-opacity"
-            style={{ backgroundColor: '#0F766E', opacity: (salvando || !nome.trim() || !valorAlvo) ? 0.6 : 1, border: 'none', cursor: 'pointer' }}>
+            style={{ backgroundColor: '#145A45', opacity: (salvando || !nome.trim() || !valorAlvo) ? 0.6 : 1, border: 'none', cursor: 'pointer' }}>
             {salvando ? 'Salvando...' : editandoMeta ? 'Salvar alterações' : 'Criar meta'}
           </button>
         </div>
@@ -309,14 +309,14 @@ export default function MetasPage() {
           <input type="number" inputMode="decimal" value={valorAporte} onChange={e => setValorAporte(e.target.value)}
             placeholder="0,00" autoFocus
             className="w-full text-center text-4xl font-bold outline-none bg-transparent"
-            style={{ color: metaSelecionada.cor || '#0F766E' }} />
+            style={{ color: metaSelecionada.cor || '#145A45' }} />
         </div>
         <p className="text-xs mb-5" style={{ color: '#94A3B8' }}>
           Esse valor também será registrado como despesa (Investimento) no fluxo patrimonial.
         </p>
         <button onClick={handleAporte} disabled={salvandoAporte || !valorAporte}
           className="w-full h-14 rounded-xl text-white font-semibold text-base transition-opacity"
-          style={{ backgroundColor: metaSelecionada.cor || '#0F766E', opacity: (salvandoAporte || !valorAporte) ? 0.6 : 1, border: 'none', cursor: 'pointer' }}>
+          style={{ backgroundColor: metaSelecionada.cor || '#145A45', opacity: (salvandoAporte || !valorAporte) ? 0.6 : 1, border: 'none', cursor: 'pointer' }}>
           {salvandoAporte ? 'Salvando...' : 'Confirmar aporte'}
         </button>
       </div>
@@ -330,7 +330,7 @@ export default function MetasPage() {
     const concluida  = pct >= 100
     const faltaValor = Math.max(Number(m.valor_alvo) - Number(m.valor_atual), 0)
     const Icon       = getIcon(m.icone)
-    const cor        = m.cor || '#0F766E'
+    const cor        = m.cor || '#145A45'
 
     return (
       <div className={desktop ? 'rounded-[20px] border p-6' : 'rounded-2xl border p-4'}
@@ -397,7 +397,7 @@ export default function MetasPage() {
     <>
       {/* ── MOBILE ── */}
       <div className="lg:hidden min-h-screen" style={{ backgroundColor: '#F8FAFC', paddingBottom: '100px' }}>
-        <div style={{ background: 'linear-gradient(135deg, #0B4D3B 0%, #0F766E 100%)', padding: '24px 20px 48px' }}>
+        <div style={{ background: 'linear-gradient(135deg, #07271F 0%, #145A45 100%)', padding: '24px 20px 48px' }}>
           <div className="flex items-center justify-between mb-2">
             <div>
               <h1 className="text-lg font-semibold text-white">Metas da Família</h1>
@@ -436,7 +436,7 @@ export default function MetasPage() {
               style={{ backgroundColor: '#fff', borderColor: '#E2E8F0' }}>
               <Target size={28} color="#E2E8F0" strokeWidth={1} />
               <p className="text-sm" style={{ color: '#94A3B8' }}>Nenhuma meta criada ainda.</p>
-              <button onClick={abrirModalNova} className="text-sm font-semibold" style={{ color: '#0F766E', background: 'none', border: 'none', cursor: 'pointer' }}>
+              <button onClick={abrirModalNova} className="text-sm font-semibold" style={{ color: '#145A45', background: 'none', border: 'none', cursor: 'pointer' }}>
                 Criar primeira meta →
               </button>
             </div>
@@ -455,7 +455,7 @@ export default function MetasPage() {
           </div>
           <button onClick={abrirModalNova}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90"
-            style={{ backgroundColor: '#0F766E', boxShadow: '0 4px 12px rgba(15,118,110,0.3)', border: 'none', cursor: 'pointer' }}>
+            style={{ backgroundColor: '#145A45', boxShadow: '0 4px 12px rgba(15,118,110,0.3)', border: 'none', cursor: 'pointer' }}>
             <Plus size={16} strokeWidth={2.5} /> Nova meta
           </button>
         </div>
@@ -486,7 +486,7 @@ export default function MetasPage() {
             style={{ backgroundColor: '#fff', borderColor: '#E2E8F0' }}>
             <Target size={32} color="#E2E8F0" strokeWidth={1} />
             <p className="text-sm" style={{ color: '#94A3B8' }}>Nenhuma meta criada ainda.</p>
-            <button onClick={abrirModalNova} className="text-sm font-semibold hover:underline" style={{ color: '#0F766E', background: 'none', border: 'none', cursor: 'pointer' }}>
+            <button onClick={abrirModalNova} className="text-sm font-semibold hover:underline" style={{ color: '#145A45', background: 'none', border: 'none', cursor: 'pointer' }}>
               Criar primeira meta →
             </button>
           </div>

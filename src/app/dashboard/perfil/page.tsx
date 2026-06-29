@@ -102,7 +102,7 @@ export default function PerfilPage() {
       <div className="lg:hidden min-h-screen" style={{ backgroundColor: '#F8FAFC', paddingBottom: '100px' }}>
 
         {/* Header verde com avatar */}
-        <div style={{ background: 'linear-gradient(135deg, #0B4D3B 0%, #0F766E 100%)', padding: '24px 20px 48px' }}>
+        <div style={{ background: 'linear-gradient(135deg, #07271F 0%, #145A45 100%)', padding: '24px 20px 48px' }}>
           <h1 className="text-lg font-semibold text-white mb-1">Perfil</h1>
           <p className="text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
             {familiaNome ? `Família ${familiaNome}` : 'Gerencie seus dados'}
@@ -114,7 +114,7 @@ export default function PerfilPage() {
           <div className="rounded-2xl border p-4 flex items-center gap-4"
             style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
             <div className="w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold flex-shrink-0"
-              style={{ backgroundColor: '#0F766E18', color: '#0F766E' }}>
+              style={{ backgroundColor: '#145A4518', color: '#145A45' }}>
               {iniciais}
             </div>
             <div className="flex-1 min-w-0">
@@ -135,7 +135,7 @@ export default function PerfilPage() {
                 style={{ borderColor: '#E2E8F0', color: '#0F172A' }} />
               <button onClick={handleSalvarNome} disabled={salvandoNome || !nome.trim()}
                 className="flex items-center gap-1.5 px-4 rounded-xl text-sm font-semibold text-white"
-                style={{ backgroundColor: '#0F766E', opacity: (salvandoNome || !nome.trim()) ? 0.6 : 1 }}>
+                style={{ backgroundColor: '#145A45', opacity: (salvandoNome || !nome.trim()) ? 0.6 : 1 }}>
                 {nomeSalvo ? <Check size={15} /> : <Save size={15} />}
                 {nomeSalvo ? 'Salvo' : 'Salvar'}
               </button>
@@ -159,7 +159,7 @@ export default function PerfilPage() {
                 </div>
                 <button onClick={handleCopiarCodigo}
                   className="w-full flex items-center justify-center gap-2 h-10 rounded-xl text-sm font-semibold"
-                  style={{ backgroundColor: copiado ? '#ECFDF5' : '#0F766E', color: copiado ? '#10B981' : '#fff' }}>
+                  style={{ backgroundColor: copiado ? '#ECFDF5' : '#145A45', color: copiado ? '#10B981' : '#fff' }}>
                   {copiado ? <CheckCheck size={15} /> : <Copy size={15} />}
                   {copiado ? 'Copiado!' : 'Copiar código'}
                 </button>
@@ -186,7 +186,7 @@ export default function PerfilPage() {
                 return (
                   <div key={m.id} className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                      style={{ backgroundColor: '#0F766E18', color: '#0F766E' }}>
+                      style={{ backgroundColor: '#145A4518', color: '#145A45' }}>
                       {inic}
                     </div>
                     <p className="text-sm font-medium" style={{ color: '#0F172A' }}>
@@ -241,7 +241,7 @@ export default function PerfilPage() {
             )}
             <button onClick={handleTrocarSenha} disabled={salvandoSenha || !novaSenha || !confirmaSenha}
               className="w-full h-11 rounded-xl text-sm font-semibold text-white"
-              style={{ backgroundColor: '#0F766E', opacity: (salvandoSenha || !novaSenha || !confirmaSenha) ? 0.6 : 1 }}>
+              style={{ backgroundColor: '#145A45', opacity: (salvandoSenha || !novaSenha || !confirmaSenha) ? 0.6 : 1 }}>
               {salvandoSenha ? 'Atualizando...' : 'Atualizar senha'}
             </button>
           </div>
@@ -273,7 +273,7 @@ export default function PerfilPage() {
               <div className="rounded-[20px] border p-6" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
                 <div className="flex items-center gap-4 mb-6">
                   <div className="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold flex-shrink-0"
-                    style={{ backgroundColor: '#0F766E18', color: '#0F766E' }}>{iniciais}</div>
+                    style={{ backgroundColor: '#145A4518', color: '#145A45' }}>{iniciais}</div>
                   <div>
                     <h2 className="font-semibold text-lg" style={{ color: '#0F172A' }}>{nome || 'Sem nome'}</h2>
                     <p className="text-sm" style={{ color: '#64748B' }}>{email}</p>
@@ -286,7 +286,7 @@ export default function PerfilPage() {
                     style={{ borderColor: '#E2E8F0', color: '#0F172A' }} />
                   <button onClick={handleSalvarNome} disabled={salvandoNome || !nome.trim()}
                     className="flex items-center gap-2 px-5 rounded-xl text-sm font-semibold text-white transition-opacity"
-                    style={{ backgroundColor: '#0F766E', opacity: (salvandoNome || !nome.trim()) ? 0.6 : 1 }}>
+                    style={{ backgroundColor: '#145A45', opacity: (salvandoNome || !nome.trim()) ? 0.6 : 1 }}>
                     {nomeSalvo ? <Check size={16} /> : <Save size={16} />}
                     {salvandoNome ? 'Salvando...' : nomeSalvo ? 'Salvo' : 'Salvar'}
                   </button>
@@ -318,7 +318,7 @@ export default function PerfilPage() {
                 {senhaMsg && <p className="text-sm mb-3" style={{ color: senhaMsg.includes('sucesso') ? '#10B981' : '#EF4444' }}>{senhaMsg}</p>}
                 <button onClick={handleTrocarSenha} disabled={salvandoSenha || !novaSenha || !confirmaSenha}
                   className="px-5 h-12 rounded-xl text-sm font-semibold text-white transition-opacity"
-                  style={{ backgroundColor: '#0F766E', opacity: (salvandoSenha || !novaSenha || !confirmaSenha) ? 0.6 : 1 }}>
+                  style={{ backgroundColor: '#145A45', opacity: (salvandoSenha || !novaSenha || !confirmaSenha) ? 0.6 : 1 }}>
                   {salvandoSenha ? 'Atualizando...' : 'Atualizar senha'}
                 </button>
               </div>
@@ -368,7 +368,7 @@ export default function PerfilPage() {
                     </div>
                     <button onClick={handleCopiarCodigo}
                       className="w-full flex items-center justify-center gap-2 h-11 rounded-xl text-sm font-semibold transition-all"
-                      style={{ backgroundColor: copiado ? '#ECFDF5' : '#0F766E', color: copiado ? '#10B981' : '#fff' }}>
+                      style={{ backgroundColor: copiado ? '#ECFDF5' : '#145A45', color: copiado ? '#10B981' : '#fff' }}>
                       {copiado ? <CheckCheck size={16} /> : <Copy size={16} />}
                       {copiado ? 'Copiado!' : 'Copiar código'}
                     </button>
@@ -393,7 +393,7 @@ export default function PerfilPage() {
                     return (
                       <div key={m.id} className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                          style={{ backgroundColor: '#0F766E18', color: '#0F766E' }}>{inic}</div>
+                          style={{ backgroundColor: '#145A4518', color: '#145A45' }}>{inic}</div>
                         <p className="text-sm font-medium truncate" style={{ color: '#0F172A' }}>
                           {m.nome}{m.id === userId ? ' (você)' : ''}
                         </p>

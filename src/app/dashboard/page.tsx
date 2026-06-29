@@ -96,7 +96,7 @@ export default function DashboardPage() {
       lanc.filter((l: any) => l.tipo === 'despesa').forEach((l: any) => {
         porCat[l.categoria] = (porCat[l.categoria] || 0) + Number(l.valor)
       })
-      const cores = ['#0F766E','#F59E0B','#8B5CF6','#3B82F6','#EC4899','#EF4444','#10B981','#64748B']
+      const cores = ['#145A45','#F59E0B','#8B5CF6','#3B82F6','#EC4899','#EF4444','#10B981','#64748B']
       setCats(Object.entries(porCat).map(([nome, val], i) => ({
         nome, val: Number(val), cor: cores[i % cores.length],
         pct: d > 0 ? Math.round((Number(val) / d) * 100) : 0
@@ -159,7 +159,7 @@ export default function DashboardPage() {
       <div className="lg:hidden min-h-screen" style={{ backgroundColor: '#F8FAFC', paddingBottom: '32px' }}>
 
         {/* Hero mobile */}
-        <div style={{ background: 'linear-gradient(135deg, #0B4D3B 0%, #0F766E 100%)', padding: '24px 20px 48px' }}>
+        <div style={{ background: 'linear-gradient(135deg, #07271F 0%, #145A45 100%)', padding: '24px 20px 48px' }}>
           <div className="flex items-center justify-between mb-6">
             <div>
               <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'rgba(255,255,255,0.5)' }}>
@@ -212,7 +212,7 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#F0FDF4' }}>
-                    <Church size={15} color="#0F766E" strokeWidth={1.75} />
+                    <Church size={15} color="#145A45" strokeWidth={1.75} />
                   </div>
                   <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>Dízimo do mês</p>
                 </div>
@@ -266,19 +266,19 @@ export default function DashboardPage() {
           <div className="rounded-2xl border" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0' }}>
             <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: '#F1F5F9' }}>
               <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>Metas da Família</p>
-              <a href="/dashboard/metas" className="flex items-center gap-1 text-xs font-semibold" style={{ color: '#0F766E' }}>
+              <a href="/dashboard/metas" className="flex items-center gap-1 text-xs font-semibold" style={{ color: '#145A45' }}>
                 Ver todas <ChevronRight size={13} strokeWidth={2} />
               </a>
             </div>
             {metas.length === 0 ? (
               <div className="p-6 text-center">
                 <p className="text-sm" style={{ color: '#94A3B8' }}>Nenhuma meta criada.</p>
-                <a href="/dashboard/metas" className="text-xs font-semibold mt-2 block" style={{ color: '#0F766E' }}>Criar meta →</a>
+                <a href="/dashboard/metas" className="text-xs font-semibold mt-2 block" style={{ color: '#145A45' }}>Criar meta →</a>
               </div>
             ) : metas.map((m: any) => {
               const pct  = Math.min(Math.round((Number(m.valor_atual) / Number(m.valor_alvo)) * 100), 100)
               const Icon = ICONES_META[m.icone] || Target
-              const cor  = m.cor || '#0F766E'
+              const cor  = m.cor || '#145A45'
               return (
                 <div key={m.id} className="p-4 border-t" style={{ borderColor: '#F1F5F9' }}>
                   <div className="flex items-center gap-3 mb-2">
@@ -303,7 +303,7 @@ export default function DashboardPage() {
           <div className="rounded-2xl border" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0' }}>
             <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: '#F1F5F9' }}>
               <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>Últimos Lançamentos</p>
-              <a href="/dashboard/movimentos" className="flex items-center gap-1 text-xs font-semibold" style={{ color: '#0F766E' }}>
+              <a href="/dashboard/movimentos" className="flex items-center gap-1 text-xs font-semibold" style={{ color: '#145A45' }}>
                 Ver todos <ChevronRight size={13} strokeWidth={2} />
               </a>
             </div>
@@ -340,15 +340,15 @@ export default function DashboardPage() {
               <AreaChart data={evolucao}>
                 <defs>
                   <linearGradient id="evoGradMobile" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#0F766E" stopOpacity={0.18} />
-                    <stop offset="100%" stopColor="#0F766E" stopOpacity={0} />
+                    <stop offset="0%" stopColor="#145A45" stopOpacity={0.18} />
+                    <stop offset="100%" stopColor="#145A45" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
                 <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
                 <Tooltip formatter={(v: any) => fmt(v)} contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', fontSize: '12px' }} />
-                <Area type="monotone" dataKey="valor" stroke="#0F766E" strokeWidth={2} fill="url(#evoGradMobile)"
-                  dot={{ fill: '#fff', stroke: '#0F766E', strokeWidth: 2, r: 3 }} />
+                <Area type="monotone" dataKey="valor" stroke="#145A45" strokeWidth={2} fill="url(#evoGradMobile)"
+                  dot={{ fill: '#fff', stroke: '#145A45', strokeWidth: 2, r: 3 }} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -377,7 +377,7 @@ export default function DashboardPage() {
 
         {/* Hero desktop */}
         <div className="rounded-[20px] p-8 mb-6 relative overflow-hidden"
-          style={{ background: 'linear-gradient(135deg, #0B4D3B 0%, #0F766E 100%)', boxShadow: '0 20px 50px -12px rgba(11,77,59,0.4)' }}>
+          style={{ background: 'linear-gradient(135deg, #07271F 0%, #145A45 100%)', boxShadow: '0 20px 50px -12px rgba(11,77,59,0.4)' }}>
           <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', filter: 'blur(40px)' }} />
           <div className="absolute -bottom-24 right-40 w-72 h-72 rounded-full" style={{ background: 'rgba(16,185,129,0.15)', filter: 'blur(60px)' }} />
           <div className="relative grid grid-cols-3 gap-8 items-center">
@@ -454,7 +454,7 @@ export default function DashboardPage() {
                 </span>
               </div>
               <div className="w-11 h-11 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: '#F0FDF4' }}>
-                <Church size={19} color="#0F766E" strokeWidth={1.75} />
+                <Church size={19} color="#145A45" strokeWidth={1.75} />
               </div>
               <p className="text-sm font-medium mb-1" style={{ color: '#64748B' }}>Dízimo do mês</p>
               <p className="text-2xl font-semibold mb-1" style={{ color: '#0F172A', letterSpacing: '-0.5px' }}>
@@ -485,8 +485,8 @@ export default function DashboardPage() {
               <AreaChart data={evolucao}>
                 <defs>
                   <linearGradient id="evoGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#0F766E" stopOpacity={0.18} />
-                    <stop offset="100%" stopColor="#0F766E" stopOpacity={0} />
+                    <stop offset="0%" stopColor="#145A45" stopOpacity={0.18} />
+                    <stop offset="100%" stopColor="#145A45" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
@@ -494,9 +494,9 @@ export default function DashboardPage() {
                 <YAxis tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
                 <Tooltip formatter={(v: any) => fmt(v)} labelStyle={{ color: '#0F172A', fontWeight: 600 }}
                   contentStyle={{ borderRadius: '14px', border: '1px solid #E2E8F0', boxShadow: '0 8px 24px rgba(0,0,0,0.08)' }} />
-                <Area type="monotone" dataKey="valor" stroke="#0F766E" strokeWidth={2.5} fill="url(#evoGrad)"
-                  dot={{ fill: '#fff', stroke: '#0F766E', strokeWidth: 2, r: 4 }}
-                  activeDot={{ fill: '#0F766E', r: 6, strokeWidth: 0 }} />
+                <Area type="monotone" dataKey="valor" stroke="#145A45" strokeWidth={2.5} fill="url(#evoGrad)"
+                  dot={{ fill: '#fff', stroke: '#145A45', strokeWidth: 2, r: 4 }}
+                  activeDot={{ fill: '#145A45', r: 6, strokeWidth: 0 }} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -531,7 +531,7 @@ export default function DashboardPage() {
             </div>
             <a href="/dashboard/movimentos"
               className="mt-4 text-center text-sm font-semibold py-2.5 rounded-xl transition-colors hover:opacity-90"
-              style={{ backgroundColor: '#F0FDF4', color: '#0F766E' }}>
+              style={{ backgroundColor: '#F0FDF4', color: '#145A45' }}>
               Ver detalhes
             </a>
           </div>
@@ -545,7 +545,7 @@ export default function DashboardPage() {
               <h2 className="font-semibold" style={{ color: '#0F172A' }}>Metas da Família</h2>
               <p className="text-sm mt-0.5" style={{ color: '#64748B' }}>Progresso dos objetivos</p>
             </div>
-            <a href="/dashboard/metas" className="flex items-center gap-1 text-sm font-semibold hover:underline" style={{ color: '#0F766E' }}>
+            <a href="/dashboard/metas" className="flex items-center gap-1 text-sm font-semibold hover:underline" style={{ color: '#145A45' }}>
               Ver todas <ArrowRight size={13} strokeWidth={2} />
             </a>
           </div>
@@ -553,14 +553,14 @@ export default function DashboardPage() {
             <div className="flex flex-col items-center justify-center py-10 gap-3">
               <Target size={28} color="#E2E8F0" strokeWidth={1} />
               <p className="text-sm" style={{ color: '#94A3B8' }}>Nenhuma meta criada ainda.</p>
-              <a href="/dashboard/metas" className="text-sm font-semibold hover:underline" style={{ color: '#0F766E' }}>Criar primeira meta →</a>
+              <a href="/dashboard/metas" className="text-sm font-semibold hover:underline" style={{ color: '#145A45' }}>Criar primeira meta →</a>
             </div>
           ) : (
             <div className="grid grid-cols-3 gap-5">
               {metas.map((m: any) => {
                 const pct  = Math.min(Math.round((Number(m.valor_atual) / Number(m.valor_alvo)) * 100), 100)
                 const Icon = ICONES_META[m.icone] || Target
-                const cor  = m.cor || '#0F766E'
+                const cor  = m.cor || '#145A45'
                 return (
                   <div key={m.id} className="rounded-2xl border p-4" style={{ borderColor: '#F1F5F9' }}>
                     <div className="flex items-center gap-3 mb-3">
@@ -623,7 +623,7 @@ export default function DashboardPage() {
                 <h2 className="font-semibold" style={{ color: '#0F172A' }}>Últimos Lançamentos</h2>
                 <p className="text-sm mt-0.5" style={{ color: '#64748B' }}>Atividade recente</p>
               </div>
-              <a href="/dashboard/movimentos" className="flex items-center gap-1 text-sm font-semibold hover:underline" style={{ color: '#0F766E' }}>
+              <a href="/dashboard/movimentos" className="flex items-center gap-1 text-sm font-semibold hover:underline" style={{ color: '#145A45' }}>
                 Ver todos <ArrowRight size={13} strokeWidth={2} />
               </a>
             </div>

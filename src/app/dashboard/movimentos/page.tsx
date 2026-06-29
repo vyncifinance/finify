@@ -307,7 +307,7 @@ export default function MovimentosPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '6px', marginBottom: '10px' }}>
           {(membrosFamilia.length ? membrosFamilia : [membroAtual]).map(m => (
             <button key={m} onClick={() => setMembroForm(m)}
-              style={{ padding: '8px', borderRadius: '12px', fontSize: '14px', fontWeight: 500, cursor: 'pointer', border: `1px solid ${membroForm === m ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: membroForm === m ? '#F0FDF4' : '#fff', color: membroForm === m ? '#0E3B2E' : '#64748B' }}>
+              style={{ padding: '8px', borderRadius: '12px', fontSize: '14px', fontWeight: 500, cursor: 'pointer', border: `1px solid ${membroForm === m ? '#0B3B2E' : '#E2E8F0'}`, backgroundColor: membroForm === m ? '#F0FDF4' : '#fff', color: membroForm === m ? '#0B3B2E' : '#64748B' }}>
               {m.split(' ')[0]}
             </button>
           ))}
@@ -320,8 +320,8 @@ export default function MovimentosPage() {
             const Icon = ICONES_CAT[c] || MoreHorizontal
             return (
               <button key={c} onClick={() => setCategoria(c)}
-                style={{ padding: '8px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 500, cursor: 'pointer', border: `1px solid ${categoria === c ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: categoria === c ? '#F0FDF4' : '#fff', color: categoria === c ? '#0E3B2E' : '#64748B', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flexShrink: 0, minWidth: '64px' }}>
-                <Icon size={14} strokeWidth={1.75} color={categoria === c ? '#0E3B2E' : '#94A3B8'} />
+                style={{ padding: '8px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 500, cursor: 'pointer', border: `1px solid ${categoria === c ? '#0B3B2E' : '#E2E8F0'}`, backgroundColor: categoria === c ? '#F0FDF4' : '#fff', color: categoria === c ? '#0B3B2E' : '#64748B', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flexShrink: 0, minWidth: '64px' }}>
+                <Icon size={14} strokeWidth={1.75} color={categoria === c ? '#0B3B2E' : '#94A3B8'} />
                 {c}
               </button>
             )
@@ -404,7 +404,7 @@ export default function MovimentosPage() {
       {/* Botão fixo */}
       <div style={{ padding: '12px 20px 20px', borderTop: '1px solid #F1F5F9', backgroundColor: '#fff', flexShrink: 0 }}>
         <button onClick={handleSalvar} disabled={salvando || !valor}
-          style={{ width: '100%', height: '48px', borderRadius: '12px', border: 'none', fontSize: '15px', fontWeight: 600, color: '#fff', cursor: salvando || !valor ? 'not-allowed' : 'pointer', backgroundColor: '#0E3B2E', opacity: salvando || !valor ? 0.6 : 1 }}>
+          style={{ width: '100%', height: '48px', borderRadius: '12px', border: 'none', fontSize: '15px', fontWeight: 600, color: '#fff', cursor: salvando || !valor ? 'not-allowed' : 'pointer', backgroundColor: '#0B3B2E', opacity: salvando || !valor ? 0.6 : 1 }}>
           {salvando ? 'Salvando...' : editando ? 'Salvar alterações' : parcelado ? `Criar ${numParcelas} parcelas` : 'Registrar lançamento'}
         </button>
       </div>
@@ -415,7 +415,7 @@ export default function MovimentosPage() {
     <>
       {/* ── MOBILE ── */}
       <div className="lg:hidden" style={{ backgroundColor: '#F8FAFC', minHeight: '100vh', paddingBottom: '100px' }}>
-        <div style={{ backgroundColor: '#0E3B2E', padding: '20px 20px 36px' }}>
+        <div style={{ backgroundColor: '#0B3B2E', padding: '20px 20px 36px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <h1 style={{ fontSize: '18px', fontWeight: 600, color: '#fff', margin: 0 }}>Fluxo Patrimonial</h1>
@@ -453,13 +453,13 @@ export default function MovimentosPage() {
         <div style={{ display: 'flex', gap: '8px', padding: '0 16px 8px', overflowX: 'auto' }}>
           {[{ key: 'todos', label: 'Todos' }, { key: 'receita', label: 'Receitas' }, { key: 'despesa', label: 'Despesas' }].map(f => (
             <button key={f.key} onClick={() => setFiltro(f.key as any)}
-              style={{ padding: '6px 16px', borderRadius: '999px', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap', border: `1px solid ${filtro === f.key ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: filtro === f.key ? '#0E3B2E' : '#fff', color: filtro === f.key ? '#fff' : '#64748B', cursor: 'pointer' }}>
+              style={{ padding: '6px 16px', borderRadius: '999px', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap', border: `1px solid ${filtro === f.key ? '#0B3B2E' : '#E2E8F0'}`, backgroundColor: filtro === f.key ? '#0B3B2E' : '#fff', color: filtro === f.key ? '#fff' : '#64748B', cursor: 'pointer' }}>
               {f.label}
             </button>
           ))}
           {membros.map(m => (
             <button key={m} onClick={() => setFiltroMembro(filtroMembro === m ? 'todos' : m)}
-              style={{ padding: '6px 16px', borderRadius: '999px', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap', border: `1px solid ${filtroMembro === m ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: filtroMembro === m ? '#0E3B2E' : '#fff', color: filtroMembro === m ? '#fff' : '#64748B', cursor: 'pointer' }}>
+              style={{ padding: '6px 16px', borderRadius: '999px', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap', border: `1px solid ${filtroMembro === m ? '#0B3B2E' : '#E2E8F0'}`, backgroundColor: filtroMembro === m ? '#0B3B2E' : '#fff', color: filtroMembro === m ? '#fff' : '#64748B', cursor: 'pointer' }}>
               {m.split(' ')[0]}
             </button>
           ))}
@@ -516,7 +516,7 @@ export default function MovimentosPage() {
         </div>
 
         <button onClick={abrirModalNovo}
-          style={{ position: 'fixed', bottom: '80px', right: '24px', width: '56px', height: '56px', borderRadius: '50%', backgroundColor: '#0E3B2E', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 8px 24px rgba(14,59,46,0.4)', zIndex: 40 }}>
+          style={{ position: 'fixed', bottom: '80px', right: '24px', width: '56px', height: '56px', borderRadius: '50%', backgroundColor: '#0B3B2E', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 8px 24px rgba(14,59,46,0.4)', zIndex: 40 }}>
           <Plus size={24} color="#fff" strokeWidth={2} />
         </button>
       </div>
@@ -530,7 +530,7 @@ export default function MovimentosPage() {
           </div>
           <button onClick={abrirModalNovo}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white hover:opacity-90"
-            style={{ backgroundColor: '#0F766E', boxShadow: '0 4px 12px rgba(15,118,110,0.3)', border: 'none', cursor: 'pointer' }}>
+            style={{ backgroundColor: '#145A45', boxShadow: '0 4px 12px rgba(15,118,110,0.3)', border: 'none', cursor: 'pointer' }}>
             <Plus size={16} strokeWidth={2.5} /> Novo lançamento
           </button>
         </div>
@@ -594,7 +594,7 @@ export default function MovimentosPage() {
             <div className="flex flex-col items-center justify-center py-16 gap-3">
               <Wallet size={32} color="#E2E8F0" strokeWidth={1} />
               <p className="text-sm" style={{ color: '#94A3B8' }}>Nenhum lançamento neste período.</p>
-              <button onClick={abrirModalNovo} className="text-sm font-semibold hover:underline" style={{ color: '#0F766E', background: 'none', border: 'none', cursor: 'pointer' }}>Registrar primeiro lançamento →</button>
+              <button onClick={abrirModalNovo} className="text-sm font-semibold hover:underline" style={{ color: '#145A45', background: 'none', border: 'none', cursor: 'pointer' }}>Registrar primeiro lançamento →</button>
             </div>
           ) : diasOrdenados.map(dia => {
             const itens    = grupos[dia]
