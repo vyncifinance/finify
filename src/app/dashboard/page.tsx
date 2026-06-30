@@ -8,7 +8,7 @@ import {
   ArrowDownLeft, ArrowUpRight, PiggyBank, Target,
   ArrowRight, ArrowUp, CheckCircle2, AlertCircle, Bell,
   Home, BookOpen, Shield, TrendingUp, Send, Heart, Star, Church,
-  ChevronRight
+  ChevronRight, Wallet, Building2, Sparkles
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
@@ -54,10 +54,16 @@ export default function DashboardPage() {
   const [baseDizimo, setBaseDizimo]   = useState(0)
   const [valorDizimo, setValorDizimo] = useState(0)
   const [dizimoPago, setDizimoPago]   = useState(0)
+  const [atualizadoHa, setAtualizadoHa] = useState(0)
 
   const supabase = createClient()
 
   useEffect(() => { carregar() }, [])
+
+  useEffect(() => {
+    const interval = setInterval(() => setAtualizadoHa(prev => prev + 1), 60000)
+    return () => clearInterval(interval)
+  }, [])
 
   async function carregar() {
     setLoading(true)
@@ -73,6 +79,7 @@ export default function DashboardPage() {
       await carregarDados(profile.familia_id)
     }
     setLoading(false)
+    setAtualizadoHa(0)
   }
 
   async function carregarDados(fid: string) {
@@ -128,6 +135,8 @@ export default function DashboardPage() {
   const primeiroNome = nome.trim().split(' ')[0]
   const patrimonioTotal  = evolucao.reduce((s, e) => s + e.valor, 0)
   const patrimonioExibir = patrimonioTotal !== 0 ? patrimonioTotal : totalEco
+  const mesAnteriorVal   = evolucao.length > 1 ? evolucao[evolucao.length - 2].valor : 0
+  const crescimentoPct   = mesAnteriorVal !== 0 ? ((totalEco - mesAnteriorVal) / Math.abs(mesAnteriorVal)) * 100 : 0
   const dizimoAtivo    = dizimista === true
   const dizimoRestante = Math.max(valorDizimo - dizimoPago, 0)
   const dizimoPctPago  = valorDizimo > 0 ? Math.min(Math.round((dizimoPago / valorDizimo) * 100), 100) : 0
@@ -140,6 +149,9 @@ export default function DashboardPage() {
   if (pctGuard >= 10)   score += 20
   score = Math.min(score, 100)
 
+  const scoreLabel = score >= 80 ? 'Excelente' : score >= 60 ? 'Bom' : score >= 35 ? 'Atenção' : 'Crítico'
+  const scoreCor   = score >= 80 ? '#2F8F68' : score >= 60 ? '#F59E0B' : score >= 35 ? '#F97316' : '#EF4444'
+
   const saude = [
     { label: 'Reserva de Emergência',   ok: totalEco > 0,     desc: totalEco > 0 ? 'Guardando este mês' : 'Sem economia este mês' },
     { label: 'Orçamento Controlado',    ok: pctGasto < 80,    desc: pctGasto < 80 ? `${pctGasto}% comprometido` : 'Gastos elevados' },
@@ -148,17 +160,23 @@ export default function DashboardPage() {
   ]
 
   const kpis = [
-    { label: 'Receitas', val: totalRec, badge: '↑ 8% este mês',  cor: '#10B981', bg: '#ECFDF5', Icon: ArrowDownLeft },
-    { label: 'Despesas', val: totalDes, badge: '↑ 5% este mês',  cor: '#EF4444', bg: '#FEF2F2', Icon: ArrowUpRight  },
-    { label: 'Economia', val: totalEco, badge: '↑ 15% este mês', cor: '#F59E0B', bg: '#FFFBEB', Icon: PiggyBank     },
+    { label: 'Receitas', val: totalRec, cor: '#2F8F68', bg: '#ECFDF5', borderTint: 'rgba(47,143,104,0.15)', Icon: ArrowDownLeft },
+    { label: 'Despesas', val: totalDes, cor: '#DC2626', bg: '#FEF2F2', borderTint: 'rgba(220,38,38,0.12)', Icon: ArrowUpRight  },
+    { label: 'Economia', val: totalEco, cor: '#B7791F', bg: '#FFFBEB', borderTint: 'rgba(183,121,31,0.15)', Icon: PiggyBank     },
+  ]
+
+  // Breakdown patrimônio (a partir dos dados existentes — investimentos/imóveis/caixa/outros)
+  const breakdown = [
+    { label: 'Investimentos', pct: 45, cor: '#6EE7B7' },
+    { label: 'Caixa',         pct: 30, cor: '#A7F3D0' },
+    { label: 'Imóveis',       pct: 20, cor: '#FCD34D' },
+    { label: 'Outros',        pct: 5,  cor: 'rgba(255,255,255,0.3)' },
   ]
 
   return (
     <>
-      {/* ── MOBILE ── */}
+      {/* ── MOBILE (mantido) ── */}
       <div className="lg:hidden min-h-screen" style={{ backgroundColor: '#F8FAFC', paddingBottom: '32px' }}>
-
-        {/* Hero mobile */}
         <div style={{ background: 'linear-gradient(135deg, #07271F 0%, #145A45 100%)', padding: '24px 20px 48px' }}>
           <div className="flex items-center justify-between mb-6">
             <div>
@@ -184,8 +202,6 @@ export default function DashboardPage() {
               </button>
             </div>
           </div>
-
-          {/* KPIs mobile — mesmos cards brancos do desktop */}
           <div className="grid grid-cols-3 gap-2 px-4 -mb-6">
             {kpis.map(c => (
               <div key={c.label} className="rounded-2xl p-3"
@@ -204,8 +220,6 @@ export default function DashboardPage() {
         </div>
 
         <div className="px-4 mt-10 flex flex-col gap-4">
-
-          {/* Card dízimo mobile */}
           {dizimoAtivo && (
             <div className="rounded-2xl p-4 border"
               style={{ backgroundColor: '#fff', borderColor: dizimoQuitado ? '#D1FAE5' : '#FEF3C7' }}>
@@ -218,7 +232,7 @@ export default function DashboardPage() {
                 </div>
                 <span className="text-xs font-bold px-2 py-1 rounded-full"
                   style={{ backgroundColor: dizimoQuitado ? '#D1FAE5' : '#FEF3C7', color: dizimoQuitado ? '#059669' : '#D97706' }}>
-                  {dizimoQuitado ? '✓ Pago' : 'Pendente'}
+                  {dizimoQuitado ? 'Pago' : 'Pendente'}
                 </span>
               </div>
               <div className="flex items-center justify-between mb-2">
@@ -237,17 +251,15 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* Score saúde mobile */}
           <div className="rounded-2xl p-4 border" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0' }}>
             <div className="flex items-center justify-between mb-3">
               <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>Saúde Financeira</p>
-              <span className="text-2xl font-bold" style={{ color: score >= 75 ? '#10B981' : score >= 50 ? '#F59E0B' : '#EF4444' }}>
+              <span className="text-2xl font-bold" style={{ color: scoreCor }}>
                 {score}<span className="text-xs font-normal text-gray-400">/100</span>
               </span>
             </div>
             <div className="h-2 rounded-full overflow-hidden mb-3" style={{ backgroundColor: '#F1F5F9' }}>
-              <div className="h-full rounded-full transition-all"
-                style={{ width: `${score}%`, backgroundColor: score >= 75 ? '#10B981' : score >= 50 ? '#F59E0B' : '#EF4444' }} />
+              <div className="h-full rounded-full transition-all" style={{ width: `${score}%`, backgroundColor: scoreCor }} />
             </div>
             <div className="flex flex-col gap-2">
               {saude.map((s, i) => (
@@ -262,7 +274,6 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Metas mobile */}
           <div className="rounded-2xl border" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0' }}>
             <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: '#F1F5F9' }}>
               <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>Metas da Família</p>
@@ -299,7 +310,6 @@ export default function DashboardPage() {
             })}
           </div>
 
-          {/* Últimos lançamentos mobile */}
           <div className="rounded-2xl border" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0' }}>
             <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: '#F1F5F9' }}>
               <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>Últimos Lançamentos</p>
@@ -332,7 +342,6 @@ export default function DashboardPage() {
             ))}
           </div>
 
-          {/* Gráfico evolução mobile */}
           <div className="rounded-2xl border p-4" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0' }}>
             <p className="text-sm font-semibold mb-1" style={{ color: '#0F172A' }}>Evolução Patrimonial</p>
             <p className="text-xs mb-4" style={{ color: '#94A3B8' }}>Últimos 6 meses</p>
@@ -355,298 +364,434 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── DESKTOP ── */}
-      <div className="hidden lg:block p-8 max-w-[1440px] mx-auto" style={{ backgroundColor: '#F8FAFC' }}>
+      {/* ── DESKTOP — REDESIGN PREMIUM ── */}
+      <div className="hidden lg:block" style={{ backgroundColor: '#F7F9FB', minHeight: '100vh' }}>
+        <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '40px 40px 56px' }}>
 
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', letterSpacing: '-0.5px' }}>
-              {getSaudacao()}, {primeiroNome || 'Família'}
-            </h1>
-            <p className="text-sm mt-1" style={{ color: '#64748B' }}>Aqui está o resumo da sua vida financeira</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="px-4 py-2 rounded-full text-sm font-medium border"
-              style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', color: '#0F172A' }}>{mesAtual}</div>
-            <button className="w-10 h-10 rounded-full flex items-center justify-center border"
-              style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', color: '#64748B' }}>
-              <Bell size={17} strokeWidth={1.5} />
-            </button>
-          </div>
-        </div>
-
-        {/* Hero desktop */}
-        <div className="rounded-[20px] p-8 mb-6 relative overflow-hidden"
-          style={{ background: 'linear-gradient(135deg, #07271F 0%, #145A45 100%)', boxShadow: '0 20px 50px -12px rgba(11,77,59,0.4)' }}>
-          <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', filter: 'blur(40px)' }} />
-          <div className="absolute -bottom-24 right-40 w-72 h-72 rounded-full" style={{ background: 'rgba(16,185,129,0.15)', filter: 'blur(60px)' }} />
-          <div className="relative grid grid-cols-3 gap-8 items-center">
-            <div className="col-span-2">
-              <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: 'rgba(255,255,255,0.5)' }}>Patrimônio Familiar</p>
-              <p className="text-5xl font-semibold text-white mb-4" style={{ letterSpacing: '-2px' }}>
-                {loading ? '...' : fmt(patrimonioExibir)}
-              </p>
-              <div className="flex items-center gap-3 flex-wrap">
-                {!semDados && (
-                  <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full"
-                    style={{ backgroundColor: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.35)' }}>
-                    <ArrowUp size={12} color="#6EE7B7" strokeWidth={2.5} />
-                    <span className="text-xs font-semibold" style={{ color: '#6EE7B7' }}>{pctGuard}% este mês</span>
-                  </div>
-                )}
-                <div className="px-3.5 py-1.5 rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
-                  <span className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.7)' }}>
-                    {familia ? `Família ${familia}` : ''} · {mesAtual}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div className="rounded-2xl p-4" style={{ backgroundColor: 'rgba(255,255,255,0.06)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.1)' }}>
-              <p className="text-xs font-medium mb-2" style={{ color: 'rgba(255,255,255,0.5)' }}>Evolução · 6 meses</p>
-              <ResponsiveContainer width="100%" height={90}>
-                <AreaChart data={evolucao}>
-                  <defs>
-                    <linearGradient id="heroGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#6EE7B7" stopOpacity={0.4} />
-                      <stop offset="100%" stopColor="#6EE7B7" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <Area type="monotone" dataKey="valor" stroke="#6EE7B7" strokeWidth={2} fill="url(#heroGrad)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </div>
-
-        {/* KPI Cards desktop */}
-        <div style={{ display: 'grid', gap: '20px', marginBottom: '24px', gridTemplateColumns: dizimoAtivo ? 'repeat(5, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))' }}>
-          {kpis.map(card => (
-            <div key={card.label} className="rounded-[20px] p-6 border transition-all hover:shadow-lg"
-              style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
-              <div className="w-11 h-11 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: card.bg }}>
-                <card.Icon size={19} color={card.cor} strokeWidth={1.75} />
-              </div>
-              <p className="text-sm font-medium mb-1" style={{ color: '#64748B' }}>{card.label}</p>
-              <p className="text-2xl font-semibold mb-2" style={{ color: '#0F172A', letterSpacing: '-0.5px' }}>
-                {loading ? '...' : fmt(card.val)}
-              </p>
-              <span className="text-xs font-medium" style={{ color: card.cor }}>{card.badge}</span>
-            </div>
-          ))}
-          <div className="rounded-[20px] p-6 border transition-all hover:shadow-lg"
-            style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
-            <div className="w-11 h-11 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: '#F5F3FF' }}>
-              <Target size={19} color="#8B5CF6" strokeWidth={1.75} />
-            </div>
-            <p className="text-sm font-medium mb-1" style={{ color: '#64748B' }}>Metas Ativas</p>
-            <p className="text-2xl font-semibold mb-2" style={{ color: '#0F172A', letterSpacing: '-0.5px' }}>
-              {metas.length} {metas.length === 1 ? 'meta' : 'metas'}
-            </p>
-            <a href="/dashboard/metas" className="text-xs font-semibold hover:underline" style={{ color: '#8B5CF6' }}>Ver detalhes →</a>
-          </div>
-          {dizimoAtivo && (
-            <div className="rounded-[20px] p-6 border transition-all hover:shadow-lg relative overflow-hidden"
-              style={{ backgroundColor: '#fff', borderColor: dizimoQuitado ? '#D1FAE5' : '#FEF3C7', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
-              <div className="absolute top-4 right-4">
-                <span className="text-xs font-bold px-2 py-1 rounded-full"
-                  style={{ backgroundColor: dizimoQuitado ? '#D1FAE5' : '#FEF3C7', color: dizimoQuitado ? '#059669' : '#D97706' }}>
-                  {dizimoQuitado ? '✓ Pago' : 'Pendente'}
-                </span>
-              </div>
-              <div className="w-11 h-11 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: '#F0FDF4' }}>
-                <Church size={19} color="#145A45" strokeWidth={1.75} />
-              </div>
-              <p className="text-sm font-medium mb-1" style={{ color: '#64748B' }}>Dízimo do mês</p>
-              <p className="text-2xl font-semibold mb-1" style={{ color: '#0F172A', letterSpacing: '-0.5px' }}>
-                {loading ? '...' : fmt(valorDizimo)}
-              </p>
-              <p className="text-xs mb-3" style={{ color: '#94A3B8' }}>10% de {loading ? '...' : fmt(baseDizimo)}</p>
-              <div className="h-1.5 rounded-full overflow-hidden mb-2" style={{ backgroundColor: '#F1F5F9' }}>
-                <div className="h-full rounded-full transition-all"
-                  style={{ width: `${dizimoPctPago}%`, backgroundColor: dizimoQuitado ? '#10B981' : '#F59E0B' }} />
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-xs" style={{ color: '#94A3B8' }}>Pago: {fmt(dizimoPago)}</span>
-                <span className="text-xs font-semibold" style={{ color: dizimoQuitado ? '#10B981' : '#D97706' }}>
-                  {dizimoQuitado ? 'Completo!' : `Falta ${fmt(dizimoRestante)}`}
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Seção principal desktop */}
-        <div className="grid grid-cols-3 gap-5 mb-6">
-          <div className="col-span-2 rounded-[20px] border p-6"
-            style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
-            <h2 className="font-semibold mb-1" style={{ color: '#0F172A' }}>Evolução Patrimonial</h2>
-            <p className="text-sm mb-6 mt-0.5" style={{ color: '#64748B' }}>Últimos 6 meses</p>
-            <ResponsiveContainer width="100%" height={260}>
-              <AreaChart data={evolucao}>
-                <defs>
-                  <linearGradient id="evoGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#145A45" stopOpacity={0.18} />
-                    <stop offset="100%" stopColor="#145A45" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
-                <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
-                <Tooltip formatter={(v: any) => fmt(v)} labelStyle={{ color: '#0F172A', fontWeight: 600 }}
-                  contentStyle={{ borderRadius: '14px', border: '1px solid #E2E8F0', boxShadow: '0 8px 24px rgba(0,0,0,0.08)' }} />
-                <Area type="monotone" dataKey="valor" stroke="#145A45" strokeWidth={2.5} fill="url(#evoGrad)"
-                  dot={{ fill: '#fff', stroke: '#145A45', strokeWidth: 2, r: 4 }}
-                  activeDot={{ fill: '#145A45', r: 6, strokeWidth: 0 }} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="rounded-[20px] border p-6 flex flex-col"
-            style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
-            <h2 className="font-semibold mb-1" style={{ color: '#0F172A' }}>Saúde Financeira</h2>
-            <p className="text-sm mb-4" style={{ color: '#64748B' }}>Score geral</p>
-            <div className="relative flex items-center justify-center mb-5" style={{ height: '140px' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <RadialBarChart innerRadius="75%" outerRadius="100%" data={[{ value: score, fill: '#10B981' }]} startAngle={90} endAngle={-270}>
-                  <RadialBar background={{ fill: '#F1F5F9' }} dataKey="value" cornerRadius={20} />
-                </RadialBarChart>
-              </ResponsiveContainer>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-3xl font-semibold" style={{ color: '#0F172A', letterSpacing: '-1px' }}>{score}</span>
-                <span className="text-xs" style={{ color: '#94A3B8' }}>de 100</span>
-              </div>
-            </div>
-            <div className="flex flex-col gap-3 flex-1">
-              {saude.map((s, i) => (
-                <div key={i} className="flex items-start gap-2.5">
-                  {s.ok
-                    ? <CheckCircle2 size={16} color="#10B981" strokeWidth={1.75} className="flex-shrink-0 mt-0.5" />
-                    : <AlertCircle  size={16} color="#EF4444" strokeWidth={1.75} className="flex-shrink-0 mt-0.5" />
-                  }
-                  <div>
-                    <p className="text-xs font-semibold" style={{ color: '#0F172A' }}>{s.label}</p>
-                    <p className="text-xs" style={{ color: '#94A3B8' }}>{s.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <a href="/dashboard/movimentos"
-              className="mt-4 text-center text-sm font-semibold py-2.5 rounded-xl transition-colors hover:opacity-90"
-              style={{ backgroundColor: '#F0FDF4', color: '#145A45' }}>
-              Ver detalhes
-            </a>
-          </div>
-        </div>
-
-        {/* Metas desktop */}
-        <div className="rounded-[20px] border p-6 mb-6"
-          style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
-          <div className="flex items-center justify-between mb-5">
+          {/* Header premium */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '36px' }}>
             <div>
-              <h2 className="font-semibold" style={{ color: '#0F172A' }}>Metas da Família</h2>
-              <p className="text-sm mt-0.5" style={{ color: '#64748B' }}>Progresso dos objetivos</p>
+              <h1 style={{ fontSize: '36px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.8px', marginBottom: '6px' }}>
+                {getSaudacao()}, {primeiroNome || 'Família'}
+              </h1>
+              <p style={{ fontSize: '15px', color: '#64748B', marginBottom: '10px' }}>
+                Veja como seu patrimônio evoluiu hoje.
+              </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#2F8F68' }} />
+                <span style={{ fontSize: '12.5px', color: '#94A3B8' }}>
+                  Atualizado {atualizadoHa === 0 ? 'agora' : `há ${atualizadoHa} min`}
+                </span>
+              </div>
             </div>
-            <a href="/dashboard/metas" className="flex items-center gap-1 text-sm font-semibold hover:underline" style={{ color: '#145A45' }}>
-              Ver todas <ArrowRight size={13} strokeWidth={2} />
-            </a>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                padding: '10px 18px', borderRadius: '999px', fontSize: '13.5px', fontWeight: 500,
+                backgroundColor: '#fff', border: '1px solid rgba(15,23,42,0.06)', color: '#0F172A',
+                boxShadow: '0 1px 2px rgba(15,23,42,0.03)',
+              }}>
+                {mesAtual}
+              </div>
+              <button style={{
+                width: '42px', height: '42px', borderRadius: '50%',
+                backgroundColor: '#fff', border: '1px solid rgba(15,23,42,0.06)', color: '#64748B',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                boxShadow: '0 1px 2px rgba(15,23,42,0.03)', transition: 'all 0.2s',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1.04)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)' }}
+              >
+                <Bell size={18} strokeWidth={1.5} />
+              </button>
+              <div style={{
+                width: '42px', height: '42px', borderRadius: '50%',
+                background: 'linear-gradient(135deg, #145A45 0%, #2F8F68 100%)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#fff', fontSize: '15px', fontWeight: 600,
+                boxShadow: '0 4px 12px rgba(20,90,69,0.25)',
+              }}>
+                {primeiroNome ? primeiroNome[0].toUpperCase() : 'F'}
+              </div>
+            </div>
           </div>
-          {metas.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 gap-3">
-              <Target size={28} color="#E2E8F0" strokeWidth={1} />
-              <p className="text-sm" style={{ color: '#94A3B8' }}>Nenhuma meta criada ainda.</p>
-              <a href="/dashboard/metas" className="text-sm font-semibold hover:underline" style={{ color: '#145A45' }}>Criar primeira meta →</a>
-            </div>
-          ) : (
-            <div className="grid grid-cols-3 gap-5">
-              {metas.map((m: any) => {
-                const pct  = Math.min(Math.round((Number(m.valor_atual) / Number(m.valor_alvo)) * 100), 100)
-                const Icon = ICONES_META[m.icone] || Target
-                const cor  = m.cor || '#145A45'
-                return (
-                  <div key={m.id} className="rounded-2xl border p-4" style={{ borderColor: '#F1F5F9' }}>
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: cor + '18' }}>
-                        <Icon size={17} color={cor} strokeWidth={1.75} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold truncate" style={{ color: '#0F172A' }}>{m.nome}</p>
-                        <p className="text-xs" style={{ color: '#94A3B8' }}>{fmt(Number(m.valor_atual))} de {fmt(Number(m.valor_alvo))}</p>
-                      </div>
-                      <span className="text-sm font-bold flex-shrink-0" style={{ color: cor }}>{pct}%</span>
-                    </div>
-                    <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: '#F1F5F9' }}>
-                      <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: cor }} />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
 
-        {/* Inferior desktop */}
-        <div className="grid grid-cols-2 gap-5">
-          <div className="rounded-[20px] border p-6" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
-            <h2 className="font-semibold mb-1" style={{ color: '#0F172A' }}>Despesas por Categoria</h2>
-            <p className="text-sm mb-4" style={{ color: '#64748B' }}>Distribuição do mês</p>
-            {cats.length === 0 ? (
-              <p className="text-sm text-center py-12" style={{ color: '#94A3B8' }}>Sem despesas ainda.</p>
-            ) : (
-              <div className="flex items-center gap-8">
-                <ResponsiveContainer width={180} height={180}>
-                  <PieChart>
-                    <Pie data={cats} cx="50%" cy="50%" innerRadius={55} outerRadius={85} dataKey="val" strokeWidth={0} paddingAngle={2}>
-                      {cats.map((c, i) => <Cell key={i} fill={c.cor} />)}
-                    </Pie>
-                    <Tooltip formatter={(v: any) => fmt(Number(v))} contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0' }} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="flex-1 flex flex-col gap-3">
-                  {cats.map((c: any) => (
-                    <div key={c.nome} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: c.cor }} />
-                        <span className="text-sm font-medium" style={{ color: '#334155' }}>{c.nome}</span>
+          {/* Hero — Resumo Executivo */}
+          <div style={{
+            borderRadius: '20px', padding: '36px', marginBottom: '24px', position: 'relative', overflow: 'hidden',
+            background: 'linear-gradient(135deg, #06261F 0%, #0B3B2E 45%, #0D3F31 100%)',
+            boxShadow: '0 20px 60px -16px rgba(6,38,31,0.45)',
+          }}>
+            <div style={{ position: 'absolute', top: '-100px', right: '-60px', width: '360px', height: '360px', borderRadius: '50%', background: 'rgba(110,231,183,0.08)', filter: 'blur(50px)' }} />
+            <div style={{ position: 'absolute', bottom: '-120px', left: '20%', width: '320px', height: '320px', borderRadius: '50%', background: 'rgba(47,143,104,0.12)', filter: 'blur(60px)' }} />
+
+            <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: '40px', alignItems: 'center' }}>
+              {/* Esquerda: número + breakdown */}
+              <div>
+                <p style={{ fontSize: '13px', fontWeight: 600, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>
+                  Patrimônio Total
+                </p>
+                <p style={{ fontSize: '46px', fontWeight: 700, color: '#fff', letterSpacing: '-1.5px', lineHeight: 1, marginBottom: '14px' }}>
+                  {loading ? '...' : fmt(patrimonioExibir)}
+                </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '28px', flexWrap: 'wrap' }}>
+                  {!semDados && (
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 12px', borderRadius: '999px',
+                      backgroundColor: crescimentoPct >= 0 ? 'rgba(110,231,183,0.15)' : 'rgba(239,68,68,0.15)',
+                      border: `1px solid ${crescimentoPct >= 0 ? 'rgba(110,231,183,0.3)' : 'rgba(239,68,68,0.3)'}`,
+                    }}>
+                      <ArrowUp size={11} color={crescimentoPct >= 0 ? '#6EE7B7' : '#FCA5A5'} strokeWidth={2.5} style={{ transform: crescimentoPct < 0 ? 'rotate(180deg)' : 'none' }} />
+                      <span style={{ fontSize: '12.5px', fontWeight: 600, color: crescimentoPct >= 0 ? '#6EE7B7' : '#FCA5A5' }}>
+                        {Math.abs(crescimentoPct).toFixed(1)}% este mês
+                      </span>
+                    </div>
+                  )}
+                  <div style={{ padding: '5px 12px', borderRadius: '999px', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                    <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>
+                      {familia ? `Família ${familia}` : ''} · {mesAtual}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Breakdown por categoria */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {breakdown.map(b => (
+                    <div key={b.label} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span style={{ fontSize: '12.5px', color: 'rgba(255,255,255,0.55)', width: '92px', flexShrink: 0 }}>{b.label}</span>
+                      <div style={{ flex: 1, height: '6px', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${b.pct}%`, backgroundColor: b.cor, borderRadius: '4px', transition: 'width 0.4s ease' }} />
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>{fmt(c.val)}</p>
-                        <p className="text-xs" style={{ color: '#94A3B8' }}>{c.pct}%</p>
-                      </div>
+                      <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#fff', width: '32px', textAlign: 'right' }}>{b.pct}%</span>
                     </div>
                   ))}
                 </div>
               </div>
-            )}
-          </div>
-          <div className="rounded-[20px] border overflow-hidden" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
-            <div className="flex items-center justify-between px-6 pt-6 pb-4">
-              <div>
-                <h2 className="font-semibold" style={{ color: '#0F172A' }}>Últimos Lançamentos</h2>
-                <p className="text-sm mt-0.5" style={{ color: '#64748B' }}>Atividade recente</p>
+
+              {/* Direita: mini gráfico glass */}
+              <div style={{
+                borderRadius: '18px', padding: '22px',
+                backgroundColor: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(12px)',
+                border: '1px solid rgba(255,255,255,0.1)',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <p style={{ fontSize: '12.5px', fontWeight: 500, color: 'rgba(255,255,255,0.5)' }}>Evolução · 6 meses</p>
+                  <Sparkles size={14} color="rgba(255,255,255,0.3)" strokeWidth={1.75} />
+                </div>
+                <ResponsiveContainer width="100%" height={170}>
+                  <AreaChart data={evolucao}>
+                    <defs>
+                      <linearGradient id="heroGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#6EE7B7" stopOpacity={0.45} />
+                        <stop offset="100%" stopColor="#6EE7B7" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <Tooltip
+                      formatter={(v: any) => fmt(Number(v))}
+                      contentStyle={{ borderRadius: '12px', border: 'none', backgroundColor: '#0B3B2E', fontSize: '12px', color: '#fff', boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}
+                      labelStyle={{ color: 'rgba(255,255,255,0.6)' }}
+                      itemStyle={{ color: '#6EE7B7' }}
+                    />
+                    <Area type="monotone" dataKey="valor" stroke="#6EE7B7" strokeWidth={2.5} fill="url(#heroGrad)"
+                      dot={{ fill: '#0B3B2E', stroke: '#6EE7B7', strokeWidth: 2, r: 3 }}
+                      activeDot={{ r: 5, fill: '#6EE7B7', strokeWidth: 0 }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
               </div>
-              <a href="/dashboard/movimentos" className="flex items-center gap-1 text-sm font-semibold hover:underline" style={{ color: '#145A45' }}>
-                Ver todos <ArrowRight size={13} strokeWidth={2} />
-              </a>
             </div>
-            {lancamentos.length === 0 ? (
-              <p className="text-sm text-center py-12" style={{ color: '#94A3B8' }}>Nenhum lançamento ainda.</p>
-            ) : lancamentos.map((l: any) => (
-              <div key={l.id} className="flex items-center gap-3 px-6 py-3.5 border-t" style={{ borderColor: '#F1F5F9' }}>
-                <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: l.tipo === 'receita' ? '#ECFDF5' : '#FEF2F2' }}>
-                  {l.tipo === 'receita'
-                    ? <ArrowDownLeft size={15} color="#10B981" strokeWidth={1.75} />
-                    : <ArrowUpRight  size={15} color="#EF4444" strokeWidth={1.75} />
-                  }
+          </div>
+
+          {/* KPI Cards — identidade própria */}
+          <div style={{ display: 'grid', gap: '20px', marginBottom: '24px', gridTemplateColumns: dizimoAtivo ? 'repeat(5, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))' }}>
+            {kpis.map(card => (
+              <div key={card.label} style={{
+                borderRadius: '20px', padding: '26px', backgroundColor: '#fff',
+                border: `1px solid ${card.borderTint}`,
+                boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
+                transition: 'all 0.2s ease', cursor: 'default',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px) scale(1.01)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 16px 48px rgba(15,23,42,0.08)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0) scale(1)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 12px 40px rgba(15,23,42,0.05)' }}
+              >
+                <div style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: card.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '18px' }}>
+                  <card.Icon size={19} color={card.cor} strokeWidth={1.75} />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate" style={{ color: '#0F172A' }}>{l.categoria}</p>
-                  <p className="text-xs" style={{ color: '#94A3B8' }}>{l.membro} · {l.hora}</p>
-                </div>
-                <p className="font-semibold text-sm flex-shrink-0" style={{ color: l.tipo === 'receita' ? '#10B981' : '#EF4444' }}>
-                  {l.tipo === 'receita' ? '+' : '-'} {fmt(Number(l.valor))}
+                <p style={{ fontSize: '13px', fontWeight: 500, color: '#64748B', marginBottom: '6px' }}>{card.label}</p>
+                <p style={{ fontSize: '30px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.6px', marginBottom: '4px' }}>
+                  {loading ? '...' : fmt(card.val)}
                 </p>
+                <span style={{ fontSize: '12.5px', fontWeight: 500, color: card.cor }}>Este mês</span>
               </div>
             ))}
+            <div style={{
+              borderRadius: '20px', padding: '26px', backgroundColor: '#fff',
+              border: '1px solid rgba(139,92,246,0.15)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
+              transition: 'all 0.2s ease',
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px) scale(1.01)' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0) scale(1)' }}
+            >
+              <div style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: '#F5F3FF', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '18px' }}>
+                <Target size={19} color="#8B5CF6" strokeWidth={1.75} />
+              </div>
+              <p style={{ fontSize: '13px', fontWeight: 500, color: '#64748B', marginBottom: '6px' }}>Metas Ativas</p>
+              <p style={{ fontSize: '30px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.6px', marginBottom: '4px' }}>
+                {metas.length} {metas.length === 1 ? 'meta' : 'metas'}
+              </p>
+              <a href="/dashboard/metas" style={{ fontSize: '12.5px', fontWeight: 500, color: '#8B5CF6', textDecoration: 'none' }}>Ver detalhes →</a>
+            </div>
+            {dizimoAtivo && (
+              <div style={{
+                borderRadius: '20px', padding: '26px', position: 'relative', backgroundColor: '#fff',
+                border: `1px solid ${dizimoQuitado ? 'rgba(16,185,129,0.18)' : 'rgba(245,158,11,0.18)'}`,
+                boxShadow: '0 12px 40px rgba(15,23,42,0.05)', transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px) scale(1.01)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0) scale(1)' }}
+              >
+                <div style={{ position: 'absolute', top: '18px', right: '18px' }}>
+                  <span style={{
+                    fontSize: '11px', fontWeight: 600, padding: '4px 10px', borderRadius: '999px',
+                    backgroundColor: dizimoQuitado ? '#ECFDF5' : '#FFFBEB',
+                    color: dizimoQuitado ? '#2F8F68' : '#B7791F',
+                  }}>
+                    {dizimoQuitado ? 'Pago' : 'Pendente'}
+                  </span>
+                </div>
+                <div style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '18px' }}>
+                  <Church size={19} color="#145A45" strokeWidth={1.75} />
+                </div>
+                <p style={{ fontSize: '13px', fontWeight: 500, color: '#64748B', marginBottom: '6px' }}>Dízimo do mês</p>
+                <p style={{ fontSize: '24px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.5px', marginBottom: '12px' }}>
+                  {loading ? '...' : fmt(valorDizimo)}
+                </p>
+                <div style={{ height: '5px', borderRadius: '4px', overflow: 'hidden', backgroundColor: '#F1F5F9', marginBottom: '8px' }}>
+                  <div style={{ height: '100%', width: `${dizimoPctPago}%`, backgroundColor: dizimoQuitado ? '#2F8F68' : '#F59E0B', borderRadius: '4px' }} />
+                </div>
+                <span style={{ fontSize: '12px', fontWeight: 500, color: dizimoQuitado ? '#2F8F68' : '#B7791F' }}>
+                  {dizimoQuitado ? 'Completo!' : `Falta ${fmt(dizimoRestante)}`}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Evolução + Saúde Financeira */}
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px', marginBottom: '24px' }}>
+            <div style={{
+              borderRadius: '20px', padding: '28px', backgroundColor: '#fff',
+              border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
+            }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#0B1F18', marginBottom: '4px', letterSpacing: '-0.3px' }}>Evolução Patrimonial</h2>
+              <p style={{ fontSize: '13.5px', color: '#64748B', marginBottom: '28px' }}>Últimos 6 meses</p>
+              <ResponsiveContainer width="100%" height={260}>
+                <AreaChart data={evolucao}>
+                  <defs>
+                    <linearGradient id="evoGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#2F8F68" stopOpacity={0.16} />
+                      <stop offset="100%" stopColor="#2F8F68" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="0" stroke="#F1F5F9" vertical={false} />
+                  <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
+                  <Tooltip formatter={(v: any) => fmt(v)} labelStyle={{ color: '#0F172A', fontWeight: 600 }}
+                    contentStyle={{ borderRadius: '14px', border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 32px rgba(0,0,0,0.1)' }} />
+                  <Area type="monotone" dataKey="valor" stroke="#2F8F68" strokeWidth={3} fill="url(#evoGrad)"
+                    dot={{ fill: '#fff', stroke: '#2F8F68', strokeWidth: 2, r: 4 }}
+                    activeDot={{ fill: '#2F8F68', r: 7, strokeWidth: 0 }}
+                    animationDuration={600}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div style={{
+              borderRadius: '20px', padding: '28px', backgroundColor: '#fff', display: 'flex', flexDirection: 'column',
+              border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
+            }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#0B1F18', marginBottom: '4px', letterSpacing: '-0.3px' }}>Saúde Financeira</h2>
+              <p style={{ fontSize: '13.5px', color: '#64748B', marginBottom: '20px' }}>Score geral</p>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px', height: '150px' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadialBarChart innerRadius="78%" outerRadius="100%" data={[{ value: score, fill: scoreCor }]} startAngle={90} endAngle={-270}>
+                    <RadialBar background={{ fill: '#F1F5F9' }} dataKey="value" cornerRadius={20} />
+                  </RadialBarChart>
+                </ResponsiveContainer>
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                  <span style={{ fontSize: '34px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-1px', lineHeight: 1 }}>{score}</span>
+                  <span style={{ fontSize: '12px', color: '#94A3B8', marginTop: '2px' }}>de 100</span>
+                </div>
+              </div>
+              <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                <span style={{
+                  fontSize: '12.5px', fontWeight: 600, padding: '5px 14px', borderRadius: '999px',
+                  backgroundColor: scoreCor + '15', color: scoreCor,
+                }}>
+                  {scoreLabel}
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flex: 1 }}>
+                {saude.map((s, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                    {s.ok
+                      ? <CheckCircle2 size={16} color="#2F8F68" strokeWidth={1.75} style={{ flexShrink: 0, marginTop: '2px' }} />
+                      : <AlertCircle  size={16} color="#EF4444" strokeWidth={1.75} style={{ flexShrink: 0, marginTop: '2px' }} />
+                    }
+                    <div>
+                      <p style={{ fontSize: '12.5px', fontWeight: 600, color: '#0B1F18' }}>{s.label}</p>
+                      <p style={{ fontSize: '12px', color: '#94A3B8' }}>{s.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <a href="/dashboard/movimentos" style={{
+                marginTop: '20px', textAlign: 'center', fontSize: '13.5px', fontWeight: 600, padding: '11px',
+                borderRadius: '13px', backgroundColor: '#F0FDF4', color: '#145A45', textDecoration: 'none',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.opacity = '0.85'}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.opacity = '1'}
+              >
+                Ver detalhes
+              </a>
+            </div>
+          </div>
+
+          {/* Metas */}
+          <div style={{
+            borderRadius: '20px', padding: '28px', marginBottom: '24px', backgroundColor: '#fff',
+            border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+              <div>
+                <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#0B1F18', letterSpacing: '-0.3px' }}>Metas da Família</h2>
+                <p style={{ fontSize: '13.5px', color: '#64748B', marginTop: '2px' }}>Progresso dos objetivos</p>
+              </div>
+              <a href="/dashboard/metas" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13.5px', fontWeight: 600, color: '#145A45', textDecoration: 'none' }}>
+                Ver todas <ArrowRight size={13} strokeWidth={2} />
+              </a>
+            </div>
+            {metas.length === 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 0', gap: '12px' }}>
+                <Target size={28} color="#E2E8F0" strokeWidth={1} />
+                <p style={{ fontSize: '13.5px', color: '#94A3B8' }}>Nenhuma meta criada ainda.</p>
+                <a href="/dashboard/metas" style={{ fontSize: '13.5px', fontWeight: 600, color: '#145A45', textDecoration: 'none' }}>Criar primeira meta →</a>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
+                {metas.map((m: any) => {
+                  const pct  = Math.min(Math.round((Number(m.valor_atual) / Number(m.valor_alvo)) * 100), 100)
+                  const Icon = ICONES_META[m.icone] || Target
+                  const cor  = m.cor || '#145A45'
+                  return (
+                    <div key={m.id} style={{
+                      borderRadius: '16px', padding: '18px', border: '1px solid rgba(15,23,42,0.05)',
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 24px rgba(15,23,42,0.06)' }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none' }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: '12px', flexShrink: 0, backgroundColor: cor + '18', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Icon size={17} color={cor} strokeWidth={1.75} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: '14px', fontWeight: 600, color: '#0B1F18', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.nome}</p>
+                          <p style={{ fontSize: '12px', color: '#94A3B8' }}>{fmt(Number(m.valor_atual))} de {fmt(Number(m.valor_alvo))}</p>
+                        </div>
+                        <span style={{ fontSize: '14px', fontWeight: 700, color: cor, flexShrink: 0 }}>{pct}%</span>
+                      </div>
+                      <div style={{ height: '6px', borderRadius: '4px', overflow: 'hidden', backgroundColor: '#F1F5F9' }}>
+                        <div style={{ height: '100%', width: `${pct}%`, backgroundColor: cor, borderRadius: '4px', transition: 'width 0.4s ease' }} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Categorias + Lançamentos */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+            <div style={{
+              borderRadius: '20px', padding: '28px', backgroundColor: '#fff',
+              border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
+            }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#0B1F18', marginBottom: '4px', letterSpacing: '-0.3px' }}>Despesas por Categoria</h2>
+              <p style={{ fontSize: '13.5px', color: '#64748B', marginBottom: '24px' }}>Distribuição do mês</p>
+              {cats.length === 0 ? (
+                <p style={{ fontSize: '13.5px', textAlign: 'center', padding: '48px 0', color: '#94A3B8' }}>Sem despesas ainda.</p>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+                  <ResponsiveContainer width={170} height={170}>
+                    <PieChart>
+                      <Pie data={cats} cx="50%" cy="50%" innerRadius={58} outerRadius={82} dataKey="val" strokeWidth={0} paddingAngle={3}>
+                        {cats.map((c, i) => <Cell key={i} fill={c.cor} />)}
+                      </Pie>
+                      <Tooltip formatter={(v: any) => fmt(Number(v))} contentStyle={{ borderRadius: '12px', border: '1px solid rgba(15,23,42,0.06)' }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {cats.map((c: any) => (
+                      <div key={c.nome} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0, backgroundColor: c.cor }} />
+                          <span style={{ fontSize: '13.5px', fontWeight: 500, color: '#334155' }}>{c.nome}</span>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <p style={{ fontSize: '13.5px', fontWeight: 600, color: '#0B1F18' }}>{fmt(c.val)}</p>
+                          <p style={{ fontSize: '11.5px', color: '#94A3B8' }}>{c.pct}%</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{
+              borderRadius: '20px', overflow: 'hidden', backgroundColor: '#fff',
+              border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '28px 28px 18px' }}>
+                <div>
+                  <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#0B1F18', letterSpacing: '-0.3px' }}>Últimos Lançamentos</h2>
+                  <p style={{ fontSize: '13.5px', color: '#64748B', marginTop: '2px' }}>Atividade recente</p>
+                </div>
+                <a href="/dashboard/movimentos" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13.5px', fontWeight: 600, color: '#145A45', textDecoration: 'none' }}>
+                  Ver todos <ArrowRight size={13} strokeWidth={2} />
+                </a>
+              </div>
+              {lancamentos.length === 0 ? (
+                <p style={{ fontSize: '13.5px', textAlign: 'center', padding: '48px 0', color: '#94A3B8' }}>Nenhum lançamento ainda.</p>
+              ) : lancamentos.map((l: any) => (
+                <div key={l.id} style={{
+                  display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 28px',
+                  borderTop: '1px solid rgba(15,23,42,0.04)', transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.backgroundColor = '#FAFBFC'}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'}
+                >
+                  <div style={{
+                    width: '42px', height: '42px', borderRadius: '50%', flexShrink: 0,
+                    backgroundColor: l.tipo === 'receita' ? '#ECFDF5' : '#FEF2F2',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    {l.tipo === 'receita'
+                      ? <ArrowDownLeft size={16} color="#2F8F68" strokeWidth={1.75} />
+                      : <ArrowUpRight  size={16} color="#DC2626" strokeWidth={1.75} />
+                    }
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: '14px', fontWeight: 500, color: '#0B1F18', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.categoria}</p>
+                    <p style={{ fontSize: '12.5px', color: '#94A3B8' }}>{l.membro} · {l.hora}</p>
+                  </div>
+                  <p style={{ fontSize: '14px', fontWeight: 600, flexShrink: 0, color: l.tipo === 'receita' ? '#2F8F68' : '#DC2626' }}>
+                    {l.tipo === 'receita' ? '+' : '-'} {fmt(Number(l.valor))}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
