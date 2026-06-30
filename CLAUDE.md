@@ -2,6 +2,9 @@
 
 # Finify — Regras do Projeto
 
+## Persona de Design
+Ao trabalhar em qualquer tela, componente ou decisão visual do Finify, assuma a postura de um **Senior Product Designer especializado em SaaS Premium**, com referência direta em produtos como **Stripe, Linear, Vercel, Notion, Raycast, Wealthfront e Mercury**. Isso significa: hierarquia visual impecável, espaçamento consistente (grid de 8px), microinterações elegantes, paleta de cores controlada, e a sensação de "luxo discreto" — nunca aparência de template genérico gerado por IA.
+
 ## Visão Geral
 Finify é uma plataforma de gestão patrimonial familiar com foco em famílias cristãs dizimistas, com público de renda média/alta. A interface deve transmitir sofisticação, confiança, patrimônio, estabilidade, tecnologia e simplicidade — nível SaaS premium (Stripe, Linear, Vercel, Mercury, Wealthfront).
 Stack: Next.js 15, Tailwind CSS, Supabase, Lucide React, Recharts.
@@ -306,3 +309,24 @@ O Finify é um produto financeiro premium. Cada elemento visual deve transmitir 
 
 ## Encoding — REGRA CRÍTICA
 Todos os arquivos `.tsx` devem ser salvos em UTF-8 real. PowerShell e VS Code às vezes corrompem acentos (`ç`, `ã`, `é`, `ó` viram sequências como `Ã§`, `Ã£`). Antes de considerar um arquivo pronto, revisar visualmente se há sequências `Ã` seguidas de caractere estranho — isso indica encoding quebrado e precisa ser corrigido antes do commit.
+
+---
+
+## Roadmap de Funcionalidades (inspirado em Mercury, Copilot Money, Monarch Money)
+
+Ideias levantadas para evolução do produto, organizadas por prioridade. Usar como referência ao planejar próximas features — não implementar nada aqui sem confirmação explícita do usuário.
+
+### Curto prazo, alto impacto
+- **Relatório mensal em PDF** — fechamento do mês com receitas, despesas, gráficos e dízimo, pronto para exportar ou imprimir
+- **Notificações/alertas** — meta perto do prazo, dízimo pendente no fim do mês, gasto acima da média numa categoria
+- **Calendário financeiro** — visualização mensal tipo calendário mostrando lançamentos por dia (útil para ver picos de gasto)
+
+### Médio prazo
+- **Orçamento por categoria** — definir um limite mensal por categoria (ex: R$800 em Alimentação) com barra de progresso e alerta ao ultrapassar
+- **Patrimônio (bens)** — módulo separado para registrar imóveis, veículos e outros bens com valor, formando o patrimônio líquido total (ativos - dívidas), complementando a tela de Investimentos já existente
+- **Comparativo entre meses** — ex: "você gastou 12% a mais em Alimentação que no mês passado"
+
+### Diferencial (posicionamento único do Finify)
+- **Módulo de Mordomia** — metas com versículo bíblico, devocional financeiro, conteúdo voltado à administração cristã do dinheiro
+- **Modo aluno/professor** — painel para acompanhar progresso de quem está aprendendo educação financeira em família
+
