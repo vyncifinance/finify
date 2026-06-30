@@ -4,10 +4,16 @@
   "description": "Gestão Patrimonial Familiar",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0E3B2E",
-  "theme_color": "#0E3B2E",
+  "background_color": "#0B3B2E",
+  "theme_color": "#0B3B2E",
   "orientation": "portrait",
   "icons": [
+    {
+      "src": "/apple-touch-icon.svg",
+      "sizes": "180x180",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
     {
       "src": "/icon-192.svg",
       "sizes": "192x192",

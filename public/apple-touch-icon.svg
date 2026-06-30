@@ -1,5 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180">
-  <rect width="180" height="180" rx="38" fill="#0E3B2E"/>
-  <rect x="4" y="4" width="172" height="172" rx="35" fill="none" stroke="#C7A15A" stroke-width="5"/>
-  <text x="90" y="122" text-anchor="middle" font-family="Georgia, serif" font-size="104" font-weight="700" fill="#C7A15A">F</text>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="180" y2="180" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#145A45"/>
+      <stop offset="100%" stop-color="#2FB36A"/>
+    </linearGradient>
+  </defs>
+  <rect width="180" height="180" rx="38" fill="url(#bg)"/>
+  <path d="M48 48 L132 48 L132 75 L78 75 L78 94 L120 94 L120 121 L78 121 L78 139 L48 139 Z" fill="white" fill-opacity="0.95"/>
 </svg>
