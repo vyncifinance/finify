@@ -35,19 +35,16 @@ function getIcon(nome: string) {
 function fmt(val: number) {
   return `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
 }
-
 function fmtShort(val: number) {
   if (val >= 1000000) return `R$ ${(val / 1000000).toFixed(1)}M`
   if (val >= 1000) return `R$ ${(val / 1000).toFixed(1)}k`
   return fmt(val)
 }
-
 function formatPrazo(prazo: string | null) {
   if (!prazo) return null
   const d = new Date(prazo + 'T12:00:00')
   return `${MESES[d.getMonth()]} ${d.getFullYear()}`
 }
-
 function calcMesesRestantes(prazo: string | null) {
   if (!prazo) return null
   const hoje = new Date()
@@ -64,19 +61,17 @@ export default function MetasPage() {
   const [membroAtual, setMembroAtual] = useState('')
   const [metas, setMetas]             = useState<any[]>([])
 
-  // Modal nova/editar meta
-  const [modalOpen, setModalOpen]     = useState(false)
-  const [editandoMeta, setEditandoMeta] = useState<any>(null)
-  const [nome, setNome]               = useState('')
-  const [valorAlvo, setValorAlvo]     = useState('')
-  const [prazo, setPrazo]             = useState('')
-  const [icone, setIcone]             = useState('target')
-  const [cor, setCor]                 = useState('#145A45')
-  const [salvando, setSalvando]       = useState(false)
-  const [deletando, setDeletando]     = useState(false)
+  const [modalOpen, setModalOpen]         = useState(false)
+  const [editandoMeta, setEditandoMeta]   = useState<any>(null)
+  const [nome, setNome]                   = useState('')
+  const [valorAlvo, setValorAlvo]         = useState('')
+  const [prazo, setPrazo]                 = useState('')
+  const [icone, setIcone]                 = useState('target')
+  const [cor, setCor]                     = useState('#145A45')
+  const [salvando, setSalvando]           = useState(false)
+  const [deletando, setDeletando]         = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
-  // Modal aporte
   const [aporteOpen, setAporteOpen]           = useState(false)
   const [metaSelecionada, setMetaSelecionada] = useState<any>(null)
   const [valorAporte, setValorAporte]         = useState('')
@@ -200,199 +195,6 @@ export default function MetasPage() {
     { label: 'Guardado',   val: totalGuardado,   cor: '#C7A15A', bg: '#FFFBEB', Icon: ArrowUp,      isNum: false },
   ]
 
-  const ModalMeta = () => !modalOpen ? null : (
-    <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center"
-      style={{ backgroundColor: 'rgba(15,23,42,0.5)' }}
-      onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}>
-      <div className="w-full lg:max-w-md rounded-t-[28px] lg:rounded-[20px] overflow-hidden flex flex-col"
-        style={{ backgroundColor: '#fff', maxHeight: '90vh' }}>
-        
-        <div className="w-10 h-1 rounded-full mx-auto mt-3 mb-1 lg:hidden flex-shrink-0" style={{ backgroundColor: '#E2E8F0' }} />
-        
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0" style={{ borderColor: '#F1F5F9' }}>
-          <h2 className="font-semibold text-lg" style={{ color: '#0F172A' }}>
-            {editandoMeta ? 'Editar meta' : 'Nova meta'}
-          </h2>
-          <div className="flex items-center gap-2">
-            {editandoMeta && (
-              <button onClick={handleDeletarMeta} disabled={deletando}
-                className="flex items-center gap-1.5 px-3 h-8 rounded-lg text-xs font-semibold transition-all"
-                style={{ backgroundColor: confirmDelete ? '#EF4444' : '#FEF2F2', color: confirmDelete ? '#fff' : '#DC2626', border: 'none', cursor: 'pointer' }}>
-                <Trash2 size={13} strokeWidth={2} />
-                {deletando ? 'Deletando...' : confirmDelete ? 'Confirmar' : 'Deletar'}
-              </button>
-            )}
-            <button onClick={() => setModalOpen(false)} style={{ color: '#94A3B8', background: 'none', border: 'none', cursor: 'pointer' }}>
-              <X size={20} strokeWidth={2} />
-            </button>
-          </div>
-        </div>
-
-        {/* Scroll area */}
-        <div className="overflow-y-auto flex-1 px-6 pt-4 pb-2">
-          <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Nome da meta</label>
-          <input type="text" value={nome} onChange={e => setNome(e.target.value)} placeholder="Ex: Casa própria"
-            className="w-full px-4 h-12 rounded-xl border text-sm mb-4 outline-none"
-            style={{ borderColor: '#E2E8F0', color: '#0F172A' }} />
-
-          <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Valor alvo (R$)</label>
-          <input type="text" value={valorAlvo} onChange={e => setValorAlvo(e.target.value)} placeholder="0,00"
-            className="w-full px-4 h-12 rounded-xl border text-sm mb-4 outline-none"
-            style={{ borderColor: '#E2E8F0', color: '#0F172A' }} />
-
-          <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Prazo (opcional)</label>
-          <input type="month" value={prazo} onChange={e => setPrazo(e.target.value)}
-            className="w-full px-4 h-12 rounded-xl border text-sm mb-4 outline-none"
-            style={{ borderColor: '#E2E8F0', color: '#0F172A' }} />
-
-          <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Ícone</label>
-          <div className="grid grid-cols-4 gap-2 mb-4">
-            {ICONES.map(ic => (
-              <button key={ic.nome} onClick={() => setIcone(ic.nome)}
-                className="flex flex-col items-center gap-1 py-2.5 rounded-xl border transition-all"
-                style={{ borderColor: icone === ic.nome ? cor : '#E2E8F0', backgroundColor: icone === ic.nome ? cor + '12' : '#fff', borderWidth: icone === ic.nome ? 2 : 1, cursor: 'pointer' }}>
-                <ic.Icon size={18} color={icone === ic.nome ? cor : '#64748B'} strokeWidth={1.75} />
-                <span className="text-[10px]" style={{ color: icone === ic.nome ? cor : '#94A3B8' }}>{ic.label}</span>
-              </button>
-            ))}
-          </div>
-
-          <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Cor</label>
-          <div className="flex gap-2.5 flex-wrap mb-4">
-            {CORES.map(c => (
-              <button key={c} onClick={() => setCor(c)}
-                className="w-8 h-8 rounded-full flex items-center justify-center transition-all"
-                style={{ backgroundColor: c, border: cor === c ? '3px solid #fff' : 'none', boxShadow: cor === c ? `0 0 0 2px ${c}` : 'none', cursor: 'pointer' }}>
-                {cor === c && <CheckCircle2 size={14} color="#fff" strokeWidth={2.5} />}
-              </button>
-            ))}
-          </div>
-
-          {confirmDelete && (
-            <p className="text-xs text-center mb-2" style={{ color: '#EF4444' }}>
-              Toque em "Confirmar" para deletar permanentemente.
-            </p>
-          )}
-        </div>
-
-        {/* Botão fixo */}
-        <div className="px-6 py-4 border-t flex-shrink-0" style={{ borderColor: '#F1F5F9', backgroundColor: '#fff' }}>
-          <button onClick={handleSalvarMeta} disabled={salvando || !nome.trim() || !valorAlvo}
-            className="w-full h-12 rounded-xl text-white font-semibold text-base transition-opacity"
-            style={{ backgroundColor: '#145A45', opacity: (salvando || !nome.trim() || !valorAlvo) ? 0.6 : 1, border: 'none', cursor: 'pointer' }}>
-            {salvando ? 'Salvando...' : editandoMeta ? 'Salvar alterações' : 'Criar meta'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-
-  const ModalAporte = () => !aporteOpen || !metaSelecionada ? null : (
-    <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center"
-      style={{ backgroundColor: 'rgba(15,23,42,0.5)' }}
-      onClick={e => { if (e.target === e.currentTarget) setAporteOpen(false) }}>
-      <div className="w-full lg:max-w-sm rounded-t-[28px] lg:rounded-[20px] p-6"
-        style={{ backgroundColor: '#fff', paddingBottom: '32px' }}>
-        <div className="w-10 h-1 rounded-full mx-auto mb-4 lg:hidden" style={{ backgroundColor: '#E2E8F0' }} />
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="font-semibold text-lg" style={{ color: '#0F172A' }}>Adicionar valor</h2>
-          <button onClick={() => setAporteOpen(false)} style={{ color: '#94A3B8', background: 'none', border: 'none', cursor: 'pointer' }}>
-            <X size={20} strokeWidth={2} />
-          </button>
-        </div>
-        <p className="text-sm mb-4" style={{ color: '#64748B' }}>
-          Meta: <span className="font-semibold" style={{ color: '#0F172A' }}>{metaSelecionada.nome}</span>
-        </p>
-        <div className="rounded-2xl p-4 mb-4 text-center" style={{ backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
-          <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#94A3B8' }}>Valor (R$)</p>
-          <input type="number" inputMode="decimal" value={valorAporte} onChange={e => setValorAporte(e.target.value)}
-            placeholder="0,00" autoFocus
-            className="w-full text-center text-4xl font-bold outline-none bg-transparent"
-            style={{ color: metaSelecionada.cor || '#145A45' }} />
-        </div>
-        <p className="text-xs mb-5" style={{ color: '#94A3B8' }}>
-          Esse valor também será registrado como despesa (Investimento) no fluxo patrimonial.
-        </p>
-        <button onClick={handleAporte} disabled={salvandoAporte || !valorAporte}
-          className="w-full h-14 rounded-xl text-white font-semibold text-base transition-opacity"
-          style={{ backgroundColor: metaSelecionada.cor || '#145A45', opacity: (salvandoAporte || !valorAporte) ? 0.6 : 1, border: 'none', cursor: 'pointer' }}>
-          {salvandoAporte ? 'Salvando...' : 'Confirmar aporte'}
-        </button>
-      </div>
-    </div>
-  )
-
-  // Card de meta reutilizável
-  const MetaCard = ({ m, desktop = false }: { m: any, desktop?: boolean }) => {
-    const pct        = Math.min(Math.round((Number(m.valor_atual) / Number(m.valor_alvo)) * 100), 100)
-    const mesesRest  = calcMesesRestantes(m.prazo)
-    const concluida  = pct >= 100
-    const faltaValor = Math.max(Number(m.valor_alvo) - Number(m.valor_atual), 0)
-    const Icon       = getIcon(m.icone)
-    const cor        = m.cor || '#145A45'
-
-    return (
-      <div className={desktop ? 'rounded-[20px] border p-6' : 'rounded-2xl border p-4'}
-        style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
-        <div className="flex items-center gap-3 mb-3">
-          <div className={`${desktop ? 'w-11 h-11 rounded-xl' : 'w-10 h-10 rounded-xl'} flex items-center justify-center flex-shrink-0`}
-            style={{ backgroundColor: cor + '18' }}>
-            <Icon size={desktop ? 19 : 17} color={cor} strokeWidth={1.75} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className={`${desktop ? 'text-sm' : 'text-sm'} font-semibold truncate`} style={{ color: '#0F172A' }}>{m.nome}</p>
-            <p className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>
-              {fmt(Number(m.valor_atual))} de {fmt(Number(m.valor_alvo))}
-            </p>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <div className="px-2 py-1 rounded-lg" style={{ backgroundColor: cor + '18' }}>
-              <span className="text-sm font-bold" style={{ color: cor }}>{pct}%</span>
-            </div>
-            {/* Botão editar */}
-            <button onClick={() => abrirModalEditar(m)}
-              className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:opacity-80"
-              style={{ backgroundColor: '#F1F5F9', border: 'none', cursor: 'pointer' }}>
-              <Pencil size={13} color="#64748B" strokeWidth={1.75} />
-            </button>
-          </div>
-        </div>
-
-        <div className="h-1.5 rounded-full overflow-hidden mb-3" style={{ backgroundColor: '#F1F5F9' }}>
-          <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: cor }} />
-        </div>
-
-        <div className="flex items-center justify-between mb-3">
-          {concluida ? (
-            <div className="flex items-center gap-1.5">
-              <CheckCircle2 size={13} color="#10B981" strokeWidth={2} />
-              <span className="text-xs font-semibold" style={{ color: '#10B981' }}>Concluída</span>
-            </div>
-          ) : (
-            <span className="text-xs" style={{ color: '#64748B' }}>Falta {fmt(faltaValor)}</span>
-          )}
-          {m.prazo && (
-            <div className="flex items-center gap-1">
-              <Calendar size={11} color="#94A3B8" strokeWidth={1.75} />
-              <span className="text-xs" style={{ color: '#94A3B8' }}>
-                {formatPrazo(m.prazo)}{mesesRest !== null && mesesRest > 0 ? ` · ${mesesRest}m` : ''}
-              </span>
-            </div>
-          )}
-        </div>
-
-        {!concluida && (
-          <button onClick={() => abrirAporte(m)}
-            className="w-full py-2.5 rounded-xl text-sm font-semibold transition-colors hover:opacity-90"
-            style={{ backgroundColor: cor + '12', color: cor, border: 'none', cursor: 'pointer' }}>
-            + Adicionar valor
-          </button>
-        )}
-      </div>
-    )
-  }
-
   return (
     <>
       {/* ── MOBILE ── */}
@@ -440,7 +242,69 @@ export default function MetasPage() {
                 Criar primeira meta →
               </button>
             </div>
-          ) : metas.map(m => <MetaCard key={m.id} m={m} />)}
+          ) : metas.map(m => {
+            const pct        = Math.min(Math.round((Number(m.valor_atual) / Number(m.valor_alvo)) * 100), 100)
+            const mesesRest  = calcMesesRestantes(m.prazo)
+            const concluida  = pct >= 100
+            const faltaValor = Math.max(Number(m.valor_alvo) - Number(m.valor_atual), 0)
+            const Icon       = getIcon(m.icone)
+            const corM       = m.cor || '#145A45'
+            return (
+              <div key={m.id} className="rounded-2xl border p-4"
+                style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: corM + '18' }}>
+                    <Icon size={17} color={corM} strokeWidth={1.75} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold truncate" style={{ color: '#0F172A' }}>{m.nome}</p>
+                    <p className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>
+                      {fmt(Number(m.valor_atual))} de {fmt(Number(m.valor_alvo))}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="px-2 py-1 rounded-lg" style={{ backgroundColor: corM + '18' }}>
+                      <span className="text-sm font-bold" style={{ color: corM }}>{pct}%</span>
+                    </div>
+                    <button onClick={() => abrirModalEditar(m)}
+                      className="w-8 h-8 rounded-lg flex items-center justify-center"
+                      style={{ backgroundColor: '#F1F5F9', border: 'none', cursor: 'pointer' }}>
+                      <Pencil size={13} color="#64748B" strokeWidth={1.75} />
+                    </button>
+                  </div>
+                </div>
+                <div className="h-1.5 rounded-full overflow-hidden mb-3" style={{ backgroundColor: '#F1F5F9' }}>
+                  <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: corM }} />
+                </div>
+                <div className="flex items-center justify-between mb-3">
+                  {concluida ? (
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle2 size={13} color="#10B981" strokeWidth={2} />
+                      <span className="text-xs font-semibold" style={{ color: '#10B981' }}>Concluída</span>
+                    </div>
+                  ) : (
+                    <span className="text-xs" style={{ color: '#64748B' }}>Falta {fmt(faltaValor)}</span>
+                  )}
+                  {m.prazo && (
+                    <div className="flex items-center gap-1">
+                      <Calendar size={11} color="#94A3B8" strokeWidth={1.75} />
+                      <span className="text-xs" style={{ color: '#94A3B8' }}>
+                        {formatPrazo(m.prazo)}{mesesRest !== null && mesesRest > 0 ? ` · ${mesesRest}m` : ''}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                {!concluida && (
+                  <button onClick={() => abrirAporte(m)}
+                    className="w-full py-2.5 rounded-xl text-sm font-semibold"
+                    style={{ backgroundColor: corM + '12', color: corM, border: 'none', cursor: 'pointer' }}>
+                    + Adicionar valor
+                  </button>
+                )}
+              </div>
+            )
+          })}
         </div>
       </div>
 
@@ -455,7 +319,7 @@ export default function MetasPage() {
           </div>
           <button onClick={abrirModalNova}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90"
-            style={{ backgroundColor: '#145A45', boxShadow: '0 4px 12px rgba(15,118,110,0.3)', border: 'none', cursor: 'pointer' }}>
+            style={{ backgroundColor: '#145A45', boxShadow: '0 4px 12px rgba(20,90,69,0.3)', border: 'none', cursor: 'pointer' }}>
             <Plus size={16} strokeWidth={2.5} /> Nova meta
           </button>
         </div>
@@ -492,13 +356,214 @@ export default function MetasPage() {
           </div>
         ) : (
           <div className="grid grid-cols-3 gap-5">
-            {metas.map(m => <MetaCard key={m.id} m={m} desktop />)}
+            {metas.map(m => {
+              const pct        = Math.min(Math.round((Number(m.valor_atual) / Number(m.valor_alvo)) * 100), 100)
+              const mesesRest  = calcMesesRestantes(m.prazo)
+              const concluida  = pct >= 100
+              const faltaValor = Math.max(Number(m.valor_alvo) - Number(m.valor_atual), 0)
+              const Icon       = getIcon(m.icone)
+              const corM       = m.cor || '#145A45'
+              return (
+                <div key={m.id} className="rounded-[20px] border p-6"
+                  style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: corM + '18' }}>
+                      <Icon size={19} color={corM} strokeWidth={1.75} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate" style={{ color: '#0F172A' }}>{m.nome}</p>
+                      <p className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>
+                        {fmt(Number(m.valor_atual))} de {fmt(Number(m.valor_alvo))}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="px-2.5 py-1 rounded-lg" style={{ backgroundColor: corM + '18' }}>
+                        <span className="text-sm font-bold" style={{ color: corM }}>{pct}%</span>
+                      </div>
+                      <button onClick={() => abrirModalEditar(m)}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center hover:opacity-80"
+                        style={{ backgroundColor: '#F1F5F9', border: 'none', cursor: 'pointer' }}>
+                        <Pencil size={13} color="#64748B" strokeWidth={1.75} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="h-1.5 rounded-full overflow-hidden mb-4" style={{ backgroundColor: '#F1F5F9' }}>
+                    <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: corM }} />
+                  </div>
+                  <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                    {concluida ? (
+                      <div className="flex items-center gap-1.5">
+                        <CheckCircle2 size={13} color="#10B981" strokeWidth={2} />
+                        <span className="text-xs font-semibold" style={{ color: '#10B981' }}>Concluída</span>
+                      </div>
+                    ) : (
+                      <span className="text-xs" style={{ color: '#64748B' }}>Falta {fmt(faltaValor)}</span>
+                    )}
+                    {m.prazo && (
+                      <div className="flex items-center gap-1.5">
+                        <Calendar size={12} color="#94A3B8" strokeWidth={1.75} />
+                        <span className="text-xs" style={{ color: '#94A3B8' }}>
+                          {formatPrazo(m.prazo)}{mesesRest !== null && mesesRest > 0 ? ` · ${mesesRest}m` : ''}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  {!concluida && (
+                    <button onClick={() => abrirAporte(m)}
+                      className="w-full py-2.5 rounded-xl text-sm font-semibold transition-colors hover:opacity-90"
+                      style={{ backgroundColor: corM + '12', color: corM, border: 'none', cursor: 'pointer' }}>
+                      + Adicionar valor
+                    </button>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
       </div>
 
-      <ModalMeta />
-      <ModalAporte />
+      {/* ── MODAL NOVA/EDITAR META (inline, sem subcomponente) ── */}
+      {modalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center"
+          style={{ backgroundColor: 'rgba(15,23,42,0.5)' }}
+          onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}>
+          <div className="w-full lg:max-w-md rounded-t-[28px] lg:rounded-[20px] overflow-hidden flex flex-col"
+            style={{ backgroundColor: '#fff', maxHeight: '90vh' }}>
+
+            <div className="w-10 h-1 rounded-full mx-auto mt-3 mb-1 lg:hidden flex-shrink-0" style={{ backgroundColor: '#E2E8F0' }} />
+
+            <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0" style={{ borderColor: '#F1F5F9' }}>
+              <h2 className="font-semibold text-lg" style={{ color: '#0F172A' }}>
+                {editandoMeta ? 'Editar meta' : 'Nova meta'}
+              </h2>
+              <div className="flex items-center gap-2">
+                {editandoMeta && (
+                  <button onClick={handleDeletarMeta} disabled={deletando}
+                    className="flex items-center gap-1.5 px-3 h-8 rounded-lg text-xs font-semibold"
+                    style={{ backgroundColor: confirmDelete ? '#EF4444' : '#FEF2F2', color: confirmDelete ? '#fff' : '#DC2626', border: 'none', cursor: 'pointer' }}>
+                    <Trash2 size={13} strokeWidth={2} />
+                    {deletando ? 'Deletando...' : confirmDelete ? 'Confirmar' : 'Deletar'}
+                  </button>
+                )}
+                <button onClick={() => setModalOpen(false)} style={{ color: '#94A3B8', background: 'none', border: 'none', cursor: 'pointer' }}>
+                  <X size={20} strokeWidth={2} />
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-y-auto flex-1 px-6 pt-4 pb-2">
+              <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Nome da meta</label>
+              <input
+                type="text"
+                value={nome}
+                onChange={e => setNome(e.target.value)}
+                placeholder="Ex: Casa própria"
+                className="w-full px-4 h-12 rounded-xl border text-sm mb-4 outline-none"
+                style={{ borderColor: '#E2E8F0', color: '#0F172A' }}
+              />
+
+              <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Valor alvo (R$)</label>
+              <input
+                type="text"
+                value={valorAlvo}
+                onChange={e => setValorAlvo(e.target.value)}
+                placeholder="0,00"
+                className="w-full px-4 h-12 rounded-xl border text-sm mb-4 outline-none"
+                style={{ borderColor: '#E2E8F0', color: '#0F172A' }}
+              />
+
+              <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Prazo (opcional)</label>
+              <input
+                type="month"
+                value={prazo}
+                onChange={e => setPrazo(e.target.value)}
+                className="w-full px-4 h-12 rounded-xl border text-sm mb-4 outline-none"
+                style={{ borderColor: '#E2E8F0', color: '#0F172A' }}
+              />
+
+              <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Ícone</label>
+              <div className="grid grid-cols-4 gap-2 mb-4">
+                {ICONES.map(ic => (
+                  <button key={ic.nome} onClick={() => setIcone(ic.nome)}
+                    className="flex flex-col items-center gap-1 py-2.5 rounded-xl border transition-all"
+                    style={{ borderColor: icone === ic.nome ? cor : '#E2E8F0', backgroundColor: icone === ic.nome ? cor + '12' : '#fff', borderWidth: icone === ic.nome ? 2 : 1, cursor: 'pointer' }}>
+                    <ic.Icon size={18} color={icone === ic.nome ? cor : '#64748B'} strokeWidth={1.75} />
+                    <span className="text-[10px]" style={{ color: icone === ic.nome ? cor : '#94A3B8' }}>{ic.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Cor</label>
+              <div className="flex gap-2.5 flex-wrap mb-4">
+                {CORES.map(c => (
+                  <button key={c} onClick={() => setCor(c)}
+                    className="w-8 h-8 rounded-full flex items-center justify-center transition-all"
+                    style={{ backgroundColor: c, border: cor === c ? '3px solid #fff' : 'none', boxShadow: cor === c ? `0 0 0 2px ${c}` : 'none', cursor: 'pointer' }}>
+                    {cor === c && <CheckCircle2 size={14} color="#fff" strokeWidth={2.5} />}
+                  </button>
+                ))}
+              </div>
+
+              {confirmDelete && (
+                <p className="text-xs text-center mb-2" style={{ color: '#EF4444' }}>
+                  Toque em "Confirmar" para deletar permanentemente.
+                </p>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t flex-shrink-0" style={{ borderColor: '#F1F5F9', backgroundColor: '#fff' }}>
+              <button onClick={handleSalvarMeta} disabled={salvando || !nome.trim() || !valorAlvo}
+                className="w-full h-12 rounded-xl text-white font-semibold text-base transition-opacity"
+                style={{ backgroundColor: '#145A45', opacity: (salvando || !nome.trim() || !valorAlvo) ? 0.6 : 1, border: 'none', cursor: 'pointer' }}>
+                {salvando ? 'Salvando...' : editandoMeta ? 'Salvar alterações' : 'Criar meta'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL APORTE (inline) ── */}
+      {aporteOpen && metaSelecionada && (
+        <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center"
+          style={{ backgroundColor: 'rgba(15,23,42,0.5)' }}
+          onClick={e => { if (e.target === e.currentTarget) setAporteOpen(false) }}>
+          <div className="w-full lg:max-w-sm rounded-t-[28px] lg:rounded-[20px] p-6"
+            style={{ backgroundColor: '#fff', paddingBottom: '32px' }}>
+            <div className="w-10 h-1 rounded-full mx-auto mb-4 lg:hidden" style={{ backgroundColor: '#E2E8F0' }} />
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-semibold text-lg" style={{ color: '#0F172A' }}>Adicionar valor</h2>
+              <button onClick={() => setAporteOpen(false)} style={{ color: '#94A3B8', background: 'none', border: 'none', cursor: 'pointer' }}>
+                <X size={20} strokeWidth={2} />
+              </button>
+            </div>
+            <p className="text-sm mb-4" style={{ color: '#64748B' }}>
+              Meta: <span className="font-semibold" style={{ color: '#0F172A' }}>{metaSelecionada.nome}</span>
+            </p>
+            <div className="rounded-2xl p-4 mb-4 text-center" style={{ backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+              <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#94A3B8' }}>Valor (R$)</p>
+              <input
+                type="number"
+                inputMode="decimal"
+                value={valorAporte}
+                onChange={e => setValorAporte(e.target.value)}
+                placeholder="0,00"
+                autoFocus
+                className="w-full text-center text-4xl font-bold outline-none bg-transparent"
+                style={{ color: metaSelecionada.cor || '#145A45' }}
+              />
+            </div>
+            <p className="text-xs mb-5" style={{ color: '#94A3B8' }}>
+              Esse valor também será registrado como despesa (Investimento) no fluxo patrimonial.
+            </p>
+            <button onClick={handleAporte} disabled={salvandoAporte || !valorAporte}
+              className="w-full h-14 rounded-xl text-white font-semibold text-base transition-opacity"
+              style={{ backgroundColor: metaSelecionada.cor || '#145A45', opacity: (salvandoAporte || !valorAporte) ? 0.6 : 1, border: 'none', cursor: 'pointer' }}>
+              {salvandoAporte ? 'Salvando...' : 'Confirmar aporte'}
+            </button>
+          </div>
+        </div>
+      )}
     </>
   )
 }
