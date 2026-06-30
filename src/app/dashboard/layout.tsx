@@ -92,8 +92,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               boxShadow: '0 2px 8px rgba(47,179,106,0.35)',
             }}>
-              <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-                <path d="M4 4h12v3H7.5v2.5H13v3H7.5V16H4V4z" fill="white" fillOpacity="0.95"/>
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <defs>
+                  <linearGradient id="lf" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stopColor="#A8F0C6" stopOpacity="0.95"/>
+                    <stop offset="100%" stopColor="#5DD68D" stopOpacity="0.65"/>
+                  </linearGradient>
+                </defs>
+                <path d="M4 16 L4 7 C4 5.3 5.3 4 7 4 L16 4 L16 7 L7 7 C6.4 7 6 7.4 6 8 L6 11 L13 11 L13 14 L6 14 L6 16 Z" fill="url(#lf)" opacity="0.5"/>
+                <path d="M5 15.5 L5 6.5 C5 5 6.2 4 7.5 4 L17 4 L17 7 L7.5 7 C7 7 7 7.8 7 8 L7 11 L14 11 L14 14 L7 14 L7 15.5 Z" fill="url(#lf)" opacity="0.95"/>
               </svg>
             </div>
             {!collapsed && (

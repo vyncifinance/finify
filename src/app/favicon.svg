@@ -1,10 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#145A45"/>
-      <stop offset="100%" stop-color="#2FB36A"/>
+      <stop offset="0%" stop-color="#2FB36A"/>
+      <stop offset="100%" stop-color="#0A3D2B"/>
+    </linearGradient>
+    <linearGradient id="leaf" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#A8F0C6" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#5DD68D" stop-opacity="0.6"/>
     </linearGradient>
   </defs>
   <rect width="32" height="32" rx="7" fill="url(#bg)"/>
-  <path d="M8 8 L24 8 L24 13 L13 13 L13 16.5 L21 16.5 L21 21.5 L13 21.5 L13 25 L8 25 Z" fill="white" fill-opacity="0.95"/>
+  <path d="M9 23 C9 23 9 14 9 11 C9 9 11 7 13 7 L23 7 L23 11 L13 11 C12 11 11.5 12 11.5 12.5 L11.5 16 L19 16 L19 19.5 L11.5 19.5 L11.5 23 Z" fill="url(#leaf)" opacity="0.5"/>
+  <path d="M10 22.5 C10 22.5 10 13.5 10 10.5 C10 8.5 11.5 7 13.5 7 L24 7 L24 11 L13.5 11 C12.5 11 12.5 12.5 12.5 13 L12.5 16 L20 16 L20 19.5 L12.5 19.5 L12.5 22.5 Z" fill="url(#leaf)" opacity="0.95"/>
 </svg>

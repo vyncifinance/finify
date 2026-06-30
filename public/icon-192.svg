@@ -1,10 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="192" y2="192" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#145A45"/>
-      <stop offset="100%" stop-color="#2FB36A"/>
+      <stop offset="0%" stop-color="#2FB36A"/>
+      <stop offset="100%" stop-color="#0A3D2B"/>
+    </linearGradient>
+    <linearGradient id="leaf" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#A8F0C6" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#5DD68D" stop-opacity="0.6"/>
     </linearGradient>
   </defs>
   <rect width="192" height="192" rx="42" fill="url(#bg)"/>
-  <path d="M52 52 L140 52 L140 80 L84 80 L84 100 L128 100 L128 128 L84 128 L84 148 L52 148 Z" fill="white" fill-opacity="0.95"/>
+  <!-- Folha traseira (F parte inferior) -->
+  <path d="M58 140 C58 140 58 88 58 72 C58 58 68 48 82 48 L134 48 L134 68 L82 68 C78 68 76 70 76 74 L76 96 L120 96 L120 116 L76 116 L76 140 Z" fill="url(#leaf)" opacity="0.55"/>
+  <!-- Folha dianteira (F completo) -->
+  <path d="M62 136 C62 136 62 86 62 70 C62 57 71 48 84 48 L138 48 L138 68 L84 68 C80 68 80 72 80 74 L80 96 L124 96 L124 116 L80 116 L80 136 Z" fill="url(#leaf)" opacity="0.95"/>
 </svg>
