@@ -10,7 +10,7 @@ import {
   Plus, Wallet, X, UtensilsCrossed, Home, Car, Smile,
   Heart, BookOpen, ShoppingBag, Church, MoreHorizontal,
   Briefcase, TrendingUp, Laptop, DollarSign, Trash2, Pencil,
-  CreditCard, FileText, AlignLeft
+  CreditCard, AlignLeft, Target, ChevronDown
 } from 'lucide-react'
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
@@ -42,8 +42,6 @@ function formatDiaLabel(dataStr: string) {
 }
 
 export default function MovimentosPage() {
-  const router       = useRouter()
-  const pathname     = usePathname()
   const familiaIdRef = useRef('')
 
   const [loading, setLoading]           = useState(true)
@@ -57,6 +55,7 @@ export default function MovimentosPage() {
   const [filtroMembro, setFiltroMembro] = useState('todos')
   const [membros, setMembros]           = useState<string[]>([])
   const [membrosFamilia, setMembrosFamilia] = useState<string[]>([])
+  const [metas, setMetas]               = useState<any[]>([])
 
   const [modalOpen, setModalOpen]         = useState(false)
   const [editando, setEditando]           = useState<any>(null)
@@ -74,6 +73,11 @@ export default function MovimentosPage() {
   const [deletando, setDeletando]         = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [isMobile, setIsMobile]           = useState(true)
+
+  // Alocação para meta
+  const [alocarMeta, setAlocarMeta]     = useState(false)
+  const [metaId, setMetaId]             = useState('')
+  const [metaPct, setMetaPct]           = useState(10)
 
   const supabase = createClient()
 
@@ -114,6 +118,10 @@ export default function MovimentosPage() {
       const { data: membrosData } = await supabase
         .from('profiles').select('nome').eq('familia_id', fid)
       if (membrosData) setMembrosFamilia(membrosData.map((m: any) => m.nome).filter(Boolean))
+      const { data: metasData } = await supabase
+        .from('metas').select('id, nome, valor_atual, valor_alvo, cor')
+        .eq('familia_id', fid).order('created_at', { ascending: false })
+      if (metasData) setMetas(metasData)
       await carregarLancamentos(fid, profile.nome, (profile.familias as any)?.nome)
     }
     setLoading(false)
@@ -146,6 +154,7 @@ export default function MovimentosPage() {
     setDataLanc(new Date().toISOString().split('T')[0])
     setMembroForm(membroAtual); setDizimar(true)
     setObservacao(''); setParcelado(false); setNumParcelas('2'); setDiaParcela('1')
+    setAlocarMeta(false); setMetaId(''); setMetaPct(10)
     setConfirmDelete(false)
     setModalOpen(true)
   }
@@ -157,6 +166,7 @@ export default function MovimentosPage() {
     setMembroForm(l.membro); setDizimar(l.dizimar !== false)
     setObservacao(l.descricao || '')
     setParcelado(false); setNumParcelas('2'); setDiaParcela('1')
+    setAlocarMeta(false); setMetaId(l.meta_id || ''); setMetaPct(l.meta_pct || 10)
     setConfirmDelete(false)
     setModalOpen(true)
   }
@@ -166,53 +176,74 @@ export default function MovimentosPage() {
     setCategoria(t === 'despesa' ? 'Alimentação' : 'Salário')
     setDizimar(t === 'receita')
     setParcelado(false)
+    setAlocarMeta(false)
   }
+
+  const valorNum = () => parseFloat(valor.replace(/\./g, '').replace(',', '.')) || 0
+  const valorMeta = () => Math.round((valorNum() * metaPct) / 100 * 100) / 100
 
   async function handleSalvar() {
     if (!valor) return
     setSalvando(true)
-    const valorNum = parseFloat(valor.replace(/\./g, '').replace(',', '.'))
-    if (isNaN(valorNum) || valorNum <= 0) { setSalvando(false); return }
-    const fid  = familiaIdRef.current
+    const vNum = valorNum()
+    if (isNaN(vNum) || vNum <= 0) { setSalvando(false); return }
+    const fid   = familiaIdRef.current
     const agora = new Date()
     const hora  = `${String(agora.getHours()).padStart(2,'0')}:${String(agora.getMinutes()).padStart(2,'0')}`
 
     if (editando) {
       const { error } = await supabase.from('lancamentos').update({
-        tipo, valor: valorNum, categoria, membro: membroForm, data: dataLanc,
+        tipo, valor: vNum, categoria, membro: membroForm, data: dataLanc,
         dizimar: tipo === 'receita' ? dizimar : false,
         descricao: observacao || null,
+        meta_id: null, meta_pct: null,
       }).eq('id', editando.id)
       setSalvando(false)
       if (!error) { setModalOpen(false); await carregarLancamentos(fid) }
     } else if (parcelado && tipo === 'despesa') {
-      // Lançamento parcelado — cria N lançamentos
       const n = parseInt(numParcelas) || 2
       const dia = parseInt(diaParcela) || 1
-      const valorParcela = valorNum / n
+      const valorParcela = vNum / n
       const dataBase = new Date(dataLanc + 'T12:00:00')
       const inserts = []
       for (let i = 0; i < n; i++) {
         const d = new Date(dataBase.getFullYear(), dataBase.getMonth() + i, dia)
-        const dataStr = d.toISOString().split('T')[0]
         inserts.push({
           familia_id: fid, user_id: userId, tipo: 'despesa',
           valor: Math.round(valorParcela * 100) / 100,
-          categoria, membro: membroForm, data: dataStr, hora,
+          categoria, membro: membroForm, data: d.toISOString().split('T')[0], hora,
           dizimar: false,
           descricao: `${observacao ? observacao + ' ' : ''}Parcela ${i + 1}/${n}`,
+          meta_id: null, meta_pct: null,
         })
       }
       const { error } = await supabase.from('lancamentos').insert(inserts)
       setSalvando(false)
       if (!error) { setModalOpen(false); await carregarLancamentos(fid) }
     } else {
+      // Alocação para meta
+      const metaIdFinal  = tipo === 'receita' && alocarMeta && metaId ? metaId : null
+      const metaPctFinal = tipo === 'receita' && alocarMeta && metaId ? metaPct : null
+
       const { error } = await supabase.from('lancamentos').insert({
-        familia_id: fid, user_id: userId, tipo, valor: valorNum,
+        familia_id: fid, user_id: userId, tipo, valor: vNum,
         categoria, membro: membroForm, data: dataLanc, hora,
         dizimar: tipo === 'receita' ? dizimar : false,
         descricao: observacao || null,
+        meta_id: metaIdFinal,
+        meta_pct: metaPctFinal,
       })
+
+      // Atualiza valor_atual da meta
+      if (!error && metaIdFinal) {
+        const meta = metas.find(m => m.id === metaIdFinal)
+        if (meta) {
+          const novoValor = Number(meta.valor_atual) + valorMeta()
+          await supabase.from('metas').update({ valor_atual: novoValor }).eq('id', metaIdFinal)
+          setMetas(prev => prev.map(m => m.id === metaIdFinal ? { ...m, valor_atual: novoValor } : m))
+        }
+      }
+
       setSalvando(false)
       if (!error) { setModalOpen(false); await carregarLancamentos(fid) }
     }
@@ -248,11 +279,12 @@ export default function MovimentosPage() {
   const resultado = totalRec - totalDes
   const mesLabel  = `${MESES[mesRef.getMonth()]} ${mesRef.getFullYear()}`
   const categorias = tipo === 'despesa' ? CATEGORIAS_DESPESA : CATEGORIAS_RECEITA
+  const temMetas   = metas.length > 0
 
-  // Conteúdo do modal compartilhado
+  const metaSelecionada = metas.find(m => m.id === metaId)
+
   const modalContent = (isMob: boolean) => (
     <>
-      {/* Drag handle mobile */}
       {isMob && <div style={{ width: '40px', height: '4px', borderRadius: '2px', backgroundColor: '#E2E8F0', margin: '12px auto 4px', flexShrink: 0 }} />}
 
       {/* Header */}
@@ -387,6 +419,68 @@ export default function MovimentosPage() {
           </div>
         )}
 
+        {/* ── ALOCAÇÃO PARA META — só receita, novo lançamento, com metas disponíveis ── */}
+        {tipo === 'receita' && !editando && temMetas && (
+          <div style={{ marginBottom: '10px' }}>
+            <button onClick={() => { setAlocarMeta(!alocarMeta); if (!metaId && metas.length > 0) setMetaId(metas[0].id) }}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '10px 14px', borderRadius: '12px', border: `1px solid ${alocarMeta ? '#8B5CF6' : '#E2E8F0'}`, backgroundColor: alocarMeta ? 'rgba(139,92,246,0.06)' : '#F8FAFC', cursor: 'pointer', marginBottom: alocarMeta ? '8px' : '0' }}>
+              <div style={{ position: 'relative', width: '36px', height: '20px', borderRadius: '10px', backgroundColor: alocarMeta ? '#8B5CF6' : '#E2E8F0', flexShrink: 0 }}>
+                <div style={{ position: 'absolute', top: '2px', left: alocarMeta ? '18px' : '2px', width: '16px', height: '16px', borderRadius: '50%', backgroundColor: '#fff', transition: 'left 0.2s' }} />
+              </div>
+              <div>
+                <p style={{ fontSize: '13px', fontWeight: 600, color: alocarMeta ? '#6D28D9' : '#0F172A', margin: 0 }}>Alocar parte para uma meta</p>
+                <p style={{ fontSize: '11px', color: '#94A3B8', margin: 0 }}>Destina uma % desta receita para a meta</p>
+              </div>
+            </button>
+
+            {alocarMeta && (
+              <div style={{ padding: '12px 14px', backgroundColor: 'rgba(139,92,246,0.05)', borderRadius: '12px', border: '1px solid rgba(139,92,246,0.2)' }}>
+                {/* Seletor de meta */}
+                <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#6D28D9', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '6px' }}>Meta</p>
+                <div style={{ position: 'relative', marginBottom: '12px' }}>
+                  <select value={metaId} onChange={e => setMetaId(e.target.value)}
+                    style={{ width: '100%', padding: '9px 36px 9px 12px', borderRadius: '10px', border: '1.5px solid rgba(139,92,246,0.3)', fontSize: '13.5px', color: '#0F172A', outline: 'none', backgroundColor: '#fff', appearance: 'none', cursor: 'pointer' }}>
+                    {metas.map(m => {
+                      const pct = Math.round((Number(m.valor_atual) / Number(m.valor_alvo)) * 100)
+                      return <option key={m.id} value={m.id}>{m.nome} · {pct}%</option>
+                    })}
+                  </select>
+                  <ChevronDown size={15} color="#8B5CF6" strokeWidth={2} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                </div>
+
+                {/* Stepper de percentual */}
+                <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#6D28D9', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '6px' }}>Percentual</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                  <button onClick={() => setMetaPct(Math.max(1, metaPct - 1))}
+                    style={{ width: '32px', height: '32px', borderRadius: '9px', border: '1px solid rgba(139,92,246,0.3)', backgroundColor: '#fff', cursor: 'pointer', fontSize: '18px', color: '#8B5CF6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600 }}>−</button>
+                  <span style={{ fontSize: '22px', fontWeight: 700, color: '#6D28D9', minWidth: '48px', textAlign: 'center' }}>{metaPct}%</span>
+                  <button onClick={() => setMetaPct(Math.min(100, metaPct + 1))}
+                    style={{ width: '32px', height: '32px', borderRadius: '9px', border: '1px solid rgba(139,92,246,0.3)', backgroundColor: '#fff', cursor: 'pointer', fontSize: '18px', color: '#8B5CF6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600 }}>+</button>
+                  <div style={{ display: 'flex', gap: '6px', marginLeft: '4px' }}>
+                    {[5, 10, 15, 20].map(p => (
+                      <button key={p} onClick={() => setMetaPct(p)}
+                        style={{ padding: '4px 8px', borderRadius: '7px', fontSize: '11px', fontWeight: 600, border: `1px solid ${metaPct === p ? '#8B5CF6' : 'rgba(139,92,246,0.2)'}`, backgroundColor: metaPct === p ? '#8B5CF6' : 'transparent', color: metaPct === p ? '#fff' : '#8B5CF6', cursor: 'pointer' }}>
+                        {p}%
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Preview do valor */}
+                {valor && metaSelecionada && (
+                  <div style={{ padding: '8px 12px', backgroundColor: '#fff', borderRadius: '9px', border: '1px solid rgba(139,92,246,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Target size={13} color="#8B5CF6" strokeWidth={2} />
+                      <span style={{ fontSize: '12px', color: '#64748B' }}>{metaSelecionada.nome}</span>
+                    </div>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#6D28D9' }}>+{fmt(valorMeta())}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Observação */}
         <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Observação (opcional)</p>
         <textarea value={observacao} onChange={e => setObservacao(e.target.value)}
@@ -498,6 +592,7 @@ export default function MovimentosPage() {
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <p style={{ fontSize: '12px', color: '#94A3B8', margin: 0 }}>{l.membro?.split(' ')[0]} · {l.hora}</p>
                             {l.descricao && <AlignLeft size={10} color="#94A3B8" strokeWidth={1.75} />}
+                            {l.meta_id && <Target size={10} color="#8B5CF6" strokeWidth={2} />}
                           </div>
                         </div>
                         <p style={{ fontSize: '14px', fontWeight: 600, color: l.tipo === 'receita' ? '#10B981' : '#EF4444', flexShrink: 0, margin: 0 }}>
@@ -530,7 +625,7 @@ export default function MovimentosPage() {
           </div>
           <button onClick={abrirModalNovo}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white hover:opacity-90"
-            style={{ backgroundColor: '#145A45', boxShadow: '0 4px 12px rgba(15,118,110,0.3)', border: 'none', cursor: 'pointer' }}>
+            style={{ backgroundColor: '#145A45', boxShadow: '0 4px 12px rgba(20,90,69,0.3)', border: 'none', cursor: 'pointer' }}>
             <Plus size={16} strokeWidth={2.5} /> Novo lançamento
           </button>
         </div>
@@ -622,6 +717,7 @@ export default function MovimentosPage() {
                         <div className="flex items-center gap-2">
                           <p className="text-xs" style={{ color: '#94A3B8' }}>{l.membro} · {l.hora}</p>
                           {l.descricao && <AlignLeft size={11} color="#94A3B8" strokeWidth={1.75} />}
+                          {l.meta_id && <Target size={11} color="#8B5CF6" strokeWidth={2} />}
                           {l.descricao && <p className="text-xs truncate" style={{ color: '#94A3B8', maxWidth: '200px' }}>{l.descricao}</p>}
                         </div>
                       </div>
