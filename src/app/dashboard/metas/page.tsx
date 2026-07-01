@@ -309,7 +309,7 @@ export default function MetasPage() {
       </div>
 
       {/* ── DESKTOP ── */}
-      <div className="hidden lg:block p-8 max-w-[1440px] mx-auto" style={{ backgroundColor: '#F8FAFC' }}>
+      <div className="hidden lg:block p-8 max-w-[1440px] mx-auto" style={{ backgroundColor: '#F8FAFC', zoom: '0.82' }}>
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', letterSpacing: '-0.5px' }}>Metas da Família</h1>

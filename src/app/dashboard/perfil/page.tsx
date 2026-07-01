@@ -256,7 +256,7 @@ export default function PerfilPage() {
       </div>
 
       {/* ── DESKTOP ── */}
-      <div className="hidden lg:block p-8 max-w-[1440px] mx-auto" style={{ backgroundColor: '#F8FAFC' }}>
+      <div className="hidden lg:block p-8 max-w-[1440px] mx-auto" style={{ backgroundColor: '#F8FAFC', zoom: '0.82' }}>
         <div className="mb-6">
           <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', letterSpacing: '-0.5px' }}>Perfil</h1>
           <p className="text-sm mt-1" style={{ color: '#64748B' }}>
