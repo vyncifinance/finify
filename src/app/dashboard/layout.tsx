@@ -25,6 +25,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router   = useRouter()
   const supabase = createClient()
 
+  const [zoom, setZoom] = useState('0.82')
+
+  useEffect(() => {
+    function calcZoom() {
+      setZoom(window.innerWidth < 1400 ? '0.72' : '0.82')
+    }
+    calcZoom()
+    window.addEventListener('resize', calcZoom)
+    return () => window.removeEventListener('resize', calcZoom)
+  }, [])
+
   useEffect(() => {
     async function buscar() {
       const { data: { session } } = await supabase.auth.getSession()
@@ -77,7 +88,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
 
       {/* ── DESKTOP ── */}
-      <div className="hidden lg:flex h-screen overflow-hidden" style={{ backgroundColor: '#F8FAFC' }}>
+      <div className="hidden lg:flex h-screen overflow-hidden" style={{ backgroundColor: '#F8FAFC', zoom }}>
         <aside className="flex flex-col flex-shrink-0 transition-all duration-300"
           style={{
             width: collapsed ? '60px' : '185px',

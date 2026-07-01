@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,10 +18,20 @@ export default function LoginPage() {
   const [erro, setErro]           = useState('')
   const [showSenha, setShowSenha] = useState(false)
   const [mounted, setMounted]     = useState(false)
+  const [zoom, setZoom]           = useState('0.82')
   const router   = useRouter()
   const supabase = createClient()
 
   useEffect(() => { setMounted(true) }, [])
+
+  useEffect(() => {
+    function calcZoom() {
+      setZoom(window.innerWidth < 1400 ? '0.72' : '0.82')
+    }
+    calcZoom()
+    window.addEventListener('resize', calcZoom)
+    return () => window.removeEventListener('resize', calcZoom)
+  }, [])
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -548,4 +558,3 @@ export default function LoginPage() {
     </div>
   )
 }
-

@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
@@ -28,10 +28,20 @@ export default function CadastroPage() {
   const [showSenha, setShowSenha]         = useState(false)
   const [showConfirmar, setShowConfirmar] = useState(false)
   const [mounted, setMounted]     = useState(false)
+  const [zoom, setZoom]           = useState('0.82')
   const router   = useRouter()
   const supabase = createClient()
 
   useEffect(() => { setMounted(true) }, [])
+
+  useEffect(() => {
+    function calcZoom() {
+      setZoom(window.innerWidth < 1400 ? '0.72' : '0.82')
+    }
+    calcZoom()
+    window.addEventListener('resize', calcZoom)
+    return () => window.removeEventListener('resize', calcZoom)
+  }, [])
 
   function validarCampos(): boolean {
     if (!nome.trim())              { setErro('Digite seu nome.'); return false }
@@ -444,4 +454,3 @@ export default function CadastroPage() {
     </div>
   )
 }
-
