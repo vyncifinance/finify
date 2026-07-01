@@ -366,10 +366,10 @@ export default function DashboardPage() {
 
       {/* ── DESKTOP — REDESIGN PREMIUM ── */}
       <div className="hidden lg:block" style={{ backgroundColor: '#F7F9FB', minHeight: '100vh' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px 24px 32px' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '16px 20px 24px' }}>
 
           {/* Header premium */}
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '10px' }}>
             <div>
               <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.5px', marginBottom: '4px' }}>
                 {getSaudacao()}, {primeiroNome || 'Família'}
@@ -417,23 +417,23 @@ export default function DashboardPage() {
 
           {/* Hero — Resumo Executivo */}
           <div style={{
-            borderRadius: '16px', padding: '20px', marginBottom: '14px', position: 'relative', overflow: 'hidden',
+            borderRadius: '16px', padding: '16px', marginBottom: '10px', position: 'relative', overflow: 'hidden',
             background: 'linear-gradient(135deg, #06261F 0%, #0B3B2E 45%, #0D3F31 100%)',
             boxShadow: '0 20px 60px -16px rgba(6,38,31,0.45)',
           }}>
             <div style={{ position: 'absolute', top: '-100px', right: '-60px', width: '360px', height: '360px', borderRadius: '50%', background: 'rgba(110,231,183,0.08)', filter: 'blur(50px)' }} />
             <div style={{ position: 'absolute', bottom: '-120px', left: '20%', width: '320px', height: '320px', borderRadius: '50%', background: 'rgba(47,143,104,0.12)', filter: 'blur(60px)' }} />
 
-            <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: '24px', alignItems: 'center' }}>
+            <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: '16px', alignItems: 'center' }}>
               {/* Esquerda: número + breakdown */}
               <div>
                 <p style={{ fontSize: '13px', fontWeight: 600, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>
                   Patrimônio Total
                 </p>
-                <p style={{ fontSize: '26px', fontWeight: 700, color: '#fff', letterSpacing: '-1.5px', lineHeight: 1, marginBottom: '14px' }}>
+                <p style={{ fontSize: '22px', fontWeight: 700, color: '#fff', letterSpacing: '-1.5px', lineHeight: 1, marginBottom: '14px' }}>
                   {loading ? '...' : fmt(patrimonioExibir)}
                 </p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px', flexWrap: 'wrap' }}>
                   {!semDados && (
                     <div style={{
                       display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 12px', borderRadius: '999px',
@@ -477,7 +477,7 @@ export default function DashboardPage() {
                   <p style={{ fontSize: '12.5px', fontWeight: 500, color: 'rgba(255,255,255,0.5)' }}>Evolução · 6 meses</p>
                   <Sparkles size={14} color="rgba(255,255,255,0.3)" strokeWidth={1.75} />
                 </div>
-                <ResponsiveContainer width="100%" height={100}>
+                <ResponsiveContainer width="100%" height={90}>
                   <AreaChart data={evolucao}>
                     <defs>
                       <linearGradient id="heroGrad" x1="0" y1="0" x2="0" y2="1">
@@ -502,7 +502,7 @@ export default function DashboardPage() {
           </div>
 
           {/* KPI Cards — identidade própria */}
-          <div style={{ display: 'grid', gap: '10px', marginBottom: '12px', gridTemplateColumns: dizimoAtivo ? 'repeat(5, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))' }}>
+          <div style={{ display: 'grid', gap: '8px', marginBottom: '10px', gridTemplateColumns: dizimoAtivo ? 'repeat(5, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))' }}>
             {kpis.map(card => (
               <div key={card.label} style={{
                 borderRadius: '16px', padding: '18px', backgroundColor: '#fff',
@@ -517,7 +517,7 @@ export default function DashboardPage() {
                   <card.Icon size={19} color={card.cor} strokeWidth={1.75} />
                 </div>
                 <p style={{ fontSize: '13px', fontWeight: 500, color: '#64748B', marginBottom: '6px' }}>{card.label}</p>
-                <p style={{ fontSize: '18px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.6px', marginBottom: '4px' }}>
+                <p style={{ fontSize: '15px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.3px', marginBottom: '2px' }}>
                   {loading ? '...' : fmt(card.val)}
                 </p>
                 <span style={{ fontSize: '12.5px', fontWeight: 500, color: card.cor }}>Este mês</span>
@@ -531,11 +531,11 @@ export default function DashboardPage() {
             onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px) scale(1.01)' }}
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0) scale(1)' }}
             >
-              <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#F5F3FF', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
+              <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#F5F3FF', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px' }}>
                 <Target size={19} color="#8B5CF6" strokeWidth={1.75} />
               </div>
               <p style={{ fontSize: '13px', fontWeight: 500, color: '#64748B', marginBottom: '6px' }}>Metas Ativas</p>
-              <p style={{ fontSize: '18px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.6px', marginBottom: '4px' }}>
+              <p style={{ fontSize: '15px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.3px', marginBottom: '2px' }}>
                 {metas.length} {metas.length === 1 ? 'meta' : 'metas'}
               </p>
               <a href="/dashboard/metas" style={{ fontSize: '12.5px', fontWeight: 500, color: '#8B5CF6', textDecoration: 'none' }}>Ver detalhes →</a>
@@ -558,7 +558,7 @@ export default function DashboardPage() {
                     {dizimoQuitado ? 'Pago' : 'Pendente'}
                   </span>
                 </div>
-                <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
+                <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px' }}>
                   <Church size={19} color="#145A45" strokeWidth={1.75} />
                 </div>
                 <p style={{ fontSize: '13px', fontWeight: 500, color: '#64748B', marginBottom: '6px' }}>Dízimo do mês</p>
@@ -576,14 +576,14 @@ export default function DashboardPage() {
           </div>
 
           {/* Evolução + Saúde Financeira */}
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '10px', marginBottom: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px', marginBottom: '10px' }}>
             <div style={{
               borderRadius: '20px', padding: '28px', backgroundColor: '#fff',
               border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
             }}>
               <h2 style={{ fontSize: '14px', fontWeight: 600, color: '#0B1F18', marginBottom: '2px', letterSpacing: '-0.2px' }}>Evolução Patrimonial</h2>
               <p style={{ fontSize: '12px', color: '#64748B', marginBottom: '16px' }}>Últimos 6 meses</p>
-              <ResponsiveContainer width="100%" height={140}>
+              <ResponsiveContainer width="100%" height={110}>
                 <AreaChart data={evolucao}>
                   <defs>
                     <linearGradient id="evoGrad" x1="0" y1="0" x2="0" y2="1">
@@ -622,7 +622,7 @@ export default function DashboardPage() {
                   <span style={{ fontSize: '12px', color: '#94A3B8', marginTop: '2px' }}>de 100</span>
                 </div>
               </div>
-              <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+              <div style={{ textAlign: 'center', marginBottom: '10px' }}>
                 <span style={{
                   fontSize: '12.5px', fontWeight: 600, padding: '5px 14px', borderRadius: '999px',
                   backgroundColor: scoreCor + '15', color: scoreCor,
@@ -685,7 +685,7 @@ export default function DashboardPage() {
                   const cor  = m.cor || '#145A45'
                   return (
                     <div key={m.id} style={{
-                      borderRadius: '12px', padding: '12px', border: '1px solid rgba(15,23,42,0.05)',
+                      borderRadius: '10px', padding: '10px', border: '1px solid rgba(15,23,42,0.05)',
                       transition: 'all 0.2s',
                     }}
                     onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 24px rgba(15,23,42,0.06)' }}
@@ -723,7 +723,7 @@ export default function DashboardPage() {
                 <p style={{ fontSize: '13.5px', textAlign: 'center', padding: '48px 0', color: '#94A3B8' }}>Sem despesas ainda.</p>
               ) : (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
-                  <ResponsiveContainer width={170} height={100}>
+                  <ResponsiveContainer width={170} height={90}>
                     <PieChart>
                       <Pie data={cats} cx="50%" cy="50%" innerRadius={58} outerRadius={82} dataKey="val" strokeWidth={0} paddingAngle={3}>
                         {cats.map((c, i) => <Cell key={i} fill={c.cor} />)}
