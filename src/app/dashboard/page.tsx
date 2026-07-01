@@ -366,15 +366,15 @@ export default function DashboardPage() {
 
       {/* ── DESKTOP — REDESIGN PREMIUM ── */}
       <div className="hidden lg:block" style={{ backgroundColor: '#F7F9FB', minHeight: '100vh' }}>
-        <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '24px 28px 36px' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px 24px 32px' }}>
 
           {/* Header premium */}
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '20px' }}>
             <div>
-              <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.8px', marginBottom: '6px' }}>
+              <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.5px', marginBottom: '4px' }}>
                 {getSaudacao()}, {primeiroNome || 'Família'}
               </h1>
-              <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '6px' }}>
+              <p style={{ fontSize: '12px', color: '#64748B', marginBottom: '4px' }}>
                 Veja como seu patrimônio evoluiu hoje.
               </p>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -417,7 +417,7 @@ export default function DashboardPage() {
 
           {/* Hero — Resumo Executivo */}
           <div style={{
-            borderRadius: '20px', padding: '24px', marginBottom: '16px', position: 'relative', overflow: 'hidden',
+            borderRadius: '16px', padding: '20px', marginBottom: '14px', position: 'relative', overflow: 'hidden',
             background: 'linear-gradient(135deg, #06261F 0%, #0B3B2E 45%, #0D3F31 100%)',
             boxShadow: '0 20px 60px -16px rgba(6,38,31,0.45)',
           }}>
@@ -430,7 +430,7 @@ export default function DashboardPage() {
                 <p style={{ fontSize: '13px', fontWeight: 600, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>
                   Patrimônio Total
                 </p>
-                <p style={{ fontSize: '32px', fontWeight: 700, color: '#fff', letterSpacing: '-1.5px', lineHeight: 1, marginBottom: '14px' }}>
+                <p style={{ fontSize: '26px', fontWeight: 700, color: '#fff', letterSpacing: '-1.5px', lineHeight: 1, marginBottom: '14px' }}>
                   {loading ? '...' : fmt(patrimonioExibir)}
                 </p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
@@ -477,7 +477,7 @@ export default function DashboardPage() {
                   <p style={{ fontSize: '12.5px', fontWeight: 500, color: 'rgba(255,255,255,0.5)' }}>Evolução · 6 meses</p>
                   <Sparkles size={14} color="rgba(255,255,255,0.3)" strokeWidth={1.75} />
                 </div>
-                <ResponsiveContainer width="100%" height={120}>
+                <ResponsiveContainer width="100%" height={100}>
                   <AreaChart data={evolucao}>
                     <defs>
                       <linearGradient id="heroGrad" x1="0" y1="0" x2="0" y2="1">
@@ -502,7 +502,7 @@ export default function DashboardPage() {
           </div>
 
           {/* KPI Cards — identidade própria */}
-          <div style={{ display: 'grid', gap: '14px', marginBottom: '16px', gridTemplateColumns: dizimoAtivo ? 'repeat(5, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))' }}>
+          <div style={{ display: 'grid', gap: '10px', marginBottom: '12px', gridTemplateColumns: dizimoAtivo ? 'repeat(5, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))' }}>
             {kpis.map(card => (
               <div key={card.label} style={{
                 borderRadius: '16px', padding: '18px', backgroundColor: '#fff',
@@ -517,7 +517,7 @@ export default function DashboardPage() {
                   <card.Icon size={19} color={card.cor} strokeWidth={1.75} />
                 </div>
                 <p style={{ fontSize: '13px', fontWeight: 500, color: '#64748B', marginBottom: '6px' }}>{card.label}</p>
-                <p style={{ fontSize: '22px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.6px', marginBottom: '4px' }}>
+                <p style={{ fontSize: '18px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.6px', marginBottom: '4px' }}>
                   {loading ? '...' : fmt(card.val)}
                 </p>
                 <span style={{ fontSize: '12.5px', fontWeight: 500, color: card.cor }}>Este mês</span>
@@ -531,18 +531,18 @@ export default function DashboardPage() {
             onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px) scale(1.01)' }}
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0) scale(1)' }}
             >
-              <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#F5F3FF', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '12px' }}>
+              <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#F5F3FF', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
                 <Target size={19} color="#8B5CF6" strokeWidth={1.75} />
               </div>
               <p style={{ fontSize: '13px', fontWeight: 500, color: '#64748B', marginBottom: '6px' }}>Metas Ativas</p>
-              <p style={{ fontSize: '22px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.6px', marginBottom: '4px' }}>
+              <p style={{ fontSize: '18px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.6px', marginBottom: '4px' }}>
                 {metas.length} {metas.length === 1 ? 'meta' : 'metas'}
               </p>
               <a href="/dashboard/metas" style={{ fontSize: '12.5px', fontWeight: 500, color: '#8B5CF6', textDecoration: 'none' }}>Ver detalhes →</a>
             </div>
             {dizimoAtivo && (
               <div style={{
-                borderRadius: '20px', padding: '26px', position: 'relative', backgroundColor: '#fff',
+                borderRadius: '14px', padding: '14px', position: 'relative', backgroundColor: '#fff',
                 border: `1px solid ${dizimoQuitado ? 'rgba(16,185,129,0.18)' : 'rgba(245,158,11,0.18)'}`,
                 boxShadow: '0 12px 40px rgba(15,23,42,0.05)', transition: 'all 0.2s ease',
               }}
@@ -558,11 +558,11 @@ export default function DashboardPage() {
                     {dizimoQuitado ? 'Pago' : 'Pendente'}
                   </span>
                 </div>
-                <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '12px' }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
                   <Church size={19} color="#145A45" strokeWidth={1.75} />
                 </div>
                 <p style={{ fontSize: '13px', fontWeight: 500, color: '#64748B', marginBottom: '6px' }}>Dízimo do mês</p>
-                <p style={{ fontSize: '24px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.5px', marginBottom: '12px' }}>
+                <p style={{ fontSize: '18px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.3px', marginBottom: '8px' }}>
                   {loading ? '...' : fmt(valorDizimo)}
                 </p>
                 <div style={{ height: '5px', borderRadius: '4px', overflow: 'hidden', backgroundColor: '#F1F5F9', marginBottom: '8px' }}>
@@ -576,14 +576,14 @@ export default function DashboardPage() {
           </div>
 
           {/* Evolução + Saúde Financeira */}
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '14px', marginBottom: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '10px', marginBottom: '12px' }}>
             <div style={{
               borderRadius: '20px', padding: '28px', backgroundColor: '#fff',
               border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
             }}>
               <h2 style={{ fontSize: '14px', fontWeight: 600, color: '#0B1F18', marginBottom: '2px', letterSpacing: '-0.2px' }}>Evolução Patrimonial</h2>
               <p style={{ fontSize: '12px', color: '#64748B', marginBottom: '16px' }}>Últimos 6 meses</p>
-              <ResponsiveContainer width="100%" height={180}>
+              <ResponsiveContainer width="100%" height={140}>
                 <AreaChart data={evolucao}>
                   <defs>
                     <linearGradient id="evoGrad" x1="0" y1="0" x2="0" y2="1">
@@ -678,7 +678,7 @@ export default function DashboardPage() {
                 <a href="/dashboard/metas" style={{ fontSize: '13.5px', fontWeight: 600, color: '#145A45', textDecoration: 'none' }}>Criar primeira meta →</a>
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
                 {metas.map((m: any) => {
                   const pct  = Math.min(Math.round((Number(m.valor_atual) / Number(m.valor_alvo)) * 100), 100)
                   const Icon = ICONES_META[m.icone] || Target
@@ -712,7 +712,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Categorias + Lançamentos */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             <div style={{
               borderRadius: '20px', padding: '28px', backgroundColor: '#fff',
               border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
@@ -723,7 +723,7 @@ export default function DashboardPage() {
                 <p style={{ fontSize: '13.5px', textAlign: 'center', padding: '48px 0', color: '#94A3B8' }}>Sem despesas ainda.</p>
               ) : (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
-                  <ResponsiveContainer width={170} height={120}>
+                  <ResponsiveContainer width={170} height={100}>
                     <PieChart>
                       <Pie data={cats} cx="50%" cy="50%" innerRadius={58} outerRadius={82} dataKey="val" strokeWidth={0} paddingAngle={3}>
                         {cats.map((c, i) => <Cell key={i} fill={c.cor} />)}
@@ -753,7 +753,7 @@ export default function DashboardPage() {
               borderRadius: '20px', overflow: 'hidden', backgroundColor: '#fff',
               border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 20px 12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px 10px' }}>
                 <div>
                   <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#0B1F18', letterSpacing: '-0.3px' }}>Últimos Lançamentos</h2>
                   <p style={{ fontSize: '12px', color: '#64748B', marginTop: '1px' }}>Atividade recente</p>
@@ -766,7 +766,7 @@ export default function DashboardPage() {
                 <p style={{ fontSize: '13.5px', textAlign: 'center', padding: '48px 0', color: '#94A3B8' }}>Nenhum lançamento ainda.</p>
               ) : lancamentos.map((l: any) => (
                 <div key={l.id} style={{
-                  display: 'flex', alignItems: 'center', gap: '14px', padding: '10px 20px',
+                  display: 'flex', alignItems: 'center', gap: '14px', padding: '8px 16px',
                   borderTop: '1px solid rgba(15,23,42,0.04)', transition: 'background 0.15s',
                 }}
                 onMouseEnter={e => (e.currentTarget as HTMLElement).style.backgroundColor = '#FAFBFC'}
