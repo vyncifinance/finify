@@ -88,7 +88,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
 
       {/* ── DESKTOP ── */}
-      <div className="hidden lg:flex h-screen overflow-hidden" style={{ backgroundColor: '#F8FAFC', zoom }}>
+      <div className="hidden lg:flex" style={{ backgroundColor: '#F8FAFC', zoom, height: `${100 / parseFloat(zoom)}vh`, overflow: 'hidden' }}>
         <aside className="flex flex-col flex-shrink-0 transition-all duration-300"
           style={{
             width: collapsed ? '60px' : '185px',
