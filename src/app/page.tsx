@@ -26,7 +26,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     function calcZoom() {
-      setZoom(window.innerWidth < 1400 ? '0.72' : '0.82')
+      setZoom(window.innerWidth < 1400 ? '0.82' : '0.90')
     }
     calcZoom()
     window.addEventListener('resize', calcZoom)
