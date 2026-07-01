@@ -25,11 +25,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router   = useRouter()
   const supabase = createClient()
 
-  const [zoom, setZoom] = useState('0.82')
+  const [zoom, setZoom] = useState('0.86')
 
   useEffect(() => {
     function calcZoom() {
-      setZoom(window.innerWidth < 1400 ? '0.82' : '0.90')
+      setZoom(window.innerWidth < 1400 ? '0.86' : '0.94')
     }
     calcZoom()
     window.addEventListener('resize', calcZoom)

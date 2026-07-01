@@ -18,7 +18,7 @@ export default function LoginPage() {
   const [erro, setErro]           = useState('')
   const [showSenha, setShowSenha] = useState(false)
   const [mounted, setMounted]     = useState(false)
-  const [zoom, setZoom]           = useState('0.82')
+  const [zoom, setZoom]           = useState('0.86')
   const router   = useRouter()
   const supabase = createClient()
 
@@ -26,7 +26,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     function calcZoom() {
-      setZoom(window.innerWidth < 1400 ? '0.82' : '0.90')
+      setZoom(window.innerWidth < 1400 ? '0.86' : '0.94')
     }
     calcZoom()
     window.addEventListener('resize', calcZoom)
