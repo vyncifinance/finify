@@ -366,7 +366,7 @@ export default function DashboardPage() {
 
       {/* ── DESKTOP — REDESIGN PREMIUM ── */}
       <div className="hidden lg:block" style={{ backgroundColor: '#F7F9FB', minHeight: '100vh' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '16px 20px 24px' }}>
+        <div style={{ maxWidth: '1080px', margin: '0 auto', padding: '16px 20px 24px' }}>
 
           {/* Header premium */}
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '10px' }}>

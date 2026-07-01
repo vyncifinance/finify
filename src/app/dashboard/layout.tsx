@@ -67,8 +67,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <button key={item.href} onClick={() => navegar(item.href)}
                   className="flex flex-col items-center justify-center py-2.5 gap-0.5 transition-all w-full"
                   style={{ color: active ? '#0B3B2E' : '#94A3B8', background: 'none', border: 'none', cursor: 'pointer' }}>
-                  <Icon size={19} strokeWidth={active ? 2 : 1.75} />
-                  <span style={{ fontSize: '9.5px', fontWeight: active ? 600 : 500 }}>{item.label}</span>
+                  <Icon size={16} strokeWidth={active ? 2 : 1.75} />
+                  <span style={{ fontSize: '9px', fontWeight: active ? 600 : 500 }}>{item.label}</span>
                 </button>
               )
             })}
@@ -80,14 +80,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="hidden lg:flex h-screen overflow-hidden" style={{ backgroundColor: '#F8FAFC' }}>
         <aside className="flex flex-col flex-shrink-0 transition-all duration-300"
           style={{
-            width: collapsed ? '72px' : '220px',
+            width: collapsed ? '60px' : '185px',
             background: 'linear-gradient(180deg, #06261F 0%, #0A342A 60%, #0D3F31 100%)',
           }}>
 
           {/* Logo */}
           <div className="flex items-center gap-3 px-4 h-16 flex-shrink-0">
             <div style={{
-              width: '32px', height: '32px', borderRadius: '9px', flexShrink: 0,
+              width: '26px', height: '26px', borderRadius: '7px', flexShrink: 0,
               background: 'linear-gradient(135deg, #145A45 0%, #2FB36A 100%)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               boxShadow: '0 2px 8px rgba(47,179,106,0.35)',
@@ -104,7 +104,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </svg>
             </div>
             {!collapsed && (
-              <span style={{ fontSize: '17px', fontWeight: 700, color: '#fff', letterSpacing: '-0.4px' }}>
+              <span style={{ fontSize: '14px', fontWeight: 700, color: '#fff', letterSpacing: '-0.3px' }}>
                 finify
               </span>
             )}
@@ -119,7 +119,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               const Icon = item.icon
               return (
                 <button key={item.href} onClick={() => navegar(item.href)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-sm font-medium w-full"
+                  className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-all text-xs font-medium w-full"
                   style={{
                     backgroundColor: active ? 'rgba(47,179,106,0.15)' : 'transparent',
                     color: active ? '#58D68D' : 'rgba(255,255,255,0.45)',
@@ -139,14 +139,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* Footer */}
           <div className="p-2.5 flex-shrink-0">
             {!collapsed && (
-              <div className="flex items-center gap-3 px-3 py-2.5 mb-1 rounded-xl"
+              <div className="flex items-center gap-2 px-2.5 py-2 mb-1 rounded-lg"
                 style={{ backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold"
+                <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold"
                   style={{ background: 'linear-gradient(135deg, #145A45 0%, #2FB36A 100%)', color: '#fff', minWidth: '32px' }}>
                   {inicial}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white truncate">{nome || 'Usuário'}</p>
+                  <p className="text-xs font-medium text-white truncate">{nome || 'Usuário'}</p>
                 </div>
               </div>
             )}
@@ -165,7 +165,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Toggle collapse */}
           <div className="absolute top-6 z-10 transition-all duration-300"
-            style={{ left: collapsed ? '84px' : '232px' }}>
+            style={{ left: collapsed ? '70px' : '196px' }}>
             <button onClick={() => setCollapsed(!collapsed)}
               className="w-7 h-7 rounded-full flex items-center justify-center border transition-all"
               style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', color: '#64748B', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
