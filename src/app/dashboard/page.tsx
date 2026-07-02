@@ -748,7 +748,6 @@ export default function DashboardPage() {
                       </Pie>
                       <Tooltip formatter={(v: any) => fmt(Number(v))} contentStyle={{ borderRadius: '12px', border: '1px solid rgba(15,23,42,0.06)' }} />
                     </PieChart>
-                  </ResponsiveContainer>
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {cats.map((c: any) => {
                       const Icon = ICONES_CAT[c.nome] || MoreHorizontal
@@ -830,4 +829,5 @@ export default function DashboardPage() {
     </>
   )
 }
+
 
