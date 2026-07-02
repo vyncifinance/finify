@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import {
-  LayoutDashboard, ArrowLeftRight, Target, User, LogOut, Menu, ChevronLeft, TrendingUp
+  LayoutDashboard, ArrowLeftRight, Target, User, LogOut, Menu, ChevronLeft, TrendingUp, Eye, EyeOff
 } from 'lucide-react'
 
 const NAV = [
@@ -35,6 +35,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     window.addEventListener('resize', calcZoom)
     return () => window.removeEventListener('resize', calcZoom)
   }, [])
+
+  useEffect(() => {
+    const saved = localStorage.getItem('finify_ocultar_valores')
+    if (saved === 'true') setOcultarValores(true)
+  }, [])
+
+  function toggleOcultar() {
+    const novo = !ocultarValores
+    setOcultarValores(novo)
+    localStorage.setItem('finify_ocultar_valores', String(novo))
+    window.dispatchEvent(new CustomEvent('finify_ocultar', { detail: novo }))
+  }
 
   useEffect(() => {
     async function buscar() {
@@ -186,7 +198,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               }
             </button>
           </div>
-          <main className="flex-1 overflow-y-auto">
+          <main className="flex-1 overflow-y-auto" data-ocultar={ocultarValores ? 'true' : 'false'}>
             {children}
           </main>
         </div>

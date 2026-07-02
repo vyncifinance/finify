@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useState } from 'react'
+import { useOcultarValores, fmtOculto, fmtShortOculto } from '@/hooks/useOcultarValores'
 import { createClient } from '@/lib/supabase'
 import {
   ArrowDownLeft, ArrowUpRight, PiggyBank, Target,
@@ -56,6 +57,7 @@ export default function DashboardPage() {
   const [dizimoPago, setDizimoPago]   = useState(0)
   const [atualizadoHa, setAtualizadoHa] = useState(0)
 
+  const ocultar  = useOcultarValores()
   const supabase = createClient()
 
   useEffect(() => { carregar() }, [])
@@ -156,7 +158,7 @@ export default function DashboardPage() {
     { label: 'Reserva de Emergência',   ok: totalEco > 0,     desc: totalEco > 0 ? 'Guardando este mês' : 'Sem economia este mês' },
     { label: 'Orçamento Controlado',    ok: pctGasto < 80,    desc: pctGasto < 80 ? `${pctGasto}% comprometido` : 'Gastos elevados' },
     { label: 'Metas em Andamento',      ok: metas.length > 0, desc: metas.length > 0 ? `${metas.length} meta(s) ativa(s)` : 'Nenhuma meta criada' },
-    { label: 'Crescimento Patrimonial', ok: totalEco > 0,     desc: totalEco > 0 ? `+${fmt(totalEco)} este mês` : 'Sem crescimento' },
+    { label: 'Crescimento Patrimonial', ok: totalEco > 0,     desc: totalEco > 0 ? `+${fmtOculto(totalEco, ocultar)} este mês` : 'Sem crescimento' },
   ]
 
   const kpis = [
@@ -184,7 +186,7 @@ export default function DashboardPage() {
                 {getSaudacao()}, {primeiroNome || 'Família'}
               </p>
               <p className="text-2xl font-bold text-white" style={{ letterSpacing: '-1px' }}>
-                {loading ? '...' : fmtShort(patrimonioExibir)}
+                {loading ? '...' : fmtShortOculto(patrimonioExibir, ocultar)}
               </p>
               <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.5)' }}>Patrimônio · {mesAtual}</p>
             </div>
@@ -212,7 +214,7 @@ export default function DashboardPage() {
                 </div>
                 <p className="text-xs font-medium mb-1" style={{ color: '#64748B' }}>{c.label}</p>
                 <p className="text-sm font-semibold leading-tight" style={{ color: c.cor }}>
-                  {loading ? '...' : fmtShort(c.val)}
+                  {loading ? '...' : fmtShortOculto(c.val, ocultar)}
                 </p>
               </div>
             ))}
@@ -236,16 +238,16 @@ export default function DashboardPage() {
                 </span>
               </div>
               <div className="flex items-center justify-between mb-2">
-                <p className="text-xl font-bold" style={{ color: '#0F172A' }}>{loading ? '...' : fmt(valorDizimo)}</p>
+                <p className="text-xl font-bold" style={{ color: '#0F172A' }}>{loading ? '...' : fmtOculto(valorDizimo, ocultar)}</p>
                 <p className="text-xs" style={{ color: '#94A3B8' }}>10% de {loading ? '...' : fmtShort(baseDizimo)}</p>
               </div>
               <div className="h-1.5 rounded-full overflow-hidden mb-1" style={{ backgroundColor: '#F1F5F9' }}>
                 <div className="h-full rounded-full" style={{ width: `${dizimoPctPago}%`, backgroundColor: dizimoQuitado ? '#10B981' : '#F59E0B' }} />
               </div>
               <div className="flex justify-between">
-                <span className="text-xs" style={{ color: '#94A3B8' }}>Pago: {fmt(dizimoPago)}</span>
+                <span className="text-xs" style={{ color: '#94A3B8' }}>Pago: {fmtOculto(dizimoPago, ocultar)}</span>
                 <span className="text-xs font-semibold" style={{ color: dizimoQuitado ? '#10B981' : '#D97706' }}>
-                  {dizimoQuitado ? 'Completo!' : `Falta ${fmt(dizimoRestante)}`}
+                  {dizimoQuitado ? 'Completo!' : `Falta ${fmtOculto(dizimoRestante, ocultar)}`}
                 </span>
               </div>
             </div>
@@ -298,7 +300,7 @@ export default function DashboardPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate" style={{ color: '#0F172A' }}>{m.nome}</p>
-                      <p className="text-xs" style={{ color: '#94A3B8' }}>{fmt(Number(m.valor_atual))} de {fmt(Number(m.valor_alvo))}</p>
+                      <p className="text-xs" style={{ color: '#94A3B8' }}>{fmtOculto(Number(m.valor_atual), ocultar)} de {fmtOculto(Number(m.valor_alvo), ocultar)}</p>
                     </div>
                     <span className="text-sm font-bold" style={{ color: cor }}>{pct}%</span>
                   </div>
@@ -431,7 +433,7 @@ export default function DashboardPage() {
                   Patrimônio Total
                 </p>
                 <p style={{ fontSize: '22px', fontWeight: 700, color: '#fff', letterSpacing: '-1.5px', lineHeight: 1, marginBottom: '14px' }}>
-                  {loading ? '...' : fmt(patrimonioExibir)}
+                  {loading ? '...' : fmtOculto(patrimonioExibir, ocultar)}
                 </p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px', flexWrap: 'wrap' }}>
                   {!semDados && (
@@ -518,7 +520,7 @@ export default function DashboardPage() {
                 </div>
                 <p style={{ fontSize: '13px', fontWeight: 500, color: '#64748B', marginBottom: '6px' }}>{card.label}</p>
                 <p style={{ fontSize: '15px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.3px', marginBottom: '2px' }}>
-                  {loading ? '...' : fmt(card.val)}
+                  {loading ? '...' : fmtOculto(card.val, ocultar)}
                 </p>
                 <span style={{ fontSize: '12.5px', fontWeight: 500, color: card.cor }}>Este mês</span>
               </div>
@@ -563,13 +565,13 @@ export default function DashboardPage() {
                 </div>
                 <p style={{ fontSize: '13px', fontWeight: 500, color: '#64748B', marginBottom: '6px' }}>Dízimo do mês</p>
                 <p style={{ fontSize: '18px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.3px', marginBottom: '8px' }}>
-                  {loading ? '...' : fmt(valorDizimo)}
+                  {loading ? '...' : fmtOculto(valorDizimo, ocultar)}
                 </p>
                 <div style={{ height: '5px', borderRadius: '4px', overflow: 'hidden', backgroundColor: '#F1F5F9', marginBottom: '8px' }}>
                   <div style={{ height: '100%', width: `${dizimoPctPago}%`, backgroundColor: dizimoQuitado ? '#2F8F68' : '#F59E0B', borderRadius: '4px' }} />
                 </div>
                 <span style={{ fontSize: '12px', fontWeight: 500, color: dizimoQuitado ? '#2F8F68' : '#B7791F' }}>
-                  {dizimoQuitado ? 'Completo!' : `Falta ${fmt(dizimoRestante)}`}
+                  {dizimoQuitado ? 'Completo!' : `Falta ${fmtOculto(dizimoRestante, ocultar)}`}
                 </span>
               </div>
             )}
@@ -697,7 +699,7 @@ export default function DashboardPage() {
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <p style={{ fontSize: '14px', fontWeight: 600, color: '#0B1F18', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.nome}</p>
-                          <p style={{ fontSize: '12px', color: '#94A3B8' }}>{fmt(Number(m.valor_atual))} de {fmt(Number(m.valor_alvo))}</p>
+                          <p style={{ fontSize: '12px', color: '#94A3B8' }}>{fmtOculto(Number(m.valor_atual), ocultar)} de {fmtOculto(Number(m.valor_alvo), ocultar)}</p>
                         </div>
                         <span style={{ fontSize: '14px', fontWeight: 700, color: cor, flexShrink: 0 }}>{pct}%</span>
                       </div>
@@ -739,7 +741,7 @@ export default function DashboardPage() {
                           <span style={{ fontSize: '13.5px', fontWeight: 500, color: '#334155' }}>{c.nome}</span>
                         </div>
                         <div style={{ textAlign: 'right' }}>
-                          <p style={{ fontSize: '13.5px', fontWeight: 600, color: '#0B1F18' }}>{fmt(c.val)}</p>
+                          <p style={{ fontSize: '13.5px', fontWeight: 600, color: '#0B1F18' }}>{fmtOculto(c.val, ocultar)}</p>
                           <p style={{ fontSize: '11.5px', color: '#94A3B8' }}>{c.pct}%</p>
                         </div>
                       </div>
@@ -787,7 +789,7 @@ export default function DashboardPage() {
                     <p style={{ fontSize: '12.5px', color: '#94A3B8' }}>{l.membro} · {l.hora}</p>
                   </div>
                   <p style={{ fontSize: '14px', fontWeight: 600, flexShrink: 0, color: l.tipo === 'receita' ? '#2F8F68' : '#DC2626' }}>
-                    {l.tipo === 'receita' ? '+' : '-'} {fmt(Number(l.valor))}
+                    {l.tipo === 'receita' ? '+' : '-'} {fmtOculto(Number(l.valor), ocultar)}
                   </p>
                 </div>
               ))}

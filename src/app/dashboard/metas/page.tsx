@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic'
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
+import { useOcultarValores, fmtOculto } from '@/hooks/useOcultarValores'
 import {
   Home, BookOpen, Shield, TrendingUp, Send, Heart, Star, Target,
   Plus, X, Calendar, ArrowUp, CheckCircle2, Pencil, Trash2
@@ -77,6 +78,7 @@ export default function MetasPage() {
   const [valorAporte, setValorAporte]         = useState('')
   const [salvandoAporte, setSalvandoAporte]   = useState(false)
 
+  const ocultar  = useOcultarValores()
   const supabase = createClient()
 
   useEffect(() => { init() }, [])
@@ -224,7 +226,7 @@ export default function MetasPage() {
               </div>
               <p className="text-xs font-medium mb-0.5" style={{ color: '#64748B' }}>{c.label}</p>
               <p className="text-sm font-semibold leading-tight" style={{ color: c.cor }}>
-                {loading ? '...' : c.isNum ? c.val : fmtShort(c.val)}
+                {loading ? '...' : c.isNum ? c.val : ocultar ? 'R$ •••' : fmtShort(c.val)}
               </p>
             </div>
           ))}
@@ -260,7 +262,7 @@ export default function MetasPage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold truncate" style={{ color: '#0F172A' }}>{m.nome}</p>
                     <p className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>
-                      {fmt(Number(m.valor_atual))} de {fmt(Number(m.valor_alvo))}
+                      {fmtOculto(Number(m.valor_atual), ocultar)} de {fmtOculto(Number(m.valor_alvo), ocultar)}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
@@ -284,7 +286,7 @@ export default function MetasPage() {
                       <span className="text-xs font-semibold" style={{ color: '#10B981' }}>Concluída</span>
                     </div>
                   ) : (
-                    <span className="text-xs" style={{ color: '#64748B' }}>Falta {fmt(faltaValor)}</span>
+                    <span className="text-xs" style={{ color: '#64748B' }}>Falta {fmtOculto(faltaValor, ocultar)}</span>
                   )}
                   {m.prazo && (
                     <div className="flex items-center gap-1">
@@ -309,7 +311,7 @@ export default function MetasPage() {
       </div>
 
       {/* ── DESKTOP ── */}
-      <div className="hidden lg:block p-8 max-w-[1440px] mx-auto" style={{ backgroundColor: '#F8FAFC', zoom: '0.82' }}>
+      <div className="hidden lg:block p-8 max-w-[1440px] mx-auto" style={{ backgroundColor: '#F8FAFC' }}>
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', letterSpacing: '-0.5px' }}>Metas da Família</h1>
@@ -337,7 +339,7 @@ export default function MetasPage() {
               </div>
               <p className="text-sm font-medium mb-1" style={{ color: '#64748B' }}>{c.label}</p>
               <p className="text-2xl font-semibold" style={{ color: '#0F172A', letterSpacing: '-0.5px' }}>
-                {loading ? '...' : c.isNum ? c.val : `${fmt(totalGuardado)} de ${fmt(totalAlvo)}`}
+                {loading ? '...' : c.isNum ? c.val : ocultar ? 'R$ •••••• de R$ ••••••' : `${fmt(totalGuardado)} de ${fmt(totalAlvo)}`}
               </p>
             </div>
           ))}
@@ -374,7 +376,7 @@ export default function MetasPage() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold truncate" style={{ color: '#0F172A' }}>{m.nome}</p>
                       <p className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>
-                        {fmt(Number(m.valor_atual))} de {fmt(Number(m.valor_alvo))}
+                        {fmtOculto(Number(m.valor_atual), ocultar)} de {fmtOculto(Number(m.valor_alvo), ocultar)}
                       </p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
@@ -398,7 +400,7 @@ export default function MetasPage() {
                         <span className="text-xs font-semibold" style={{ color: '#10B981' }}>Concluída</span>
                       </div>
                     ) : (
-                      <span className="text-xs" style={{ color: '#64748B' }}>Falta {fmt(faltaValor)}</span>
+                      <span className="text-xs" style={{ color: '#64748B' }}>Falta {fmtOculto(faltaValor, ocultar)}</span>
                     )}
                     {m.prazo && (
                       <div className="flex items-center gap-1.5">
