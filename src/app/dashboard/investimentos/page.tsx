@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic'
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
+import { useOcultarValores, fmtOculto } from '@/hooks/useOcultarValores'
 import {
   TrendingUp, TrendingDown, Plus, X, Pencil, Trash2,
   ArrowUpRight, ArrowDownRight, Minus, BarChart2, Calendar
@@ -55,6 +56,7 @@ export default function InvestimentosPage() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [isMobile, setIsMobile]     = useState(true)
 
+  const ocultar  = useOcultarValores()
   const supabase = createClient()
 
   useEffect(() => {
@@ -374,7 +376,7 @@ export default function InvestimentosPage() {
       </div>
 
       {/* ── DESKTOP ── */}
-      <div className="hidden lg:block p-8 max-w-[1440px] mx-auto" style={{ backgroundColor: '#F8FAFC', zoom: '0.82' }}>
+      <div className="hidden lg:block p-8 max-w-[1440px] mx-auto" style={{ backgroundColor: '#F8FAFC' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
           <div>
             <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#0F172A', letterSpacing: '-0.5px', margin: 0 }}>Investimentos</h1>
@@ -396,14 +398,14 @@ export default function InvestimentosPage() {
           {[
             {
               label: 'Saldo atual',
-              val: loading ? '...' : saldoAtual > 0 ? fmt(saldoAtual) : '—',
+              val: loading ? '...' : saldoAtual > 0 ? fmtOculto(saldoAtual, ocultar) : '—',
               sub: atual ? fmtMesLong(atual.mes) : 'Nenhum registro',
               cor: '#145A45', bg: '#F0FDF4',
               Icon: BarChart2,
             },
             {
               label: 'Variação do mês',
-              val: loading ? '...' : varMes !== 0 ? fmt(Math.abs(varMes)) : '—',
+              val: loading ? '...' : varMes !== 0 ? fmtOculto(Math.abs(varMes), ocultar) : '—',
               sub: varMes !== 0 ? fmtPct(varMesPct) : 'Sem mês anterior',
               cor: varMes >= 0 ? '#10B981' : '#EF4444',
               bg: varMes >= 0 ? '#ECFDF5' : '#FEF2F2',
@@ -411,7 +413,7 @@ export default function InvestimentosPage() {
             },
             {
               label: 'Variação total',
-              val: loading ? '...' : varTotal !== 0 ? fmt(Math.abs(varTotal)) : '—',
+              val: loading ? '...' : varTotal !== 0 ? fmtOculto(Math.abs(varTotal), ocultar) : '—',
               sub: varTotal !== 0 ? fmtPct(varTotalPct) : 'Desde o início',
               cor: varTotal >= 0 ? '#10B981' : '#EF4444',
               bg: varTotal >= 0 ? '#ECFDF5' : '#FEF2F2',
@@ -546,7 +548,7 @@ export default function InvestimentosPage() {
                       </div>
                       <p style={{ fontSize: '14px', fontWeight: 600, color: '#0F172A', margin: 0 }}>{fmtMesLong(r.mes)}</p>
                     </div>
-                    <p style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A', margin: 0 }}>{fmt(Number(r.saldo))}</p>
+                    <p style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A', margin: 0 }}>{fmtOculto(Number(r.saldo), ocultar)}</p>
                     <p style={{ fontSize: '13px', fontWeight: 600, color: varR === null ? '#94A3B8' : subiu ? '#10B981' : '#EF4444', margin: 0 }}>
                       {varR === null ? '—' : `${subiu ? '+' : ''}${fmt(varR)}`}
                     </p>
