@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 export const dynamic = 'force-dynamic'
 
@@ -748,7 +748,12 @@ export default function DashboardPage() {
                       </Pie>
                       <Tooltip formatter={(v: any) => fmt(Number(v))} contentStyle={{ borderRadius: '12px', border: '1px solid rgba(15,23,42,0.06)' }} />
                     </PieChart>
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                      <span style={{ fontSize: '10px', color: '#94A3B8' }}>Total</span>
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#0B1F18' }}>{ocultar ? '••••' : `R$${(totalDes/1000).toFixed(1)}k`}</span>
+                    </div>
+                  </div>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {cats.map((c: any) => {
                       const Icon = ICONES_CAT[c.nome] || MoreHorizontal
                       return (
@@ -829,6 +834,3 @@ export default function DashboardPage() {
     </>
   )
 }
-
-
-
