@@ -176,6 +176,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </div>
               </div>
             )}
+            <button onClick={toggleOcultar}
+              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-all text-xs font-medium mb-1"
+              style={{ color: ocultarValores ? '#58D68D' : 'rgba(255,255,255,0.45)', border: ocultarValores ? '1px solid rgba(47,179,106,0.2)' : '1px solid transparent', backgroundColor: ocultarValores ? 'rgba(47,179,106,0.15)' : 'transparent', cursor: 'pointer' }}
+              onMouseEnter={e => { if (!ocultarValores) (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'rgba(255,255,255,0.05)' }}
+              onMouseLeave={e => { if (!ocultarValores) (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent' }}
+            >
+              {ocultarValores
+                ? <EyeOff size={17} strokeWidth={1.75} className="flex-shrink-0" />
+                : <Eye size={17} strokeWidth={1.75} className="flex-shrink-0" />
+              }
+              {!collapsed && <span>{ocultarValores ? 'Mostrar valores' : 'Ocultar valores'}</span>}
+            </button>
             <button onClick={handleLogout}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all"
               style={{ color: 'rgba(255,255,255,0.4)', border: 'none', cursor: 'pointer', background: 'none' }}
