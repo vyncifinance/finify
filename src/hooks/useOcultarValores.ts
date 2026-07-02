@@ -1,32 +1,21 @@
+'use client'
+
 import { useState, useEffect } from 'react'
 
 export function useOcultarValores() {
   const [ocultar, setOcultar] = useState(false)
 
   useEffect(() => {
-    // Lê o estado inicial
+    // Só executa no cliente, nunca no servidor
     const saved = localStorage.getItem('finify_ocultar_valores')
     setOcultar(saved === 'true')
 
-    // Escuta mudanças (quando o layout toggler muda)
-    function onStorage(e: StorageEvent) {
-      if (e.key === 'finify_ocultar_valores') {
-        setOcultar(e.newValue === 'true')
-      }
-    }
-
-    // Também escuta evento customizado para mesma aba
     function onToggle(e: Event) {
-      const val = (e as CustomEvent).detail
-      setOcultar(val)
+      setOcultar((e as CustomEvent).detail)
     }
 
-    window.addEventListener('storage', onStorage)
     window.addEventListener('finify_ocultar', onToggle)
-    return () => {
-      window.removeEventListener('storage', onStorage)
-      window.removeEventListener('finify_ocultar', onToggle)
-    }
+    return () => window.removeEventListener('finify_ocultar', onToggle)
   }, [])
 
   return ocultar
