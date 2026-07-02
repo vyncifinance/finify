@@ -9,8 +9,24 @@ import {
   ArrowDownLeft, ArrowUpRight, PiggyBank, Target,
   ArrowRight, ArrowUp, CheckCircle2, AlertCircle, Bell,
   Home, BookOpen, Shield, TrendingUp, Send, Heart, Star, Church,
-  ChevronRight, Wallet, Building2, Sparkles
+  ChevronRight, Wallet, Building2, Sparkles, UtensilsCrossed, Car,
+  Smile, ShoppingBag, CreditCard, MoreHorizontal, Briefcase
 } from 'lucide-react'
+
+const ICONES_CAT: Record<string, any> = {
+  'Alimentação': UtensilsCrossed,
+  'Moradia': Home,
+  'Transporte': Car,
+  'Lazer': Smile,
+  'Saúde': Heart,
+  'Educação': BookOpen,
+  'Compras': ShoppingBag,
+  'Cartão de Crédito': CreditCard,
+  'Dízimo': Church,
+  'Outros': MoreHorizontal,
+  'Salário': Briefcase,
+  'Investimento': TrendingUp,
+}
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, RadialBarChart, RadialBar
@@ -105,7 +121,7 @@ export default function DashboardPage() {
       lanc.filter((l: any) => l.tipo === 'despesa').forEach((l: any) => {
         porCat[l.categoria] = (porCat[l.categoria] || 0) + Number(l.valor)
       })
-      const cores = ['#145A45','#0F4737','#2FB36A','#58D68D','#0B3B2E','#07271F','#94A3B8','#ECEFF3']
+      const cores = ['#145A45','#3B82F6','#F59E0B','#8B5CF6','#EF4444','#EC4899','#10B981','#64748B']
       setCats(Object.entries(porCat).map(([nome, val], i) => ({
         nome, val: Number(val), cor: cores[i % cores.length],
         pct: d > 0 ? Math.round((Number(val) / d) * 100) : 0
