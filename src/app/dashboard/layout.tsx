@@ -28,6 +28,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const supabase = createClient()
 
   const [zoom, setZoom] = useState('0.86')
+  const [ocultarValores, setOcultarValores] = useState(false)
 
   useEffect(() => {
     function calcZoom() {
