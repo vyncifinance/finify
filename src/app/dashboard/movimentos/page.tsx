@@ -13,6 +13,7 @@ import {
   CreditCard, FileText, AlignLeft, Building2
 } from 'lucide-react'
 import ContextSwitcher, { type Empresa } from '@/components/ContextSwitcher'
+import { useOcultarValores, fmtOculto } from '@/hooks/useOcultarValores'
 import { lerContexto, salvarContexto, type ContextoAtivo } from '@/lib/contexto'
 import {
   CATEGORIAS_DESPESA_EMPRESA, CATEGORIAS_RECEITA_EMPRESA, ICONES_CAT_EMPRESA
@@ -98,6 +99,7 @@ export default function MovimentosPage() {
   const [isMobile, setIsMobile]           = useState(true)
 
   const supabase = createClient()
+  const ocultarValores = useOcultarValores()
 
   useEffect(() => {
     setIsMobile(window.innerWidth < 1024)
@@ -554,7 +556,7 @@ export default function MovimentosPage() {
               </div>
               <p style={{ fontSize: '11px', fontWeight: 500, color: '#64748B', marginBottom: '4px' }}>{c.label}</p>
               <p style={{ fontSize: '13px', fontWeight: 600, color: c.cor, lineHeight: 1.2 }}>
-                {loading ? '...' : `R$ ${Math.abs(c.val).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                {loading ? '...' : fmtOculto(Math.abs(c.val), ocultarValores)}
               </p>
             </div>
           ))}
@@ -591,7 +593,7 @@ export default function MovimentosPage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', padding: '0 4px' }}>
                   <span style={{ fontSize: '11px', fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{formatDiaLabel(dia)}</span>
                   <span style={{ fontSize: '11px', fontWeight: 600, color: totalDia >= 0 ? '#10B981' : '#EF4444' }}>
-                    {totalDia >= 0 ? '+' : '-'} {fmt(Math.abs(totalDia))}
+                    {totalDia >= 0 ? '+' : '-'} {fmtOculto(Math.abs(totalDia), ocultarValores)}
                   </span>
                 </div>
                 <div style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', overflow: 'hidden' }}>
@@ -611,7 +613,7 @@ export default function MovimentosPage() {
                           </div>
                         </div>
                         <p style={{ fontSize: '14px', fontWeight: 600, color: l.tipo === 'receita' ? '#10B981' : '#EF4444', flexShrink: 0, margin: 0 }}>
-                          {l.tipo === 'receita' ? '+' : '-'} {fmt(Number(l.valor))}
+                          {l.tipo === 'receita' ? '+' : '-'} {fmtOculto(Number(l.valor), ocultarValores)}
                         </p>
                         <div style={{ width: '28px', height: '28px', borderRadius: '8px', backgroundColor: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                           <Pencil size={12} color="#64748B" strokeWidth={1.75} />
@@ -676,7 +678,7 @@ export default function MovimentosPage() {
                 <c.Icon size={19} color={c.cor} strokeWidth={1.75} />
               </div>
               <p className="text-sm font-medium mb-1" style={{ color: '#64748B' }}>{c.label}</p>
-              <p className="text-2xl font-semibold" style={{ color: c.cor, letterSpacing: '-0.5px' }}>{loading ? '...' : fmt(c.val)}</p>
+              <p className="text-2xl font-semibold" style={{ color: c.cor, letterSpacing: '-0.5px' }}>{loading ? '...' : fmtOculto(c.val, ocultarValores)}</p>
             </div>
           ))}
         </div>
@@ -724,7 +726,7 @@ export default function MovimentosPage() {
                 <div className="flex items-center justify-between px-6 py-3" style={{ backgroundColor: '#F8FAFC' }}>
                   <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#64748B' }}>{formatDiaLabel(dia)}</span>
                   <span className="text-xs font-semibold" style={{ color: totalDia >= 0 ? '#10B981' : '#EF4444' }}>
-                    {totalDia >= 0 ? '+' : '-'} {fmt(Math.abs(totalDia))}
+                    {totalDia >= 0 ? '+' : '-'} {fmtOculto(Math.abs(totalDia), ocultarValores)}
                   </span>
                 </div>
                 {itens.map((l: any) => {
@@ -746,7 +748,7 @@ export default function MovimentosPage() {
                         </div>
                       </div>
                       <p className="font-semibold text-sm flex-shrink-0" style={{ color: l.tipo === 'receita' ? '#10B981' : '#EF4444' }}>
-                        {l.tipo === 'receita' ? '+' : '-'} {fmt(Number(l.valor))}
+                        {l.tipo === 'receita' ? '+' : '-'} {fmtOculto(Number(l.valor), ocultarValores)}
                       </p>
                       <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
                         style={{ backgroundColor: '#F1F5F9' }}>
