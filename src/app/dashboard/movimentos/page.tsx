@@ -4,15 +4,19 @@ export const dynamic = 'force-dynamic'
 
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { useOcultarValores, fmtOculto } from '@/hooks/useOcultarValores'
 import { createClient } from '@/lib/supabase'
 import {
   ArrowDownLeft, ArrowUpRight, ChevronLeft, ChevronRight,
   Plus, Wallet, X, UtensilsCrossed, Home, Car, Smile,
   Heart, BookOpen, ShoppingBag, Church, MoreHorizontal,
   Briefcase, TrendingUp, Laptop, DollarSign, Trash2, Pencil,
-  CreditCard, AlignLeft, Target, ChevronDown
+  CreditCard, FileText, AlignLeft, Building2
 } from 'lucide-react'
+import ContextSwitcher, { type Empresa } from '@/components/ContextSwitcher'
+import { lerContexto, salvarContexto, type ContextoAtivo } from '@/lib/contexto'
+import {
+  CATEGORIAS_DESPESA_EMPRESA, CATEGORIAS_RECEITA_EMPRESA, ICONES_CAT_EMPRESA
+} from '@/lib/categorias-empresa'
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
@@ -42,7 +46,18 @@ function formatDiaLabel(dataStr: string) {
   return `${dias[data.getDay()]}, ${data.getDate()} de ${MESES[data.getMonth()]}`
 }
 
+function maskCnpj(value: string) {
+  const digits = value.replace(/\D/g, '').slice(0, 14)
+  return digits
+    .replace(/(\d{2})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1/$2')
+    .replace(/(\d{4})(\d{1,2})$/, '$1-$2')
+}
+
 export default function MovimentosPage() {
+  const router       = useRouter()
+  const pathname     = usePathname()
   const familiaIdRef = useRef('')
 
   const [loading, setLoading]           = useState(true)
@@ -56,7 +71,14 @@ export default function MovimentosPage() {
   const [filtroMembro, setFiltroMembro] = useState('todos')
   const [membros, setMembros]           = useState<string[]>([])
   const [membrosFamilia, setMembrosFamilia] = useState<string[]>([])
-  const [metas, setMetas]               = useState<any[]>([])
+
+  // Contexto Pessoal / Empresa (CNPJ)
+  const [contexto, setContexto] = useState<ContextoAtivo>({ tipo: 'pessoal', empresaId: null })
+  const [empresas, setEmpresas] = useState<Empresa[]>([])
+  const [modalEmpresaOpen, setModalEmpresaOpen] = useState(false)
+  const [novaEmpresaNome, setNovaEmpresaNome]   = useState('')
+  const [novaEmpresaCnpj, setNovaEmpresaCnpj]   = useState('')
+  const [salvandoEmpresa, setSalvandoEmpresa]   = useState(false)
 
   const [modalOpen, setModalOpen]         = useState(false)
   const [editando, setEditando]           = useState<any>(null)
@@ -75,12 +97,6 @@ export default function MovimentosPage() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [isMobile, setIsMobile]           = useState(true)
 
-  // Alocação para meta
-  const [alocarMeta, setAlocarMeta]     = useState(false)
-  const [metaId, setMetaId]             = useState('')
-  const [metaPct, setMetaPct]           = useState(10)
-
-  const ocultar  = useOcultarValores()
   const supabase = createClient()
 
   useEffect(() => {
@@ -93,7 +109,7 @@ export default function MovimentosPage() {
   useEffect(() => { init() }, [])
   useEffect(() => {
     if (familiaIdRef.current) carregarLancamentos(familiaIdRef.current)
-  }, [mesRef])
+  }, [mesRef, contexto.tipo, contexto.empresaId])
   useEffect(() => {
     const handler = () => {
       if (!document.hidden && familiaIdRef.current) carregarLancamentos(familiaIdRef.current)
@@ -112,30 +128,52 @@ export default function MovimentosPage() {
       .eq('id', session.user.id).single()
     if (profile) {
       const fid = profile.familia_id
+      const nomeFamiliaValue = (profile.familias as any)?.nome || ''
       setMembroAtual(profile.nome || '')
       setFamiliaId(fid)
       familiaIdRef.current = fid
-      setFamiliaNome((profile.familias as any)?.nome || '')
+      setFamiliaNome(nomeFamiliaValue)
       setMembroForm(profile.nome || '')
+
+      const ctxInicial = lerContexto()
+      setContexto(ctxInicial)
+
       const { data: membrosData } = await supabase
         .from('profiles').select('nome').eq('familia_id', fid)
       if (membrosData) setMembrosFamilia(membrosData.map((m: any) => m.nome).filter(Boolean))
-      const { data: metasData } = await supabase
-        .from('metas').select('id, nome, valor_atual, valor_alvo, cor')
-        .eq('familia_id', fid).order('created_at', { ascending: false })
-      if (metasData) setMetas(metasData)
-      await carregarLancamentos(fid, profile.nome, (profile.familias as any)?.nome)
+
+      const { data: empresasData } = await supabase
+        .from('empresas').select('*').eq('familia_id', fid).order('created_at', { ascending: true })
+      if (empresasData) setEmpresas(empresasData)
+
+      await carregarLancamentos(fid, profile.nome, nomeFamiliaValue, ctxInicial)
     }
     setLoading(false)
   }
 
-  async function carregarLancamentos(fid: string, nomeUsuario?: string, nomeFamilia?: string) {
+  async function carregarLancamentos(
+    fid: string,
+    nomeUsuario?: string,
+    nomeFamilia?: string,
+    contextoOverride?: ContextoAtivo
+  ) {
     if (!fid) return
+    const ctx = contextoOverride || contexto
     const ini = new Date(mesRef.getFullYear(), mesRef.getMonth(), 1).toISOString().split('T')[0]
     const fim = new Date(mesRef.getFullYear(), mesRef.getMonth() + 1, 0).toISOString().split('T')[0]
-    const { data: lanc } = await supabase.from('lancamentos').select('*')
+
+    let query = supabase.from('lancamentos').select('*')
       .eq('familia_id', fid).gte('data', ini).lte('data', fim)
+
+    if (ctx.tipo === 'empresa' && ctx.empresaId) {
+      query = query.eq('empresa_id', ctx.empresaId)
+    } else {
+      query = query.is('empresa_id', null)
+    }
+
+    const { data: lanc } = await query
       .order('data', { ascending: false }).order('hora', { ascending: false })
+
     if (lanc) {
       setLancamentos(lanc)
       const s = new Set<string>()
@@ -146,17 +184,40 @@ export default function MovimentosPage() {
     }
   }
 
+  function trocarContexto(novo: ContextoAtivo) {
+    setContexto(novo)
+    salvarContexto(novo)
+    if (familiaIdRef.current) carregarLancamentos(familiaIdRef.current, undefined, undefined, novo)
+  }
+
+  async function handleSalvarEmpresa() {
+    if (!novaEmpresaNome.trim() || !novaEmpresaCnpj.trim()) return
+    setSalvandoEmpresa(true)
+    const { data, error } = await supabase.from('empresas').insert({
+      familia_id: familiaIdRef.current,
+      nome: novaEmpresaNome.trim(),
+      cnpj: novaEmpresaCnpj.replace(/\D/g, ''),
+    }).select().single()
+    setSalvandoEmpresa(false)
+    if (!error && data) {
+      setEmpresas(prev => [...prev, data])
+      setModalEmpresaOpen(false)
+      setNovaEmpresaNome('')
+      setNovaEmpresaCnpj('')
+      trocarContexto({ tipo: 'empresa', empresaId: data.id })
+    }
+  }
+
   function mudarMes(delta: number) {
     setMesRef(new Date(mesRef.getFullYear(), mesRef.getMonth() + delta, 1))
   }
 
   function abrirModalNovo() {
     setEditando(null)
-    setTipo('despesa'); setValor(''); setCategoria('Alimentação')
+    setTipo('despesa'); setValor(''); setCategoria(contexto.tipo === 'empresa' ? CATEGORIAS_DESPESA_EMPRESA[0] : 'Alimentação')
     setDataLanc(new Date().toISOString().split('T')[0])
-    setMembroForm(membroAtual); setDizimar(true)
+    setMembroForm(membroAtual); setDizimar(false)
     setObservacao(''); setParcelado(false); setNumParcelas('2'); setDiaParcela('1')
-    setAlocarMeta(false); setMetaId(''); setMetaPct(10)
     setConfirmDelete(false)
     setModalOpen(true)
   }
@@ -168,84 +229,67 @@ export default function MovimentosPage() {
     setMembroForm(l.membro); setDizimar(l.dizimar !== false)
     setObservacao(l.descricao || '')
     setParcelado(false); setNumParcelas('2'); setDiaParcela('1')
-    setAlocarMeta(false); setMetaId(l.meta_id || ''); setMetaPct(l.meta_pct || 10)
     setConfirmDelete(false)
     setModalOpen(true)
   }
 
   function handleTipo(t: 'despesa' | 'receita') {
     setTipo(t)
-    setCategoria(t === 'despesa' ? 'Alimentação' : 'Salário')
-    setDizimar(t === 'receita')
+    const catsDespesa = contexto.tipo === 'empresa' ? CATEGORIAS_DESPESA_EMPRESA : CATEGORIAS_DESPESA
+    const catsReceita = contexto.tipo === 'empresa' ? CATEGORIAS_RECEITA_EMPRESA : CATEGORIAS_RECEITA
+    setCategoria(t === 'despesa' ? catsDespesa[0] : catsReceita[0])
+    setDizimar(t === 'receita' && contexto.tipo === 'pessoal')
     setParcelado(false)
-    setAlocarMeta(false)
   }
-
-  const valorNum = () => parseFloat(valor.replace(/\./g, '').replace(',', '.')) || 0
-  const valorMeta = () => Math.round((valorNum() * metaPct) / 100 * 100) / 100
 
   async function handleSalvar() {
     if (!valor) return
     setSalvando(true)
-    const vNum = valorNum()
-    if (isNaN(vNum) || vNum <= 0) { setSalvando(false); return }
-    const fid   = familiaIdRef.current
+    const valorNum = parseFloat(valor.replace(/\./g, '').replace(',', '.'))
+    if (isNaN(valorNum) || valorNum <= 0) { setSalvando(false); return }
+    const fid  = familiaIdRef.current
     const agora = new Date()
     const hora  = `${String(agora.getHours()).padStart(2,'0')}:${String(agora.getMinutes()).padStart(2,'0')}`
+    const empresaIdAtual = contexto.tipo === 'empresa' ? contexto.empresaId : null
 
     if (editando) {
       const { error } = await supabase.from('lancamentos').update({
-        tipo, valor: vNum, categoria, membro: membroForm, data: dataLanc,
+        tipo, valor: valorNum, categoria, membro: membroForm, data: dataLanc,
         dizimar: tipo === 'receita' ? dizimar : false,
         descricao: observacao || null,
-        meta_id: null, meta_pct: null,
       }).eq('id', editando.id)
       setSalvando(false)
       if (!error) { setModalOpen(false); await carregarLancamentos(fid) }
     } else if (parcelado && tipo === 'despesa') {
+      // Lançamento parcelado — cria N lançamentos
       const n = parseInt(numParcelas) || 2
       const dia = parseInt(diaParcela) || 1
-      const valorParcela = vNum / n
+      const valorParcela = valorNum / n
       const dataBase = new Date(dataLanc + 'T12:00:00')
       const inserts = []
       for (let i = 0; i < n; i++) {
         const d = new Date(dataBase.getFullYear(), dataBase.getMonth() + i, dia)
+        const dataStr = d.toISOString().split('T')[0]
         inserts.push({
           familia_id: fid, user_id: userId, tipo: 'despesa',
           valor: Math.round(valorParcela * 100) / 100,
-          categoria, membro: membroForm, data: d.toISOString().split('T')[0], hora,
+          categoria, membro: membroForm, data: dataStr, hora,
           dizimar: false,
           descricao: `${observacao ? observacao + ' ' : ''}Parcela ${i + 1}/${n}`,
-          meta_id: null, meta_pct: null,
+          empresa_id: empresaIdAtual,
         })
       }
       const { error } = await supabase.from('lancamentos').insert(inserts)
       setSalvando(false)
       if (!error) { setModalOpen(false); await carregarLancamentos(fid) }
     } else {
-      // Alocação para meta
-      const metaIdFinal  = tipo === 'receita' && alocarMeta && metaId ? metaId : null
-      const metaPctFinal = tipo === 'receita' && alocarMeta && metaId ? metaPct : null
-
       const { error } = await supabase.from('lancamentos').insert({
-        familia_id: fid, user_id: userId, tipo, valor: vNum,
+        familia_id: fid, user_id: userId, tipo, valor: valorNum,
         categoria, membro: membroForm, data: dataLanc, hora,
         dizimar: tipo === 'receita' ? dizimar : false,
         descricao: observacao || null,
-        meta_id: metaIdFinal,
-        meta_pct: metaPctFinal,
+        empresa_id: empresaIdAtual,
       })
-
-      // Atualiza valor_atual da meta
-      if (!error && metaIdFinal) {
-        const meta = metas.find(m => m.id === metaIdFinal)
-        if (meta) {
-          const novoValor = Number(meta.valor_atual) + valorMeta()
-          await supabase.from('metas').update({ valor_atual: novoValor }).eq('id', metaIdFinal)
-          setMetas(prev => prev.map(m => m.id === metaIdFinal ? { ...m, valor_atual: novoValor } : m))
-        }
-      }
-
       setSalvando(false)
       if (!error) { setModalOpen(false); await carregarLancamentos(fid) }
     }
@@ -261,6 +305,11 @@ export default function MovimentosPage() {
       setLancamentos(prev => prev.filter((l: any) => l.id !== editando.id))
       setModalOpen(false)
     }
+  }
+
+  function iconeCategoria(l: any) {
+    const mapa = l.empresa_id ? ICONES_CAT_EMPRESA : ICONES_CAT
+    return mapa[l.categoria] || (l.tipo === 'receita' ? ArrowDownLeft : ArrowUpRight)
   }
 
   const filtrados = lancamentos.filter(l => {
@@ -280,13 +329,15 @@ export default function MovimentosPage() {
   const totalDes = lancamentos.filter(l => l.tipo === 'despesa').reduce((s, l) => s + Number(l.valor), 0)
   const resultado = totalRec - totalDes
   const mesLabel  = `${MESES[mesRef.getMonth()]} ${mesRef.getFullYear()}`
-  const categorias = tipo === 'despesa' ? CATEGORIAS_DESPESA : CATEGORIAS_RECEITA
-  const temMetas   = metas.length > 0
+  const categorias = contexto.tipo === 'empresa'
+    ? (tipo === 'despesa' ? CATEGORIAS_DESPESA_EMPRESA : CATEGORIAS_RECEITA_EMPRESA)
+    : (tipo === 'despesa' ? CATEGORIAS_DESPESA : CATEGORIAS_RECEITA)
+  const iconesCategoriaModal = contexto.tipo === 'empresa' ? ICONES_CAT_EMPRESA : ICONES_CAT
 
-  const metaSelecionada = metas.find(m => m.id === metaId)
-
+  // Conteúdo do modal compartilhado
   const modalContent = (isMob: boolean) => (
     <>
+      {/* Drag handle mobile */}
       {isMob && <div style={{ width: '40px', height: '4px', borderRadius: '2px', backgroundColor: '#E2E8F0', margin: '12px auto 4px', flexShrink: 0 }} />}
 
       {/* Header */}
@@ -310,6 +361,21 @@ export default function MovimentosPage() {
 
       {/* Scroll area */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px 8px' }}>
+
+        {/* Contexto (Pessoal / Empresa) — não muda em edição, só em lançamento novo */}
+        {!editando && (
+          <div style={{ marginBottom: '10px' }}>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Lançando em</p>
+            <ContextSwitcher
+              variant="compact"
+              familiaNome={familiaNome || 'Família'}
+              empresas={empresas}
+              contextoAtivo={contexto}
+              onTrocar={trocarContexto}
+              onAdicionarEmpresa={() => setModalEmpresaOpen(true)}
+            />
+          </div>
+        )}
 
         {/* Tipo */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
@@ -341,7 +407,7 @@ export default function MovimentosPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '6px', marginBottom: '10px' }}>
           {(membrosFamilia.length ? membrosFamilia : [membroAtual]).map(m => (
             <button key={m} onClick={() => setMembroForm(m)}
-              style={{ padding: '8px', borderRadius: '12px', fontSize: '14px', fontWeight: 500, cursor: 'pointer', border: `1px solid ${membroForm === m ? '#0B3B2E' : '#E2E8F0'}`, backgroundColor: membroForm === m ? '#F0FDF4' : '#fff', color: membroForm === m ? '#0B3B2E' : '#64748B' }}>
+              style={{ padding: '8px', borderRadius: '12px', fontSize: '14px', fontWeight: 500, cursor: 'pointer', border: `1px solid ${membroForm === m ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: membroForm === m ? '#F0FDF4' : '#fff', color: membroForm === m ? '#0E3B2E' : '#64748B' }}>
               {m.split(' ')[0]}
             </button>
           ))}
@@ -351,11 +417,11 @@ export default function MovimentosPage() {
         <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Categoria</p>
         <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', marginBottom: '10px', paddingBottom: '4px' }}>
           {categorias.map(c => {
-            const Icon = ICONES_CAT[c] || MoreHorizontal
+            const Icon = iconesCategoriaModal[c] || MoreHorizontal
             return (
               <button key={c} onClick={() => setCategoria(c)}
-                style={{ padding: '8px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 500, cursor: 'pointer', border: `1px solid ${categoria === c ? '#0B3B2E' : '#E2E8F0'}`, backgroundColor: categoria === c ? '#F0FDF4' : '#fff', color: categoria === c ? '#0B3B2E' : '#64748B', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flexShrink: 0, minWidth: '64px' }}>
-                <Icon size={14} strokeWidth={1.75} color={categoria === c ? '#0B3B2E' : '#94A3B8'} />
+                style={{ padding: '8px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 500, cursor: 'pointer', border: `1px solid ${categoria === c ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: categoria === c ? '#F0FDF4' : '#fff', color: categoria === c ? '#0E3B2E' : '#64748B', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flexShrink: 0, minWidth: '64px' }}>
+                <Icon size={14} strokeWidth={1.75} color={categoria === c ? '#0E3B2E' : '#94A3B8'} />
                 {c}
               </button>
             )
@@ -421,68 +487,6 @@ export default function MovimentosPage() {
           </div>
         )}
 
-        {/* ── ALOCAÇÃO PARA META — só receita, novo lançamento, com metas disponíveis ── */}
-        {tipo === 'receita' && !editando && temMetas && (
-          <div style={{ marginBottom: '10px' }}>
-            <button onClick={() => { setAlocarMeta(!alocarMeta); if (!metaId && metas.length > 0) setMetaId(metas[0].id) }}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '10px 14px', borderRadius: '12px', border: `1px solid ${alocarMeta ? '#8B5CF6' : '#E2E8F0'}`, backgroundColor: alocarMeta ? 'rgba(139,92,246,0.06)' : '#F8FAFC', cursor: 'pointer', marginBottom: alocarMeta ? '8px' : '0' }}>
-              <div style={{ position: 'relative', width: '36px', height: '20px', borderRadius: '10px', backgroundColor: alocarMeta ? '#8B5CF6' : '#E2E8F0', flexShrink: 0 }}>
-                <div style={{ position: 'absolute', top: '2px', left: alocarMeta ? '18px' : '2px', width: '16px', height: '16px', borderRadius: '50%', backgroundColor: '#fff', transition: 'left 0.2s' }} />
-              </div>
-              <div>
-                <p style={{ fontSize: '13px', fontWeight: 600, color: alocarMeta ? '#6D28D9' : '#0F172A', margin: 0 }}>Alocar parte para uma meta</p>
-                <p style={{ fontSize: '11px', color: '#94A3B8', margin: 0 }}>Destina uma % desta receita para a meta</p>
-              </div>
-            </button>
-
-            {alocarMeta && (
-              <div style={{ padding: '12px 14px', backgroundColor: 'rgba(139,92,246,0.05)', borderRadius: '12px', border: '1px solid rgba(139,92,246,0.2)' }}>
-                {/* Seletor de meta */}
-                <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#6D28D9', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '6px' }}>Meta</p>
-                <div style={{ position: 'relative', marginBottom: '12px' }}>
-                  <select value={metaId} onChange={e => setMetaId(e.target.value)}
-                    style={{ width: '100%', padding: '9px 36px 9px 12px', borderRadius: '10px', border: '1.5px solid rgba(139,92,246,0.3)', fontSize: '13.5px', color: '#0F172A', outline: 'none', backgroundColor: '#fff', appearance: 'none', cursor: 'pointer' }}>
-                    {metas.map(m => {
-                      const pct = Math.round((Number(m.valor_atual) / Number(m.valor_alvo)) * 100)
-                      return <option key={m.id} value={m.id}>{m.nome} · {pct}%</option>
-                    })}
-                  </select>
-                  <ChevronDown size={15} color="#8B5CF6" strokeWidth={2} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-                </div>
-
-                {/* Stepper de percentual */}
-                <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#6D28D9', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '6px' }}>Percentual</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-                  <button onClick={() => setMetaPct(Math.max(1, metaPct - 1))}
-                    style={{ width: '32px', height: '32px', borderRadius: '9px', border: '1px solid rgba(139,92,246,0.3)', backgroundColor: '#fff', cursor: 'pointer', fontSize: '18px', color: '#8B5CF6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600 }}>−</button>
-                  <span style={{ fontSize: '22px', fontWeight: 700, color: '#6D28D9', minWidth: '48px', textAlign: 'center' }}>{metaPct}%</span>
-                  <button onClick={() => setMetaPct(Math.min(100, metaPct + 1))}
-                    style={{ width: '32px', height: '32px', borderRadius: '9px', border: '1px solid rgba(139,92,246,0.3)', backgroundColor: '#fff', cursor: 'pointer', fontSize: '18px', color: '#8B5CF6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600 }}>+</button>
-                  <div style={{ display: 'flex', gap: '6px', marginLeft: '4px' }}>
-                    {[5, 10, 15, 20].map(p => (
-                      <button key={p} onClick={() => setMetaPct(p)}
-                        style={{ padding: '4px 8px', borderRadius: '7px', fontSize: '11px', fontWeight: 600, border: `1px solid ${metaPct === p ? '#8B5CF6' : 'rgba(139,92,246,0.2)'}`, backgroundColor: metaPct === p ? '#8B5CF6' : 'transparent', color: metaPct === p ? '#fff' : '#8B5CF6', cursor: 'pointer' }}>
-                        {p}%
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Preview do valor */}
-                {valor && metaSelecionada && (
-                  <div style={{ padding: '8px 12px', backgroundColor: '#fff', borderRadius: '9px', border: '1px solid rgba(139,92,246,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Target size={13} color="#8B5CF6" strokeWidth={2} />
-                      <span style={{ fontSize: '12px', color: '#64748B' }}>{metaSelecionada.nome}</span>
-                    </div>
-                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#6D28D9' }}>+{fmt(valorMeta())}</span>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Observação */}
         <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Observação (opcional)</p>
         <textarea value={observacao} onChange={e => setObservacao(e.target.value)}
@@ -500,7 +504,7 @@ export default function MovimentosPage() {
       {/* Botão fixo */}
       <div style={{ padding: '12px 20px 20px', borderTop: '1px solid #F1F5F9', backgroundColor: '#fff', flexShrink: 0 }}>
         <button onClick={handleSalvar} disabled={salvando || !valor}
-          style={{ width: '100%', height: '48px', borderRadius: '12px', border: 'none', fontSize: '15px', fontWeight: 600, color: '#fff', cursor: salvando || !valor ? 'not-allowed' : 'pointer', backgroundColor: '#0B3B2E', opacity: salvando || !valor ? 0.6 : 1 }}>
+          style={{ width: '100%', height: '48px', borderRadius: '12px', border: 'none', fontSize: '15px', fontWeight: 600, color: '#fff', cursor: salvando || !valor ? 'not-allowed' : 'pointer', backgroundColor: '#0E3B2E', opacity: salvando || !valor ? 0.6 : 1 }}>
           {salvando ? 'Salvando...' : editando ? 'Salvar alterações' : parcelado ? `Criar ${numParcelas} parcelas` : 'Registrar lançamento'}
         </button>
       </div>
@@ -511,7 +515,17 @@ export default function MovimentosPage() {
     <>
       {/* ── MOBILE ── */}
       <div className="lg:hidden" style={{ backgroundColor: '#F8FAFC', minHeight: '100vh', paddingBottom: '100px' }}>
-        <div style={{ backgroundColor: '#0B3B2E', padding: '20px 20px 36px' }}>
+        <div style={{ backgroundColor: '#0E3B2E', padding: '20px 20px 36px' }}>
+          <div style={{ marginBottom: '14px' }}>
+            <ContextSwitcher
+              variant="header"
+              familiaNome={familiaNome || 'Família'}
+              empresas={empresas}
+              contextoAtivo={contexto}
+              onTrocar={trocarContexto}
+              onAdicionarEmpresa={() => setModalEmpresaOpen(true)}
+            />
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <h1 style={{ fontSize: '18px', fontWeight: 600, color: '#fff', margin: 0 }}>Fluxo Patrimonial</h1>
@@ -540,7 +554,7 @@ export default function MovimentosPage() {
               </div>
               <p style={{ fontSize: '11px', fontWeight: 500, color: '#64748B', marginBottom: '4px' }}>{c.label}</p>
               <p style={{ fontSize: '13px', fontWeight: 600, color: c.cor, lineHeight: 1.2 }}>
-                {loading ? '...' : fmtOculto(Math.abs(c.val), ocultar)}
+                {loading ? '...' : `R$ ${Math.abs(c.val).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
               </p>
             </div>
           ))}
@@ -549,13 +563,13 @@ export default function MovimentosPage() {
         <div style={{ display: 'flex', gap: '8px', padding: '0 16px 8px', overflowX: 'auto' }}>
           {[{ key: 'todos', label: 'Todos' }, { key: 'receita', label: 'Receitas' }, { key: 'despesa', label: 'Despesas' }].map(f => (
             <button key={f.key} onClick={() => setFiltro(f.key as any)}
-              style={{ padding: '6px 16px', borderRadius: '999px', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap', border: `1px solid ${filtro === f.key ? '#0B3B2E' : '#E2E8F0'}`, backgroundColor: filtro === f.key ? '#0B3B2E' : '#fff', color: filtro === f.key ? '#fff' : '#64748B', cursor: 'pointer' }}>
+              style={{ padding: '6px 16px', borderRadius: '999px', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap', border: `1px solid ${filtro === f.key ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: filtro === f.key ? '#0E3B2E' : '#fff', color: filtro === f.key ? '#fff' : '#64748B', cursor: 'pointer' }}>
               {f.label}
             </button>
           ))}
           {membros.map(m => (
             <button key={m} onClick={() => setFiltroMembro(filtroMembro === m ? 'todos' : m)}
-              style={{ padding: '6px 16px', borderRadius: '999px', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap', border: `1px solid ${filtroMembro === m ? '#0B3B2E' : '#E2E8F0'}`, backgroundColor: filtroMembro === m ? '#0B3B2E' : '#fff', color: filtroMembro === m ? '#fff' : '#64748B', cursor: 'pointer' }}>
+              style={{ padding: '6px 16px', borderRadius: '999px', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap', border: `1px solid ${filtroMembro === m ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: filtroMembro === m ? '#0E3B2E' : '#fff', color: filtroMembro === m ? '#fff' : '#64748B', cursor: 'pointer' }}>
               {m.split(' ')[0]}
             </button>
           ))}
@@ -577,12 +591,12 @@ export default function MovimentosPage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', padding: '0 4px' }}>
                   <span style={{ fontSize: '11px', fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{formatDiaLabel(dia)}</span>
                   <span style={{ fontSize: '11px', fontWeight: 600, color: totalDia >= 0 ? '#10B981' : '#EF4444' }}>
-                    {totalDia >= 0 ? '+' : '-'} {fmtOculto(Math.abs(totalDia), ocultar)}
+                    {totalDia >= 0 ? '+' : '-'} {fmt(Math.abs(totalDia))}
                   </span>
                 </div>
                 <div style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', overflow: 'hidden' }}>
                   {itens.map((l: any, i: number) => {
-                    const Icon = ICONES_CAT[l.categoria] || (l.tipo === 'receita' ? ArrowDownLeft : ArrowUpRight)
+                    const Icon = iconeCategoria(l)
                     return (
                       <button key={l.id} onClick={() => abrirModalEditar(l)}
                         style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderTop: i > 0 ? '1px solid #F1F5F9' : 'none', backgroundColor: 'transparent', border: i > 0 ? '1px solid #F1F5F9' : 'none', borderLeft: 'none', borderRight: 'none', borderBottom: 'none', cursor: 'pointer', textAlign: 'left' }}>
@@ -594,11 +608,10 @@ export default function MovimentosPage() {
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <p style={{ fontSize: '12px', color: '#94A3B8', margin: 0 }}>{l.membro?.split(' ')[0]} · {l.hora}</p>
                             {l.descricao && <AlignLeft size={10} color="#94A3B8" strokeWidth={1.75} />}
-                            {l.meta_id && <Target size={10} color="#8B5CF6" strokeWidth={2} />}
                           </div>
                         </div>
                         <p style={{ fontSize: '14px', fontWeight: 600, color: l.tipo === 'receita' ? '#10B981' : '#EF4444', flexShrink: 0, margin: 0 }}>
-                          {l.tipo === 'receita' ? '+' : '-'} {fmtOculto(Number(l.valor), ocultar)}
+                          {l.tipo === 'receita' ? '+' : '-'} {fmt(Number(l.valor))}
                         </p>
                         <div style={{ width: '28px', height: '28px', borderRadius: '8px', backgroundColor: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                           <Pencil size={12} color="#64748B" strokeWidth={1.75} />
@@ -613,7 +626,7 @@ export default function MovimentosPage() {
         </div>
 
         <button onClick={abrirModalNovo}
-          style={{ position: 'fixed', bottom: '80px', right: '24px', width: '56px', height: '56px', borderRadius: '50%', backgroundColor: '#0B3B2E', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 8px 24px rgba(14,59,46,0.4)', zIndex: 40 }}>
+          style={{ position: 'fixed', bottom: '80px', right: '24px', width: '56px', height: '56px', borderRadius: '50%', backgroundColor: '#0E3B2E', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 8px 24px rgba(14,59,46,0.4)', zIndex: 40 }}>
           <Plus size={24} color="#fff" strokeWidth={2} />
         </button>
       </div>
@@ -622,12 +635,22 @@ export default function MovimentosPage() {
       <div className="hidden lg:block p-8 max-w-[1440px] mx-auto" style={{ backgroundColor: '#F8FAFC' }}>
         <div className="flex items-center justify-between mb-6">
           <div>
+            <div style={{ marginBottom: '10px' }}>
+              <ContextSwitcher
+                variant="compact"
+                familiaNome={familiaNome || 'Família'}
+                empresas={empresas}
+                contextoAtivo={contexto}
+                onTrocar={trocarContexto}
+                onAdicionarEmpresa={() => setModalEmpresaOpen(true)}
+              />
+            </div>
             <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', letterSpacing: '-0.5px' }}>Fluxo Patrimonial</h1>
             <p className="text-sm mt-1" style={{ color: '#64748B' }}>Acompanhe receitas e despesas{familiaNome ? ` da família ${familiaNome}` : ''}</p>
           </div>
           <button onClick={abrirModalNovo}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white hover:opacity-90"
-            style={{ backgroundColor: '#145A45', boxShadow: '0 4px 12px rgba(20,90,69,0.3)', border: 'none', cursor: 'pointer' }}>
+            style={{ backgroundColor: '#0F766E', boxShadow: '0 4px 12px rgba(15,118,110,0.3)', border: 'none', cursor: 'pointer' }}>
             <Plus size={16} strokeWidth={2.5} /> Novo lançamento
           </button>
         </div>
@@ -653,7 +676,7 @@ export default function MovimentosPage() {
                 <c.Icon size={19} color={c.cor} strokeWidth={1.75} />
               </div>
               <p className="text-sm font-medium mb-1" style={{ color: '#64748B' }}>{c.label}</p>
-              <p className="text-2xl font-semibold" style={{ color: c.cor, letterSpacing: '-0.5px' }}>{loading ? '...' : fmtOculto(c.val, ocultar)}</p>
+              <p className="text-2xl font-semibold" style={{ color: c.cor, letterSpacing: '-0.5px' }}>{loading ? '...' : fmt(c.val)}</p>
             </div>
           ))}
         </div>
@@ -691,7 +714,7 @@ export default function MovimentosPage() {
             <div className="flex flex-col items-center justify-center py-16 gap-3">
               <Wallet size={32} color="#E2E8F0" strokeWidth={1} />
               <p className="text-sm" style={{ color: '#94A3B8' }}>Nenhum lançamento neste período.</p>
-              <button onClick={abrirModalNovo} className="text-sm font-semibold hover:underline" style={{ color: '#145A45', background: 'none', border: 'none', cursor: 'pointer' }}>Registrar primeiro lançamento →</button>
+              <button onClick={abrirModalNovo} className="text-sm font-semibold hover:underline" style={{ color: '#0F766E', background: 'none', border: 'none', cursor: 'pointer' }}>Registrar primeiro lançamento →</button>
             </div>
           ) : diasOrdenados.map(dia => {
             const itens    = grupos[dia]
@@ -701,11 +724,11 @@ export default function MovimentosPage() {
                 <div className="flex items-center justify-between px-6 py-3" style={{ backgroundColor: '#F8FAFC' }}>
                   <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#64748B' }}>{formatDiaLabel(dia)}</span>
                   <span className="text-xs font-semibold" style={{ color: totalDia >= 0 ? '#10B981' : '#EF4444' }}>
-                    {totalDia >= 0 ? '+' : '-'} {fmtOculto(Math.abs(totalDia), ocultar)}
+                    {totalDia >= 0 ? '+' : '-'} {fmt(Math.abs(totalDia))}
                   </span>
                 </div>
                 {itens.map((l: any) => {
-                  const Icon = ICONES_CAT[l.categoria] || (l.tipo === 'receita' ? ArrowDownLeft : ArrowUpRight)
+                  const Icon = iconeCategoria(l)
                   return (
                     <button key={l.id} onClick={() => abrirModalEditar(l)}
                       className="w-full flex items-center gap-3 px-6 py-3.5 border-t text-left hover:bg-gray-50"
@@ -719,12 +742,11 @@ export default function MovimentosPage() {
                         <div className="flex items-center gap-2">
                           <p className="text-xs" style={{ color: '#94A3B8' }}>{l.membro} · {l.hora}</p>
                           {l.descricao && <AlignLeft size={11} color="#94A3B8" strokeWidth={1.75} />}
-                          {l.meta_id && <Target size={11} color="#8B5CF6" strokeWidth={2} />}
                           {l.descricao && <p className="text-xs truncate" style={{ color: '#94A3B8', maxWidth: '200px' }}>{l.descricao}</p>}
                         </div>
                       </div>
                       <p className="font-semibold text-sm flex-shrink-0" style={{ color: l.tipo === 'receita' ? '#10B981' : '#EF4444' }}>
-                        {l.tipo === 'receita' ? '+' : '-'} {fmtOculto(Number(l.valor), ocultar)}
+                        {l.tipo === 'receita' ? '+' : '-'} {fmt(Number(l.valor))}
                       </p>
                       <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
                         style={{ backgroundColor: '#F1F5F9' }}>
@@ -739,7 +761,7 @@ export default function MovimentosPage() {
         </div>
       </div>
 
-      {/* Modal Mobile */}
+      {/* Modal Mobile — lançamento */}
       {modalOpen && isMobile && (
         <div onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}
           style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
@@ -749,12 +771,61 @@ export default function MovimentosPage() {
         </div>
       )}
 
-      {/* Modal Desktop */}
+      {/* Modal Desktop — lançamento */}
       {modalOpen && !isMobile && (
         <div onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}
           style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
           <div style={{ width: '520px', backgroundColor: '#fff', borderRadius: '20px', display: 'flex', flexDirection: 'column', maxHeight: '90vh', margin: 'auto' }}>
             {modalContent(false)}
+          </div>
+        </div>
+      )}
+
+      {/* Modal — Nova empresa (CNPJ) */}
+      {modalEmpresaOpen && (
+        <div onClick={e => { if (e.target === e.currentTarget) setModalEmpresaOpen(false) }}
+          style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)', padding: '20px' }}>
+          <div style={{ width: '100%', maxWidth: '420px', backgroundColor: '#fff', borderRadius: '20px', padding: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '9px', backgroundColor: '#334155', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Building2 size={16} color="#fff" strokeWidth={2} />
+                </div>
+                <h2 style={{ fontSize: '17px', fontWeight: 600, color: '#0F172A', margin: 0 }}>Nova empresa</h2>
+              </div>
+              <button onClick={() => setModalEmpresaOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}>
+                <X size={20} strokeWidth={2} />
+              </button>
+            </div>
+
+            <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Nome da empresa</p>
+            <input
+              type="text" value={novaEmpresaNome} onChange={e => setNovaEmpresaNome(e.target.value)}
+              placeholder="Ex: Studio Aline ME"
+              style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #E5E7EB', fontSize: '14px', color: '#0F172A', outline: 'none', marginBottom: '14px', boxSizing: 'border-box', backgroundColor: '#FAFAFA' }}
+            />
+
+            <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>CNPJ</p>
+            <input
+              type="text" inputMode="numeric" value={novaEmpresaCnpj}
+              onChange={e => setNovaEmpresaCnpj(maskCnpj(e.target.value))}
+              placeholder="00.000.000/0000-00"
+              style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #E5E7EB', fontSize: '14px', color: '#0F172A', outline: 'none', marginBottom: '20px', boxSizing: 'border-box', backgroundColor: '#FAFAFA' }}
+            />
+
+            <button
+              onClick={handleSalvarEmpresa}
+              disabled={salvandoEmpresa || !novaEmpresaNome.trim() || !novaEmpresaCnpj.trim()}
+              style={{
+                width: '100%', height: '52px', borderRadius: '14px', border: 'none',
+                fontSize: '15px', fontWeight: 600, color: '#fff',
+                cursor: salvandoEmpresa ? 'not-allowed' : 'pointer',
+                background: 'linear-gradient(135deg, #07271F 0%, #145A45 100%)',
+                boxShadow: '0 4px 16px rgba(11,59,46,0.3)',
+                opacity: (salvandoEmpresa || !novaEmpresaNome.trim() || !novaEmpresaCnpj.trim()) ? 0.6 : 1,
+              }}>
+              {salvandoEmpresa ? 'Salvando...' : 'Criar empresa'}
+            </button>
           </div>
         </div>
       )}
