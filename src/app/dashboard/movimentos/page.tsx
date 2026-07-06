@@ -10,14 +10,8 @@ import {
   Plus, Wallet, X, UtensilsCrossed, Home, Car, Smile,
   Heart, BookOpen, ShoppingBag, Church, MoreHorizontal,
   Briefcase, TrendingUp, Laptop, DollarSign, Trash2, Pencil,
-  CreditCard, FileText, AlignLeft, Building2
+  CreditCard, FileText, AlignLeft, Repeat, CheckCircle2
 } from 'lucide-react'
-import ContextSwitcher, { type Empresa } from '@/components/ContextSwitcher'
-import { useOcultarValores, fmtOculto } from '@/hooks/useOcultarValores'
-import { lerContexto, salvarContexto, type ContextoAtivo } from '@/lib/contexto'
-import {
-  CATEGORIAS_DESPESA_EMPRESA, CATEGORIAS_RECEITA_EMPRESA, ICONES_CAT_EMPRESA
-} from '@/lib/categorias-empresa'
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
@@ -47,15 +41,6 @@ function formatDiaLabel(dataStr: string) {
   return `${dias[data.getDay()]}, ${data.getDate()} de ${MESES[data.getMonth()]}`
 }
 
-function maskCnpj(value: string) {
-  const digits = value.replace(/\D/g, '').slice(0, 14)
-  return digits
-    .replace(/(\d{2})(\d)/, '$1.$2')
-    .replace(/(\d{3})(\d)/, '$1.$2')
-    .replace(/(\d{3})(\d)/, '$1/$2')
-    .replace(/(\d{4})(\d{1,2})$/, '$1-$2')
-}
-
 export default function MovimentosPage() {
   const router       = useRouter()
   const pathname     = usePathname()
@@ -73,13 +58,22 @@ export default function MovimentosPage() {
   const [membros, setMembros]           = useState<string[]>([])
   const [membrosFamilia, setMembrosFamilia] = useState<string[]>([])
 
-  // Contexto Pessoal / Empresa (CNPJ)
-  const [contexto, setContexto] = useState<ContextoAtivo>({ tipo: 'pessoal', empresaId: null })
-  const [empresas, setEmpresas] = useState<Empresa[]>([])
-  const [modalEmpresaOpen, setModalEmpresaOpen] = useState(false)
-  const [novaEmpresaNome, setNovaEmpresaNome]   = useState('')
-  const [novaEmpresaCnpj, setNovaEmpresaCnpj]   = useState('')
-  const [salvandoEmpresa, setSalvandoEmpresa]   = useState(false)
+  const [despesasFixas, setDespesasFixas] = useState<any[]>([])
+  const [dfModalOpen, setDfModalOpen]     = useState(false)
+  const [dfEditando, setDfEditando]       = useState<any>(null)
+  const [dfNome, setDfNome]               = useState('')
+  const [dfValor, setDfValor]             = useState('')
+  const [dfCategoria, setDfCategoria]     = useState('Moradia')
+  const [dfDia, setDfDia]                 = useState('5')
+  const [dfVariavel, setDfVariavel]       = useState(false)
+  const [dfSalvando, setDfSalvando]       = useState(false)
+  const [dfDeletando, setDfDeletando]     = useState(false)
+  const [dfConfirmDelete, setDfConfirmDelete] = useState(false)
+
+  const [pagarModalOpen, setPagarModalOpen] = useState(false)
+  const [dfPagando, setDfPagando]           = useState<any>(null)
+  const [valorPagar, setValorPagar]         = useState('')
+  const [pagando, setPagando]               = useState(false)
 
   const [modalOpen, setModalOpen]         = useState(false)
   const [editando, setEditando]           = useState<any>(null)
@@ -99,7 +93,6 @@ export default function MovimentosPage() {
   const [isMobile, setIsMobile]           = useState(true)
 
   const supabase = createClient()
-  const ocultarValores = useOcultarValores()
 
   useEffect(() => {
     setIsMobile(window.innerWidth < 1024)
@@ -111,7 +104,7 @@ export default function MovimentosPage() {
   useEffect(() => { init() }, [])
   useEffect(() => {
     if (familiaIdRef.current) carregarLancamentos(familiaIdRef.current)
-  }, [mesRef, contexto.tipo, contexto.empresaId])
+  }, [mesRef])
   useEffect(() => {
     const handler = () => {
       if (!document.hidden && familiaIdRef.current) carregarLancamentos(familiaIdRef.current)
@@ -130,52 +123,33 @@ export default function MovimentosPage() {
       .eq('id', session.user.id).single()
     if (profile) {
       const fid = profile.familia_id
-      const nomeFamiliaValue = (profile.familias as any)?.nome || ''
       setMembroAtual(profile.nome || '')
       setFamiliaId(fid)
       familiaIdRef.current = fid
-      setFamiliaNome(nomeFamiliaValue)
+      setFamiliaNome((profile.familias as any)?.nome || '')
       setMembroForm(profile.nome || '')
-
-      const ctxInicial = lerContexto()
-      setContexto(ctxInicial)
-
       const { data: membrosData } = await supabase
         .from('profiles').select('nome').eq('familia_id', fid)
       if (membrosData) setMembrosFamilia(membrosData.map((m: any) => m.nome).filter(Boolean))
-
-      const { data: empresasData } = await supabase
-        .from('empresas').select('*').eq('familia_id', fid).order('created_at', { ascending: true })
-      if (empresasData) setEmpresas(empresasData)
-
-      await carregarLancamentos(fid, profile.nome, nomeFamiliaValue, ctxInicial)
+      await carregarLancamentos(fid, profile.nome, (profile.familias as any)?.nome)
+      await recarregarDespesasFixas(fid)
     }
     setLoading(false)
   }
 
-  async function carregarLancamentos(
-    fid: string,
-    nomeUsuario?: string,
-    nomeFamilia?: string,
-    contextoOverride?: ContextoAtivo
-  ) {
+  async function recarregarDespesasFixas(fid: string) {
+    const { data } = await supabase.from('despesas_fixas').select('*')
+      .eq('familia_id', fid).eq('ativo', true).order('dia_vencimento', { ascending: true })
+    if (data) setDespesasFixas(data)
+  }
+
+  async function carregarLancamentos(fid: string, nomeUsuario?: string, nomeFamilia?: string) {
     if (!fid) return
-    const ctx = contextoOverride || contexto
     const ini = new Date(mesRef.getFullYear(), mesRef.getMonth(), 1).toISOString().split('T')[0]
     const fim = new Date(mesRef.getFullYear(), mesRef.getMonth() + 1, 0).toISOString().split('T')[0]
-
-    let query = supabase.from('lancamentos').select('*')
+    const { data: lanc } = await supabase.from('lancamentos').select('*')
       .eq('familia_id', fid).gte('data', ini).lte('data', fim)
-
-    if (ctx.tipo === 'empresa' && ctx.empresaId) {
-      query = query.eq('empresa_id', ctx.empresaId)
-    } else {
-      query = query.is('empresa_id', null)
-    }
-
-    const { data: lanc } = await query
       .order('data', { ascending: false }).order('hora', { ascending: false })
-
     if (lanc) {
       setLancamentos(lanc)
       const s = new Set<string>()
@@ -186,39 +160,15 @@ export default function MovimentosPage() {
     }
   }
 
-  function trocarContexto(novo: ContextoAtivo) {
-    setContexto(novo)
-    salvarContexto(novo)
-    if (familiaIdRef.current) carregarLancamentos(familiaIdRef.current, undefined, undefined, novo)
-  }
-
-  async function handleSalvarEmpresa() {
-    if (!novaEmpresaNome.trim() || !novaEmpresaCnpj.trim()) return
-    setSalvandoEmpresa(true)
-    const { data, error } = await supabase.from('empresas').insert({
-      familia_id: familiaIdRef.current,
-      nome: novaEmpresaNome.trim(),
-      cnpj: novaEmpresaCnpj.replace(/\D/g, ''),
-    }).select().single()
-    setSalvandoEmpresa(false)
-    if (!error && data) {
-      setEmpresas(prev => [...prev, data])
-      setModalEmpresaOpen(false)
-      setNovaEmpresaNome('')
-      setNovaEmpresaCnpj('')
-      trocarContexto({ tipo: 'empresa', empresaId: data.id })
-    }
-  }
-
   function mudarMes(delta: number) {
     setMesRef(new Date(mesRef.getFullYear(), mesRef.getMonth() + delta, 1))
   }
 
   function abrirModalNovo() {
     setEditando(null)
-    setTipo('despesa'); setValor(''); setCategoria(contexto.tipo === 'empresa' ? CATEGORIAS_DESPESA_EMPRESA[0] : 'Alimentação')
+    setTipo('despesa'); setValor(''); setCategoria('Alimentação')
     setDataLanc(new Date().toISOString().split('T')[0])
-    setMembroForm(membroAtual); setDizimar(false)
+    setMembroForm(membroAtual); setDizimar(true)
     setObservacao(''); setParcelado(false); setNumParcelas('2'); setDiaParcela('1')
     setConfirmDelete(false)
     setModalOpen(true)
@@ -237,10 +187,8 @@ export default function MovimentosPage() {
 
   function handleTipo(t: 'despesa' | 'receita') {
     setTipo(t)
-    const catsDespesa = contexto.tipo === 'empresa' ? CATEGORIAS_DESPESA_EMPRESA : CATEGORIAS_DESPESA
-    const catsReceita = contexto.tipo === 'empresa' ? CATEGORIAS_RECEITA_EMPRESA : CATEGORIAS_RECEITA
-    setCategoria(t === 'despesa' ? catsDespesa[0] : catsReceita[0])
-    setDizimar(t === 'receita' && contexto.tipo === 'pessoal')
+    setCategoria(t === 'despesa' ? 'Alimentação' : 'Salário')
+    setDizimar(t === 'receita')
     setParcelado(false)
   }
 
@@ -252,7 +200,6 @@ export default function MovimentosPage() {
     const fid  = familiaIdRef.current
     const agora = new Date()
     const hora  = `${String(agora.getHours()).padStart(2,'0')}:${String(agora.getMinutes()).padStart(2,'0')}`
-    const empresaIdAtual = contexto.tipo === 'empresa' ? contexto.empresaId : null
 
     if (editando) {
       const { error } = await supabase.from('lancamentos').update({
@@ -278,7 +225,6 @@ export default function MovimentosPage() {
           categoria, membro: membroForm, data: dataStr, hora,
           dizimar: false,
           descricao: `${observacao ? observacao + ' ' : ''}Parcela ${i + 1}/${n}`,
-          empresa_id: empresaIdAtual,
         })
       }
       const { error } = await supabase.from('lancamentos').insert(inserts)
@@ -290,7 +236,6 @@ export default function MovimentosPage() {
         categoria, membro: membroForm, data: dataLanc, hora,
         dizimar: tipo === 'receita' ? dizimar : false,
         descricao: observacao || null,
-        empresa_id: empresaIdAtual,
       })
       setSalvando(false)
       if (!error) { setModalOpen(false); await carregarLancamentos(fid) }
@@ -309,10 +254,109 @@ export default function MovimentosPage() {
     }
   }
 
-  function iconeCategoria(l: any) {
-    const mapa = l.empresa_id ? ICONES_CAT_EMPRESA : ICONES_CAT
-    return mapa[l.categoria] || (l.tipo === 'receita' ? ArrowDownLeft : ArrowUpRight)
+  function abrirDfModalNovo() {
+    setDfEditando(null); setDfNome(''); setDfValor(''); setDfCategoria('Moradia'); setDfDia('5')
+    setDfVariavel(false)
+    setDfConfirmDelete(false); setDfModalOpen(true)
   }
+
+  function abrirDfModalEditar(df: any) {
+    setDfEditando(df); setDfNome(df.nome)
+    setDfValor(Number(df.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
+    setDfCategoria(df.categoria); setDfDia(String(df.dia_vencimento))
+    setDfVariavel(!!df.valor_variavel)
+    setDfConfirmDelete(false); setDfModalOpen(true)
+  }
+
+  async function handleSalvarDf() {
+    if (!dfNome.trim() || !dfValor) return
+    setDfSalvando(true)
+    const valorNum = parseFloat(dfValor.replace(/\./g, '').replace(',', '.'))
+    const diaNum   = Math.min(31, Math.max(1, parseInt(dfDia) || 1))
+    const fid = familiaIdRef.current
+
+    if (dfEditando) {
+      const { error } = await supabase.from('despesas_fixas').update({
+        nome: dfNome.trim(), valor: valorNum, categoria: dfCategoria, dia_vencimento: diaNum, valor_variavel: dfVariavel,
+      }).eq('id', dfEditando.id)
+      setDfSalvando(false)
+      if (!error) { setDfModalOpen(false); await recarregarDespesasFixas(fid) }
+    } else {
+      const { error } = await supabase.from('despesas_fixas').insert({
+        familia_id: fid, user_id: userId, nome: dfNome.trim(), valor: valorNum,
+        categoria: dfCategoria, dia_vencimento: diaNum, valor_variavel: dfVariavel, ativo: true,
+      })
+      setDfSalvando(false)
+      if (!error) { setDfModalOpen(false); await recarregarDespesasFixas(fid) }
+    }
+  }
+
+  async function handleDeletarDf() {
+    if (!dfEditando) return
+    if (!dfConfirmDelete) { setDfConfirmDelete(true); return }
+    setDfDeletando(true)
+    const { error } = await supabase.from('despesas_fixas').update({ ativo: false }).eq('id', dfEditando.id)
+    setDfDeletando(false)
+    if (!error) {
+      setDespesasFixas(prev => prev.filter((d: any) => d.id !== dfEditando.id))
+      setDfModalOpen(false)
+    }
+  }
+
+  function iniciarPagamento(df: any) {
+    if (df.valor_variavel) {
+      setDfPagando(df)
+      setValorPagar(Number(df.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
+      setPagarModalOpen(true)
+    } else {
+      efetivarPagamento(df, Number(df.valor))
+    }
+  }
+
+  async function efetivarPagamento(df: any, valor: number) {
+    setPagando(true)
+    const fid   = familiaIdRef.current
+    const agora = new Date()
+    const hora  = `${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}`
+    const dataStr = `${mesRef.getFullYear()}-${String(mesRef.getMonth() + 1).padStart(2, '0')}-${String(df.dia_vencimento).padStart(2, '0')}`
+    const { error } = await supabase.from('lancamentos').insert({
+      familia_id: fid, user_id: userId, tipo: 'despesa', valor,
+      categoria: df.categoria, membro: membroAtual, data: dataStr, hora,
+      dizimar: false, descricao: null, despesa_fixa_id: df.id,
+    })
+    if (!error) {
+      // Para despesas variáveis, o valor confirmado vira a nova referência do próximo mês
+      if (df.valor_variavel && valor !== Number(df.valor)) {
+        await supabase.from('despesas_fixas').update({ valor }).eq('id', df.id)
+        await recarregarDespesasFixas(fid)
+      }
+      await carregarLancamentos(fid)
+    }
+    setPagando(false)
+    setPagarModalOpen(false)
+  }
+
+  async function confirmarPagamentoVariavel() {
+    if (!dfPagando || !valorPagar) return
+    const valorNum = parseFloat(valorPagar.replace(/\./g, '').replace(',', '.'))
+    if (isNaN(valorNum) || valorNum <= 0) return
+    await efetivarPagamento(dfPagando, valorNum)
+  }
+
+  async function desfazerPagamento(df: any) {
+    if (!df.lancamento) return
+    const { error } = await supabase.from('lancamentos').delete().eq('id', df.lancamento.id)
+    if (!error) await carregarLancamentos(familiaIdRef.current)
+  }
+
+  const fixasDoMes = despesasFixas.map((df: any) => {
+    const lanc = lancamentos.find((l: any) => l.despesa_fixa_id === df.id)
+    const hoje = new Date()
+    const ehMesAtual = hoje.getFullYear() === mesRef.getFullYear() && hoje.getMonth() === mesRef.getMonth()
+    const atrasada = !lanc && ehMesAtual && hoje.getDate() > df.dia_vencimento
+    return { ...df, lancamento: lanc, pago: !!lanc, atrasada }
+  })
+  const totalFixasPendentes = fixasDoMes.filter((f: any) => !f.pago).reduce((s: number, f: any) => s + Number(f.valor), 0)
 
   const filtrados = lancamentos.filter(l => {
     if (filtro !== 'todos' && l.tipo !== filtro) return false
@@ -331,10 +375,215 @@ export default function MovimentosPage() {
   const totalDes = lancamentos.filter(l => l.tipo === 'despesa').reduce((s, l) => s + Number(l.valor), 0)
   const resultado = totalRec - totalDes
   const mesLabel  = `${MESES[mesRef.getMonth()]} ${mesRef.getFullYear()}`
-  const categorias = contexto.tipo === 'empresa'
-    ? (tipo === 'despesa' ? CATEGORIAS_DESPESA_EMPRESA : CATEGORIAS_RECEITA_EMPRESA)
-    : (tipo === 'despesa' ? CATEGORIAS_DESPESA : CATEGORIAS_RECEITA)
-  const iconesCategoriaModal = contexto.tipo === 'empresa' ? ICONES_CAT_EMPRESA : ICONES_CAT
+  const categorias = tipo === 'despesa' ? CATEGORIAS_DESPESA : CATEGORIAS_RECEITA
+
+  // Seção "Despesas Fixas" — compartilhada entre mobile e desktop
+  const despesasFixasSection = (isMob: boolean) => (
+    <div style={{ marginBottom: isMob ? '16px' : '24px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Repeat size={isMob ? 14 : 16} color="#64748B" strokeWidth={1.75} />
+          <span style={{ fontSize: isMob ? '13px' : '15px', fontWeight: 700, color: '#0B3B2E', letterSpacing: '-0.2px' }}>Despesas Fixas</span>
+          {totalFixasPendentes > 0 && (
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#EF4444', backgroundColor: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.25)', padding: '5px 12px', borderRadius: '999px' }}>
+              {fmt(totalFixasPendentes)} a pagar
+            </span>
+          )}
+        </div>
+        <button onClick={abrirDfModalNovo} className="df-new-btn"
+          style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 600, color: '#0B3B2E', background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: '10px', padding: '6px 12px', cursor: 'pointer' }}>
+          <Plus size={14} strokeWidth={2.5} /> Nova
+        </button>
+      </div>
+
+      {fixasDoMes.length === 0 ? (
+        <div style={{ backgroundColor: '#fff', border: '1px solid #ECEFF3', borderRadius: '20px', padding: '24px', textAlign: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 12px 40px rgba(0,0,0,0.07)' }}>
+          <p style={{ fontSize: '13px', color: '#94A3B8', margin: 0 }}>Nenhuma despesa fixa cadastrada.</p>
+        </div>
+      ) : (
+        <div style={{ backgroundColor: '#fff', border: '1px solid #ECEFF3', borderRadius: '20px', overflow: 'hidden', boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 12px 40px rgba(0,0,0,0.07)' }}>
+          {fixasDoMes.map((df: any, i: number) => {
+            const Icon = ICONES_CAT[df.categoria] || MoreHorizontal
+            return (
+              <div key={df.id} className="df-card"
+                style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: isMob ? '12px 14px' : '14px 20px', borderTop: i > 0 ? '1px solid #F1F5F9' : 'none' }}>
+                <button onClick={() => abrirDfModalEditar(df)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'rgba(11,59,46,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Icon size={15} color="#0B3B2E" strokeWidth={1.75} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <p style={{ fontSize: '13px', fontWeight: 600, color: '#111827', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{df.nome}</p>
+                      {df.valor_variavel && (
+                        <span style={{ fontSize: '9.5px', fontWeight: 700, color: '#94A3B8', border: '1px solid #E5E7EB', borderRadius: '5px', padding: '1px 5px', flexShrink: 0 }}>VARIÁVEL</span>
+                      )}
+                    </div>
+                    <p style={{ fontSize: '11px', color: '#94A3B8', margin: 0 }}>
+                      Vence dia {df.dia_vencimento} · {df.valor_variavel && !df.pago ? '~' : ''}{fmt(Number(df.valor))}
+                    </p>
+                  </div>
+                </button>
+                {df.pago ? (
+                  <button onClick={() => desfazerPagamento(df)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 14px', borderRadius: '999px', border: '1px solid rgba(47,179,106,0.25)', backgroundColor: 'rgba(47,179,106,0.12)', color: '#2FB36A', fontSize: '11px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
+                    <CheckCircle2 size={12} strokeWidth={2} /> Pago
+                  </button>
+                ) : (
+                  <button onClick={() => iniciarPagamento(df)}
+                    style={{ padding: '5px 14px', borderRadius: '999px', border: df.atrasada ? '1px solid rgba(239,68,68,0.25)' : '1px solid #E5E7EB', backgroundColor: df.atrasada ? 'rgba(239,68,68,0.10)' : '#F7F8FA', color: df.atrasada ? '#EF4444' : '#64748B', fontSize: '11px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
+                    {df.atrasada ? 'Atrasada' : 'A pagar'}
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+
+  // Conteúdo do modal de despesa fixa
+  const dfModalContent = (isMob: boolean) => (
+    <>
+      {isMob && <div style={{ width: '40px', height: '4px', borderRadius: '2px', backgroundColor: '#E2E8F0', margin: '12px auto 4px', flexShrink: 0 }} />}
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', borderBottom: '1px solid #F1F5F9', flexShrink: 0 }}>
+        <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0B3B2E', margin: 0, letterSpacing: '-0.3px' }}>
+          {dfEditando ? 'Editar despesa fixa' : 'Nova despesa fixa'}
+        </h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {dfEditando && (
+            <button onClick={handleDeletarDf} disabled={dfDeletando}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 700, border: 'none', cursor: 'pointer', backgroundColor: dfConfirmDelete ? '#EF4444' : 'rgba(239,68,68,0.10)', color: dfConfirmDelete ? '#fff' : '#DC2626', transition: 'all 0.15s ease' }}>
+              <Trash2 size={13} strokeWidth={2} />
+              {dfDeletando ? 'Deletando...' : dfConfirmDelete ? 'Confirmar' : 'Deletar'}
+            </button>
+          )}
+          <button onClick={() => setDfModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}>
+            <X size={20} strokeWidth={2} />
+          </button>
+        </div>
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto', padding: '18px 24px 8px' }}>
+
+        <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Nome</p>
+        <input value={dfNome} onChange={e => setDfNome(e.target.value)} placeholder="Ex: Aluguel" className="df-input"
+          style={{ width: '100%', height: '52px', padding: '0 16px', borderRadius: '14px', border: '1.5px solid #E5E7EB', backgroundColor: '#FAFAFA', fontSize: '14px', color: '#111827', marginBottom: '16px', boxSizing: 'border-box' }} />
+
+        <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Valor {dfVariavel ? 'de referência' : ''}</p>
+        <input
+          type="text" inputMode="numeric" value={dfValor} className="df-input"
+          onChange={e => {
+            const digits = e.target.value.replace(/\D/g, '')
+            const num = parseInt(digits || '0', 10)
+            setDfValor(digits === '' ? '' : (num / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
+          }}
+          placeholder="0,00"
+          style={{ width: '100%', height: '52px', padding: '0 16px', borderRadius: '14px', border: '1.5px solid #E5E7EB', backgroundColor: '#FAFAFA', fontSize: '14px', color: '#111827', marginBottom: '10px', boxSizing: 'border-box' }} />
+
+        <button onClick={() => setDfVariavel(!dfVariavel)}
+          style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '10px 14px', borderRadius: '12px', border: dfVariavel ? '1.5px solid #2FB36A' : '1.5px solid #E5E7EB', backgroundColor: dfVariavel ? '#F0FDF4' : '#FAFAFA', cursor: 'pointer', marginBottom: '16px', boxSizing: 'border-box' }}>
+          <div style={{ position: 'relative', width: '36px', height: '20px', borderRadius: '10px', backgroundColor: dfVariavel ? '#2FB36A' : '#E2E8F0', flexShrink: 0 }}>
+            <div style={{ position: 'absolute', top: '2px', left: dfVariavel ? '18px' : '2px', width: '16px', height: '16px', borderRadius: '50%', backgroundColor: '#fff', transition: 'left 0.2s' }} />
+          </div>
+          <div style={{ textAlign: 'left' }}>
+            <p style={{ fontSize: '13px', fontWeight: 700, color: dfVariavel ? '#0B3B2E' : '#111827', margin: 0 }}>Valor variável</p>
+            <p style={{ fontSize: '11px', color: '#94A3B8', margin: 0 }}>
+              {dfVariavel ? 'Você confirma o valor ao marcar como pago' : 'O valor é sempre o mesmo (ex: aluguel, internet)'}
+            </p>
+          </div>
+        </button>
+
+        <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Categoria</p>
+        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', marginBottom: '16px', paddingBottom: '4px' }}>
+          {CATEGORIAS_DESPESA.map(c => {
+            const Icon = ICONES_CAT[c] || MoreHorizontal
+            const ativo = dfCategoria === c
+            return (
+              <button key={c} onClick={() => setDfCategoria(c)} className="df-chip"
+                style={{ padding: '8px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', border: ativo ? '1.5px solid #2FB36A' : '1.5px solid #E5E7EB', backgroundColor: ativo ? '#F0FDF4' : '#fff', color: ativo ? '#0B3B2E' : '#64748B', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flexShrink: 0, minWidth: '64px' }}>
+                <Icon size={14} strokeWidth={1.75} color={ativo ? '#2FB36A' : '#94A3B8'} />
+                {c}
+              </button>
+            )
+          })}
+        </div>
+
+        <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Dia de vencimento</p>
+        <input type="number" min="1" max="31" value={dfDia} onChange={e => setDfDia(e.target.value)} className="df-input"
+          style={{ width: '100%', height: '52px', padding: '0 16px', borderRadius: '14px', border: '1.5px solid #E5E7EB', backgroundColor: '#FAFAFA', fontSize: '14px', color: '#111827', marginBottom: '8px', boxSizing: 'border-box' }} />
+
+        {dfConfirmDelete && (
+          <p style={{ fontSize: '12px', color: '#EF4444', textAlign: 'center', marginBottom: '4px' }}>
+            Toque em "Confirmar" para deletar permanentemente.
+          </p>
+        )}
+      </div>
+
+      <div style={{ padding: '14px 24px 24px', borderTop: '1px solid #F1F5F9', backgroundColor: '#fff', flexShrink: 0 }}>
+        <button onClick={handleSalvarDf} disabled={dfSalvando || !dfNome.trim() || !dfValor} className="df-cta"
+          style={{
+            width: '100%', height: '56px', borderRadius: '16px', border: 'none', fontSize: '15px', fontWeight: 700, color: '#fff',
+            cursor: dfSalvando || !dfNome.trim() || !dfValor ? 'not-allowed' : 'pointer',
+            background: 'linear-gradient(135deg, #07271F 0%, #145A45 100%)',
+            boxShadow: '0 4px 16px rgba(11,59,46,0.3)',
+            opacity: dfSalvando || !dfNome.trim() || !dfValor ? 0.6 : 1,
+          }}>
+          {dfSalvando ? 'Salvando...' : dfEditando ? 'Salvar alterações' : 'Criar despesa fixa'}
+        </button>
+      </div>
+    </>
+  )
+
+  // Conteúdo do modal de confirmação de pagamento (despesas variáveis)
+  const pagarModalContent = (isMob: boolean) => (
+    <>
+      {isMob && <div style={{ width: '40px', height: '4px', borderRadius: '2px', backgroundColor: '#E2E8F0', margin: '12px auto 4px', flexShrink: 0 }} />}
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', borderBottom: '1px solid #F1F5F9', flexShrink: 0 }}>
+        <div>
+          <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0B3B2E', margin: 0, letterSpacing: '-0.3px' }}>Confirmar pagamento</h2>
+          <p style={{ fontSize: '12px', color: '#94A3B8', margin: '2px 0 0' }}>{dfPagando?.nome}</p>
+        </div>
+        <button onClick={() => setPagarModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}>
+          <X size={20} strokeWidth={2} />
+        </button>
+      </div>
+
+      <div style={{ padding: '18px 24px 8px' }}>
+        <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>
+          Valor pago esse mês
+        </p>
+        <input
+          type="text" inputMode="numeric" value={valorPagar} className="df-input" autoFocus
+          onChange={e => {
+            const digits = e.target.value.replace(/\D/g, '')
+            const num = parseInt(digits || '0', 10)
+            setValorPagar(digits === '' ? '' : (num / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
+          }}
+          placeholder="0,00"
+          style={{ width: '100%', height: '56px', padding: '0 16px', borderRadius: '14px', border: '1.5px solid #E5E7EB', backgroundColor: '#FAFAFA', fontSize: '20px', fontWeight: 700, color: '#111827', marginBottom: '8px', boxSizing: 'border-box' }} />
+        <p style={{ fontSize: '11px', color: '#94A3B8', margin: '0 0 16px' }}>
+          Essa despesa é variável — o valor confirmado vira a referência do próximo mês.
+        </p>
+      </div>
+
+      <div style={{ padding: '14px 24px 24px', borderTop: '1px solid #F1F5F9', backgroundColor: '#fff', flexShrink: 0 }}>
+        <button onClick={confirmarPagamentoVariavel} disabled={pagando || !valorPagar} className="df-cta"
+          style={{
+            width: '100%', height: '56px', borderRadius: '16px', border: 'none', fontSize: '15px', fontWeight: 700, color: '#fff',
+            cursor: pagando || !valorPagar ? 'not-allowed' : 'pointer',
+            background: 'linear-gradient(135deg, #07271F 0%, #145A45 100%)',
+            boxShadow: '0 4px 16px rgba(11,59,46,0.3)',
+            opacity: pagando || !valorPagar ? 0.6 : 1,
+          }}>
+          {pagando ? 'Registrando...' : 'Confirmar pagamento'}
+        </button>
+      </div>
+    </>
+  )
 
   // Conteúdo do modal compartilhado
   const modalContent = (isMob: boolean) => (
@@ -363,21 +612,6 @@ export default function MovimentosPage() {
 
       {/* Scroll area */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px 8px' }}>
-
-        {/* Contexto (Pessoal / Empresa) — não muda em edição, só em lançamento novo */}
-        {!editando && (
-          <div style={{ marginBottom: '10px' }}>
-            <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Lançando em</p>
-            <ContextSwitcher
-              variant="compact"
-              familiaNome={familiaNome || 'Família'}
-              empresas={empresas}
-              contextoAtivo={contexto}
-              onTrocar={trocarContexto}
-              onAdicionarEmpresa={() => setModalEmpresaOpen(true)}
-            />
-          </div>
-        )}
 
         {/* Tipo */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
@@ -419,7 +653,7 @@ export default function MovimentosPage() {
         <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Categoria</p>
         <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', marginBottom: '10px', paddingBottom: '4px' }}>
           {categorias.map(c => {
-            const Icon = iconesCategoriaModal[c] || MoreHorizontal
+            const Icon = ICONES_CAT[c] || MoreHorizontal
             return (
               <button key={c} onClick={() => setCategoria(c)}
                 style={{ padding: '8px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 500, cursor: 'pointer', border: `1px solid ${categoria === c ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: categoria === c ? '#F0FDF4' : '#fff', color: categoria === c ? '#0E3B2E' : '#64748B', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flexShrink: 0, minWidth: '64px' }}>
@@ -515,19 +749,22 @@ export default function MovimentosPage() {
 
   return (
     <>
+      <style jsx>{`
+        .df-card { transition: background-color 0.15s ease; }
+        .df-card:hover { background-color: #F7F8FA; }
+        .df-new-btn { transition: all 0.15s ease; }
+        .df-new-btn:hover { border-color: #2FB36A !important; background-color: #F0FDF4 !important; color: #0B3B2E !important; }
+        .df-chip { transition: all 0.15s ease; }
+        .df-chip:hover { border-color: #2FB36A; }
+        .df-input { transition: all 0.2s ease; }
+        .df-input:focus { border-color: #2FB36A !important; background-color: #fff !important; box-shadow: 0 0 0 3px rgba(47,179,106,0.12); outline: none; }
+        .df-cta { transition: all 0.15s ease; }
+        .df-cta:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(11,59,46,0.35); }
+      `}</style>
+
       {/* ── MOBILE ── */}
       <div className="lg:hidden" style={{ backgroundColor: '#F8FAFC', minHeight: '100vh', paddingBottom: '100px' }}>
         <div style={{ backgroundColor: '#0E3B2E', padding: '20px 20px 36px' }}>
-          <div style={{ marginBottom: '14px' }}>
-            <ContextSwitcher
-              variant="header"
-              familiaNome={familiaNome || 'Família'}
-              empresas={empresas}
-              contextoAtivo={contexto}
-              onTrocar={trocarContexto}
-              onAdicionarEmpresa={() => setModalEmpresaOpen(true)}
-            />
-          </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <h1 style={{ fontSize: '18px', fontWeight: 600, color: '#fff', margin: 0 }}>Fluxo Patrimonial</h1>
@@ -556,10 +793,14 @@ export default function MovimentosPage() {
               </div>
               <p style={{ fontSize: '11px', fontWeight: 500, color: '#64748B', marginBottom: '4px' }}>{c.label}</p>
               <p style={{ fontSize: '13px', fontWeight: 600, color: c.cor, lineHeight: 1.2 }}>
-                {loading ? '...' : fmtOculto(Math.abs(c.val), ocultarValores)}
+                {loading ? '...' : `R$ ${Math.abs(c.val).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
               </p>
             </div>
           ))}
+        </div>
+
+        <div style={{ padding: '0 16px' }}>
+          {despesasFixasSection(true)}
         </div>
 
         <div style={{ display: 'flex', gap: '8px', padding: '0 16px 8px', overflowX: 'auto' }}>
@@ -593,12 +834,12 @@ export default function MovimentosPage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', padding: '0 4px' }}>
                   <span style={{ fontSize: '11px', fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{formatDiaLabel(dia)}</span>
                   <span style={{ fontSize: '11px', fontWeight: 600, color: totalDia >= 0 ? '#10B981' : '#EF4444' }}>
-                    {totalDia >= 0 ? '+' : '-'} {fmtOculto(Math.abs(totalDia), ocultarValores)}
+                    {totalDia >= 0 ? '+' : '-'} {fmt(Math.abs(totalDia))}
                   </span>
                 </div>
                 <div style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', overflow: 'hidden' }}>
                   {itens.map((l: any, i: number) => {
-                    const Icon = iconeCategoria(l)
+                    const Icon = ICONES_CAT[l.categoria] || (l.tipo === 'receita' ? ArrowDownLeft : ArrowUpRight)
                     return (
                       <button key={l.id} onClick={() => abrirModalEditar(l)}
                         style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderTop: i > 0 ? '1px solid #F1F5F9' : 'none', backgroundColor: 'transparent', border: i > 0 ? '1px solid #F1F5F9' : 'none', borderLeft: 'none', borderRight: 'none', borderBottom: 'none', cursor: 'pointer', textAlign: 'left' }}>
@@ -613,7 +854,7 @@ export default function MovimentosPage() {
                           </div>
                         </div>
                         <p style={{ fontSize: '14px', fontWeight: 600, color: l.tipo === 'receita' ? '#10B981' : '#EF4444', flexShrink: 0, margin: 0 }}>
-                          {l.tipo === 'receita' ? '+' : '-'} {fmtOculto(Number(l.valor), ocultarValores)}
+                          {l.tipo === 'receita' ? '+' : '-'} {fmt(Number(l.valor))}
                         </p>
                         <div style={{ width: '28px', height: '28px', borderRadius: '8px', backgroundColor: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                           <Pencil size={12} color="#64748B" strokeWidth={1.75} />
@@ -637,16 +878,6 @@ export default function MovimentosPage() {
       <div className="hidden lg:block p-8 max-w-[1440px] mx-auto" style={{ backgroundColor: '#F8FAFC' }}>
         <div className="flex items-center justify-between mb-6">
           <div>
-            <div style={{ marginBottom: '10px' }}>
-              <ContextSwitcher
-                variant="compact"
-                familiaNome={familiaNome || 'Família'}
-                empresas={empresas}
-                contextoAtivo={contexto}
-                onTrocar={trocarContexto}
-                onAdicionarEmpresa={() => setModalEmpresaOpen(true)}
-              />
-            </div>
             <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', letterSpacing: '-0.5px' }}>Fluxo Patrimonial</h1>
             <p className="text-sm mt-1" style={{ color: '#64748B' }}>Acompanhe receitas e despesas{familiaNome ? ` da família ${familiaNome}` : ''}</p>
           </div>
@@ -678,10 +909,12 @@ export default function MovimentosPage() {
                 <c.Icon size={19} color={c.cor} strokeWidth={1.75} />
               </div>
               <p className="text-sm font-medium mb-1" style={{ color: '#64748B' }}>{c.label}</p>
-              <p className="text-2xl font-semibold" style={{ color: c.cor, letterSpacing: '-0.5px' }}>{loading ? '...' : fmtOculto(c.val, ocultarValores)}</p>
+              <p className="text-2xl font-semibold" style={{ color: c.cor, letterSpacing: '-0.5px' }}>{loading ? '...' : fmt(c.val)}</p>
             </div>
           ))}
         </div>
+
+        {despesasFixasSection(false)}
 
         <div className="flex items-center gap-3 mb-5 flex-wrap">
           <div className="flex items-center gap-1 p-1 rounded-xl" style={{ backgroundColor: '#F1F5F9' }}>
@@ -726,11 +959,11 @@ export default function MovimentosPage() {
                 <div className="flex items-center justify-between px-6 py-3" style={{ backgroundColor: '#F8FAFC' }}>
                   <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#64748B' }}>{formatDiaLabel(dia)}</span>
                   <span className="text-xs font-semibold" style={{ color: totalDia >= 0 ? '#10B981' : '#EF4444' }}>
-                    {totalDia >= 0 ? '+' : '-'} {fmtOculto(Math.abs(totalDia), ocultarValores)}
+                    {totalDia >= 0 ? '+' : '-'} {fmt(Math.abs(totalDia))}
                   </span>
                 </div>
                 {itens.map((l: any) => {
-                  const Icon = iconeCategoria(l)
+                  const Icon = ICONES_CAT[l.categoria] || (l.tipo === 'receita' ? ArrowDownLeft : ArrowUpRight)
                   return (
                     <button key={l.id} onClick={() => abrirModalEditar(l)}
                       className="w-full flex items-center gap-3 px-6 py-3.5 border-t text-left hover:bg-gray-50"
@@ -748,7 +981,7 @@ export default function MovimentosPage() {
                         </div>
                       </div>
                       <p className="font-semibold text-sm flex-shrink-0" style={{ color: l.tipo === 'receita' ? '#10B981' : '#EF4444' }}>
-                        {l.tipo === 'receita' ? '+' : '-'} {fmtOculto(Number(l.valor), ocultarValores)}
+                        {l.tipo === 'receita' ? '+' : '-'} {fmt(Number(l.valor))}
                       </p>
                       <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
                         style={{ backgroundColor: '#F1F5F9' }}>
@@ -763,7 +996,7 @@ export default function MovimentosPage() {
         </div>
       </div>
 
-      {/* Modal Mobile — lançamento */}
+      {/* Modal Mobile */}
       {modalOpen && isMobile && (
         <div onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}
           style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
@@ -773,7 +1006,7 @@ export default function MovimentosPage() {
         </div>
       )}
 
-      {/* Modal Desktop — lançamento */}
+      {/* Modal Desktop */}
       {modalOpen && !isMobile && (
         <div onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}
           style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
@@ -783,51 +1016,42 @@ export default function MovimentosPage() {
         </div>
       )}
 
-      {/* Modal — Nova empresa (CNPJ) */}
-      {modalEmpresaOpen && (
-        <div onClick={e => { if (e.target === e.currentTarget) setModalEmpresaOpen(false) }}
-          style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)', padding: '20px' }}>
-          <div style={{ width: '100%', maxWidth: '420px', backgroundColor: '#fff', borderRadius: '20px', padding: '24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '32px', height: '32px', borderRadius: '9px', backgroundColor: '#334155', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Building2 size={16} color="#fff" strokeWidth={2} />
-                </div>
-                <h2 style={{ fontSize: '17px', fontWeight: 600, color: '#0F172A', margin: 0 }}>Nova empresa</h2>
-              </div>
-              <button onClick={() => setModalEmpresaOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}>
-                <X size={20} strokeWidth={2} />
-              </button>
-            </div>
+      {/* Modal Despesa Fixa — Mobile */}
+      {dfModalOpen && isMobile && (
+        <div onClick={e => { if (e.target === e.currentTarget) setDfModalOpen(false) }}
+          style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
+          <div style={{ width: '100%', backgroundColor: '#fff', borderRadius: '28px 28px 0 0', display: 'flex', flexDirection: 'column', maxHeight: 'calc(85vh - 65px)', marginBottom: '65px' }}>
+            {dfModalContent(true)}
+          </div>
+        </div>
+      )}
 
-            <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Nome da empresa</p>
-            <input
-              type="text" value={novaEmpresaNome} onChange={e => setNovaEmpresaNome(e.target.value)}
-              placeholder="Ex: Studio Aline ME"
-              style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #E5E7EB', fontSize: '14px', color: '#0F172A', outline: 'none', marginBottom: '14px', boxSizing: 'border-box', backgroundColor: '#FAFAFA' }}
-            />
+      {/* Modal Despesa Fixa — Desktop */}
+      {dfModalOpen && !isMobile && (
+        <div onClick={e => { if (e.target === e.currentTarget) setDfModalOpen(false) }}
+          style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
+          <div style={{ width: '480px', backgroundColor: '#fff', borderRadius: '20px', display: 'flex', flexDirection: 'column', maxHeight: '90vh', margin: 'auto' }}>
+            {dfModalContent(false)}
+          </div>
+        </div>
+      )}
 
-            <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>CNPJ</p>
-            <input
-              type="text" inputMode="numeric" value={novaEmpresaCnpj}
-              onChange={e => setNovaEmpresaCnpj(maskCnpj(e.target.value))}
-              placeholder="00.000.000/0000-00"
-              style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #E5E7EB', fontSize: '14px', color: '#0F172A', outline: 'none', marginBottom: '20px', boxSizing: 'border-box', backgroundColor: '#FAFAFA' }}
-            />
+      {/* Modal Confirmar Pagamento — Mobile */}
+      {pagarModalOpen && isMobile && (
+        <div onClick={e => { if (e.target === e.currentTarget) setPagarModalOpen(false) }}
+          style={{ position: 'fixed', inset: 0, zIndex: 55, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
+          <div style={{ width: '100%', backgroundColor: '#fff', borderRadius: '28px 28px 0 0', display: 'flex', flexDirection: 'column', marginBottom: '65px' }}>
+            {pagarModalContent(true)}
+          </div>
+        </div>
+      )}
 
-            <button
-              onClick={handleSalvarEmpresa}
-              disabled={salvandoEmpresa || !novaEmpresaNome.trim() || !novaEmpresaCnpj.trim()}
-              style={{
-                width: '100%', height: '52px', borderRadius: '14px', border: 'none',
-                fontSize: '15px', fontWeight: 600, color: '#fff',
-                cursor: salvandoEmpresa ? 'not-allowed' : 'pointer',
-                background: 'linear-gradient(135deg, #07271F 0%, #145A45 100%)',
-                boxShadow: '0 4px 16px rgba(11,59,46,0.3)',
-                opacity: (salvandoEmpresa || !novaEmpresaNome.trim() || !novaEmpresaCnpj.trim()) ? 0.6 : 1,
-              }}>
-              {salvandoEmpresa ? 'Salvando...' : 'Criar empresa'}
-            </button>
+      {/* Modal Confirmar Pagamento — Desktop */}
+      {pagarModalOpen && !isMobile && (
+        <div onClick={e => { if (e.target === e.currentTarget) setPagarModalOpen(false) }}
+          style={{ position: 'fixed', inset: 0, zIndex: 55, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
+          <div style={{ width: '420px', backgroundColor: '#fff', borderRadius: '20px', display: 'flex', flexDirection: 'column', margin: 'auto' }}>
+            {pagarModalContent(false)}
           </div>
         </div>
       )}
