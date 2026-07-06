@@ -158,10 +158,6 @@ export default function DashboardPage() {
   const crescimentoValor = totalEco - mesAnteriorVal
   const crescimentoPct   = mesAnteriorVal !== 0 ? (crescimentoValor / Math.abs(mesAnteriorVal)) * 100 : 0
   const dizimoAtivo    = dizimista === true
-
-  const mediaEvolucao = evolucao.length > 0 ? Math.round((evolucao.reduce((s, e) => s + e.valor, 0) / evolucao.length) * 100) / 100 : 0
-  const melhorMes = evolucao.length > 0 ? evolucao.reduce((a, b) => b.valor > a.valor ? b : a) : null
-  const piorMes   = evolucao.length > 0 ? evolucao.reduce((a, b) => b.valor < a.valor ? b : a) : null
   const dizimoRestante = Math.max(valorDizimo - dizimoPago, 0)
   const dizimoPctPago  = valorDizimo > 0 ? Math.min(Math.round((dizimoPago / valorDizimo) * 100), 100) : 0
   const dizimoQuitado  = dizimoPago >= valorDizimo && valorDizimo > 0
@@ -596,57 +592,59 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Evolução + Saúde Financeira */}
+          {/* Metas + Saúde Financeira */}
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px', marginBottom: '10px', alignItems: 'start' }}>
             <div style={{
               borderRadius: '20px', padding: '24px', backgroundColor: '#fff',
               border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
             }}>
-              <h2 style={{ fontSize: '14px', fontWeight: 600, color: '#0B1F18', marginBottom: '2px', letterSpacing: '-0.2px' }}>Resultado Mensal</h2>
-              <p style={{ fontSize: '12px', color: '#64748B', marginBottom: '16px' }}>Receitas − despesas · últimos 6 meses</p>
-              <ResponsiveContainer width="100%" height={110}>
-                <AreaChart data={evolucao}>
-                  <defs>
-                    <linearGradient id="evoGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#2F8F68" stopOpacity={0.16} />
-                      <stop offset="100%" stopColor="#2F8F68" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="0" stroke="#F1F5F9" vertical={false} />
-                  <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
-                  <Tooltip formatter={(v: any) => fmt(v)} labelStyle={{ color: '#0F172A', fontWeight: 600 }}
-                    contentStyle={{ borderRadius: '14px', border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 32px rgba(0,0,0,0.1)' }} />
-                  <Area type="monotone" dataKey="valor" stroke="#2F8F68" strokeWidth={3} fill="url(#evoGrad)"
-                    dot={{ fill: '#fff', stroke: '#2F8F68', strokeWidth: 2, r: 4 }}
-                    activeDot={{ fill: '#2F8F68', r: 7, strokeWidth: 0 }}
-                    animationDuration={600}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '20px', paddingTop: '18px', borderTop: '1px solid #F1F5F9' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: metas.length === 0 ? '0' : '16px' }}>
                 <div>
-                  <p style={{ fontSize: '11px', color: '#94A3B8', marginBottom: '4px' }}>Média do período</p>
-                  <p style={{ fontSize: '15px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.3px' }}>
-                    {loading ? '...' : fmtOculto(mediaEvolucao, ocultar)}
-                  </p>
+                  <h2 style={{ fontSize: '14px', fontWeight: 600, color: '#0B1F18', marginBottom: '2px', letterSpacing: '-0.2px' }}>Metas da Família</h2>
+                  <p style={{ fontSize: '12px', color: '#64748B' }}>Progresso dos objetivos</p>
                 </div>
-                <div>
-                  <p style={{ fontSize: '11px', color: '#94A3B8', marginBottom: '4px' }}>Melhor mês</p>
-                  <p style={{ fontSize: '15px', fontWeight: 700, color: '#2F8F68', letterSpacing: '-0.3px' }}>
-                    {loading || !melhorMes ? '...' : fmtOculto(melhorMes.valor, ocultar)}
-                  </p>
-                  {melhorMes && <p style={{ fontSize: '11px', color: '#94A3B8', marginTop: '2px' }}>{melhorMes.mes}</p>}
-                </div>
-                <div>
-                  <p style={{ fontSize: '11px', color: '#94A3B8', marginBottom: '4px' }}>Pior mês</p>
-                  <p style={{ fontSize: '15px', fontWeight: 700, color: piorMes && piorMes.valor < 0 ? '#DC2626' : '#0B1F18', letterSpacing: '-0.3px' }}>
-                    {loading || !piorMes ? '...' : fmtOculto(piorMes.valor, ocultar)}
-                  </p>
-                  {piorMes && <p style={{ fontSize: '11px', color: '#94A3B8', marginTop: '2px' }}>{piorMes.mes}</p>}
-                </div>
+                <a href="/dashboard/metas" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px', fontWeight: 600, color: '#145A45', textDecoration: 'none', flexShrink: 0 }}>
+                  Ver todas <ArrowRight size={13} strokeWidth={2} />
+                </a>
               </div>
+              {metas.length === 0 ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingTop: '18px', marginTop: '18px', borderTop: '1px solid #F1F5F9' }}>
+                  <Target size={18} color="#E2E8F0" strokeWidth={1.5} />
+                  <p style={{ fontSize: '12.5px', color: '#94A3B8', flex: 1 }}>Nenhuma meta criada ainda.</p>
+                  <a href="/dashboard/metas" style={{ fontSize: '13px', fontWeight: 600, color: '#145A45', textDecoration: 'none', whiteSpace: 'nowrap' }}>Criar primeira meta →</a>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {metas.map((m: any) => {
+                    const pct  = Math.min(Math.round((Number(m.valor_atual) / Number(m.valor_alvo)) * 100), 100)
+                    const Icon = ICONES_META[m.icone] || Target
+                    const cor  = m.cor || '#145A45'
+                    return (
+                      <div key={m.id} style={{
+                        display: 'flex', alignItems: 'center', gap: '12px',
+                        borderRadius: '12px', padding: '10px', border: '1px solid rgba(15,23,42,0.05)',
+                        transition: 'all 0.2s',
+                      }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 24px rgba(15,23,42,0.06)' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none' }}
+                      >
+                        <div style={{ width: '40px', height: '40px', borderRadius: '12px', flexShrink: 0, backgroundColor: cor + '18', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Icon size={17} color={cor} strokeWidth={1.75} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                            <p style={{ fontSize: '13.5px', fontWeight: 600, color: '#0B1F18', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.nome}</p>
+                            <span style={{ fontSize: '13px', fontWeight: 700, color: cor, flexShrink: 0, marginLeft: '8px' }}>{pct}%</span>
+                          </div>
+                          <div style={{ height: '5px', borderRadius: '4px', overflow: 'hidden', backgroundColor: '#F1F5F9' }}>
+                            <div style={{ height: '100%', width: `${pct}%`, backgroundColor: cor, borderRadius: '4px', transition: 'width 0.4s ease' }} />
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
 
             <div style={{
@@ -699,60 +697,6 @@ export default function DashboardPage() {
                 Ver detalhes
               </a>
             </div>
-          </div>
-
-          {/* Metas */}
-          <div style={{
-            borderRadius: '20px', padding: metas.length === 0 ? '20px 28px' : '28px', marginBottom: '24px', backgroundColor: '#fff',
-            border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: metas.length === 0 ? '0' : '24px' }}>
-              <div>
-                <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#0B1F18', letterSpacing: '-0.3px' }}>Metas da Família</h2>
-                <p style={{ fontSize: '12px', color: '#64748B', marginTop: '1px' }}>Progresso dos objetivos</p>
-              </div>
-              <a href="/dashboard/metas" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13.5px', fontWeight: 600, color: '#145A45', textDecoration: 'none' }}>
-                Ver todas <ArrowRight size={13} strokeWidth={2} />
-              </a>
-            </div>
-            {metas.length === 0 ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingTop: '18px', marginTop: '18px', borderTop: '1px solid #F1F5F9' }}>
-                <Target size={18} color="#E2E8F0" strokeWidth={1.5} />
-                <p style={{ fontSize: '12.5px', color: '#94A3B8', flex: 1 }}>Nenhuma meta criada ainda.</p>
-                <a href="/dashboard/metas" style={{ fontSize: '13px', fontWeight: 600, color: '#145A45', textDecoration: 'none', whiteSpace: 'nowrap' }}>Criar primeira meta →</a>
-              </div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                {metas.map((m: any) => {
-                  const pct  = Math.min(Math.round((Number(m.valor_atual) / Number(m.valor_alvo)) * 100), 100)
-                  const Icon = ICONES_META[m.icone] || Target
-                  const cor  = m.cor || '#145A45'
-                  return (
-                    <div key={m.id} style={{
-                      borderRadius: '10px', padding: '10px', border: '1px solid rgba(15,23,42,0.05)',
-                      transition: 'all 0.2s',
-                    }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 24px rgba(15,23,42,0.06)' }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none' }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
-                        <div style={{ width: '40px', height: '40px', borderRadius: '12px', flexShrink: 0, backgroundColor: cor + '18', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Icon size={17} color={cor} strokeWidth={1.75} />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ fontSize: '14px', fontWeight: 600, color: '#0B1F18', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.nome}</p>
-                          <p style={{ fontSize: '12px', color: '#94A3B8' }}>{fmtOculto(Number(m.valor_atual), ocultar)} de {fmtOculto(Number(m.valor_alvo), ocultar)}</p>
-                        </div>
-                        <span style={{ fontSize: '14px', fontWeight: 700, color: cor, flexShrink: 0 }}>{pct}%</span>
-                      </div>
-                      <div style={{ height: '6px', borderRadius: '4px', overflow: 'hidden', backgroundColor: '#F1F5F9' }}>
-                        <div style={{ height: '100%', width: `${pct}%`, backgroundColor: cor, borderRadius: '4px', transition: 'width 0.4s ease' }} />
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
           </div>
 
           {/* Categorias + Lançamentos */}
