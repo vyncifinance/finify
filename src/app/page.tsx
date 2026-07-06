@@ -7,8 +7,8 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import {
   Eye, EyeOff, Lock, Shield, RefreshCw, Smartphone,
-  Users, TrendingUp, Target, Home, BarChart2, FileText,
-  ArrowRight, Check
+  Users, Home, BarChart2, FileText,
+  ArrowRight, Play
 } from 'lucide-react'
 
 export default function LoginPage() {
@@ -156,28 +156,47 @@ export default function LoginPage() {
                 Organize seu patrimônio, acompanhe seus objetivos e construa um futuro financeiro sólido.
               </p>
 
-              {/* Benefícios */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {[
-                  { Icon: BarChart2, title: 'Visão completa', desc: 'Bens, investimentos e dívidas em um único lugar.' },
-                  { Icon: Shield,    title: 'Segurança',      desc: 'Criptografia bancária e autenticação segura.' },
-                  { Icon: Target,    title: 'Planejamento',   desc: 'Metas patrimoniais e acompanhamento em tempo real.' },
-                ].map(({ Icon, title, desc }) => (
-                  <div key={title} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                    <div style={{
-                      width: '32px', height: '32px', borderRadius: '9px', flexShrink: 0,
-                      backgroundColor: 'rgba(47,179,106,0.12)',
-                      border: '1px solid rgba(47,179,106,0.2)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
-                      <Icon size={15} color="#2FB36A" strokeWidth={1.75} />
-                    </div>
-                    <div>
-                      <p style={{ fontSize: '13px', fontWeight: 600, color: '#fff', marginBottom: '2px' }}>{title}</p>
-                      <p style={{ fontSize: '11.5px', color: 'rgba(255,255,255,0.38)', lineHeight: 1.5 }}>{desc}</p>
-                    </div>
-                  </div>
-                ))}
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '32px' }}>
+                <a href="/cadastro" style={{
+                  padding: '13px 22px', borderRadius: '12px',
+                  backgroundColor: '#2FB36A', color: '#07271F',
+                  fontSize: '14px', fontWeight: 600, textDecoration: 'none',
+                  transition: 'all 0.15s',
+                }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(-1px)' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(0)' }}
+                >
+                  Criar conta gratuita
+                </a>
+                <a href="#" style={{
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                  padding: '13px 22px', borderRadius: '12px',
+                  backgroundColor: 'transparent', color: '#fff',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  fontSize: '14px', fontWeight: 600, textDecoration: 'none',
+                  transition: 'all 0.15s',
+                }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = 'rgba(255,255,255,0.4)' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = 'rgba(255,255,255,0.2)' }}
+                >
+                  <Play size={13} fill="currentColor" strokeWidth={0} />
+                  Ver demonstração
+                </a>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ display: 'flex' }}>
+                  {['#D97757', '#5B8DEF', '#9B7FE0', '#E0B860'].map((cor, i) => (
+                    <div key={cor} style={{
+                      width: '28px', height: '28px', borderRadius: '50%',
+                      backgroundColor: cor, border: '2px solid #0A342A',
+                      marginLeft: i === 0 ? 0 : '-8px',
+                    }} />
+                  ))}
+                </div>
+                <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)' }}>
+                  Mais de <strong style={{ color: '#fff' }}>1.200 famílias</strong> confiam na Finify
+                </span>
               </div>
             </div>
 
@@ -293,36 +312,6 @@ export default function LoginPage() {
                 <FileText size={20} color="#58D68D" strokeWidth={1.5} />
               </div>
             </div>
-          </div>
-
-          {/* Stats */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '10px' }}>
-            {[
-              { Icon: Users,      val: '1.2K+',  label: 'Famílias ativas' },
-              { Icon: TrendingUp, val: 'R$12M+', label: 'Patrimônio gerenciado' },
-              { Icon: Shield,     val: '98%',    label: 'Metas concluídas' },
-            ].map(({ Icon, val, label }) => (
-              <div key={label} style={{
-                display: 'flex', alignItems: 'center', gap: '10px',
-                padding: '14px 14px',
-                borderRadius: '14px',
-                backgroundColor: 'rgba(255,255,255,0.04)',
-                border: '1px solid rgba(255,255,255,0.07)',
-                backdropFilter: 'blur(8px)',
-              }}>
-                <div style={{
-                  width: '30px', height: '30px', borderRadius: '8px', flexShrink: 0,
-                  backgroundColor: 'rgba(47,179,106,0.12)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <Icon size={14} color="#2FB36A" strokeWidth={1.75} />
-                </div>
-                <div>
-                  <p style={{ fontSize: '17px', fontWeight: 700, color: '#fff', letterSpacing: '-0.4px', lineHeight: 1.1 }}>{val}</p>
-                  <p style={{ fontSize: '9.5px', color: 'rgba(255,255,255,0.38)', marginTop: '1px' }}>{label}</p>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </div>
