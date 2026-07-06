@@ -103,7 +103,10 @@ export default function LoginPage() {
 
   return (
     <div style={{
-      minHeight: '100vh', display: 'flex',
+      height: `${100 / parseFloat(zoom)}vh`,
+      zoom,
+      overflow: 'hidden',
+      display: 'flex',
       fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       opacity: mounted ? 1 : 0, transition: 'opacity 0.4s ease',
     }}>
