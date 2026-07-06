@@ -67,6 +67,8 @@ export default function DashboardPage() {
   const [metas, setMetas]       = useState<any[]>([])
   const [lancamentos, setLancamentos] = useState<any[]>([])
   const [evolucao, setEvolucao]       = useState<any[]>([])
+  const [bens, setBens]               = useState<any[]>([])
+  const [investSaldo, setInvestSaldo] = useState(0)
   const [dizimista, setDizimista]     = useState(true)
   const [baseDizimo, setBaseDizimo]   = useState(0)
   const [valorDizimo, setValorDizimo] = useState(0)
@@ -128,16 +130,27 @@ export default function DashboardPage() {
       })))
     }
 
+    // Patrimônio real: bens cadastrados (imóveis, veículos, caixa, outros) + histórico de investimentos
+    const { data: bensData } = await supabase.from('bens').select('*').eq('familia_id', fid)
+    if (bensData) setBens(bensData)
+    const bensAtivosTotal  = (bensData || []).filter((b: any) => !b.eh_divida).reduce((s: number, b: any) => s + Number(b.valor), 0)
+    const bensDividasTotal = (bensData || []).filter((b: any) => b.eh_divida).reduce((s: number, b: any) => s + Number(b.valor), 0)
+    const bensLiquido = bensAtivosTotal - bensDividasTotal
+
+    const { data: investData } = await supabase.from('investimentos').select('mes, saldo').eq('familia_id', fid).order('mes', { ascending: true })
+    const investOrdenados = investData || []
+    const investAtual = investOrdenados.length ? Number(investOrdenados[investOrdenados.length - 1].saldo) : 0
+    setInvestSaldo(investAtual)
+
+    // Evolução dos últimos 6 meses: saldo de investimentos daquele mês (carregando o último conhecido) + bens líquidos atuais
     const evo = []
+    let ultimoSaldoConhecido = 0
     for (let i = 5; i >= 0; i--) {
       const d2 = new Date(agora.getFullYear(), agora.getMonth() - i, 1)
-      const i2 = new Date(d2.getFullYear(), d2.getMonth(), 1).toISOString().split('T')[0]
-      const f2 = new Date(d2.getFullYear(), d2.getMonth() + 1, 0).toISOString().split('T')[0]
-      const { data: mes } = await supabase.from('lancamentos').select('tipo, valor')
-        .eq('familia_id', fid).gte('data', i2).lte('data', f2)
-      const r2 = (mes || []).filter((l: any) => l.tipo === 'receita').reduce((s: number, l: any) => s + Number(l.valor), 0)
-      const d3 = (mes || []).filter((l: any) => l.tipo === 'despesa').reduce((s: number, l: any) => s + Number(l.valor), 0)
-      evo.push({ mes: MESES[d2.getMonth()].substring(0, 3), valor: r2 - d3 })
+      const chave = `${d2.getFullYear()}-${String(d2.getMonth() + 1).padStart(2, '0')}`
+      const registro = investOrdenados.find((r: any) => r.mes.startsWith(chave))
+      if (registro) ultimoSaldoConhecido = Number(registro.saldo)
+      evo.push({ mes: MESES[d2.getMonth()].substring(0, 3), valor: ultimoSaldoConhecido + bensLiquido })
     }
     setEvolucao(evo)
 
@@ -151,10 +164,21 @@ export default function DashboardPage() {
   const pctGuard     = totalRec > 0 ? Math.round((totalEco / totalRec) * 100) : 0
   const semDados     = totalRec === 0 && totalDes === 0
   const primeiroNome = nome.trim().split(' ')[0]
-  const patrimonioTotal  = evolucao.reduce((s, e) => s + e.valor, 0)
-  const patrimonioExibir = patrimonioTotal !== 0 ? patrimonioTotal : totalEco
-  const mesAnteriorVal   = evolucao.length > 1 ? evolucao[evolucao.length - 2].valor : 0
-  const crescimentoPct   = mesAnteriorVal !== 0 ? ((totalEco - mesAnteriorVal) / Math.abs(mesAnteriorVal)) * 100 : 0
+
+  // Patrimônio líquido real = ativos (bens + investimentos) - dívidas
+  const bensAtivos      = bens.filter((b: any) => !b.eh_divida)
+  const bensDividasList = bens.filter((b: any) => b.eh_divida)
+  const bensCaixa   = bensAtivos.filter((b: any) => b.tipo === 'caixa').reduce((s: number, b: any) => s + Number(b.valor), 0)
+  const bensImoveis = bensAtivos.filter((b: any) => b.tipo === 'imovel').reduce((s: number, b: any) => s + Number(b.valor), 0)
+  const bensOutros  = bensAtivos.filter((b: any) => b.tipo === 'veiculo' || b.tipo === 'outro').reduce((s: number, b: any) => s + Number(b.valor), 0)
+  const bensDividasTotal = bensDividasList.reduce((s: number, b: any) => s + Number(b.valor), 0)
+
+  const totalAtivos      = investSaldo + bensCaixa + bensImoveis + bensOutros
+  const patrimonioTotal  = totalAtivos - bensDividasTotal
+  const patrimonioExibir = patrimonioTotal
+  const mesAnteriorVal   = evolucao.length > 1 ? evolucao[evolucao.length - 2].valor : patrimonioTotal
+  const crescimentoValor = patrimonioTotal - mesAnteriorVal
+  const crescimentoPct   = mesAnteriorVal !== 0 ? (crescimentoValor / Math.abs(mesAnteriorVal)) * 100 : 0
   const dizimoAtivo    = dizimista === true
   const dizimoRestante = Math.max(valorDizimo - dizimoPago, 0)
   const dizimoPctPago  = valorDizimo > 0 ? Math.min(Math.round((dizimoPago / valorDizimo) * 100), 100) : 0
@@ -183,13 +207,13 @@ export default function DashboardPage() {
     { label: 'Economia', val: totalEco, cor: '#B7791F', bg: '#FFFBEB', borderTint: 'rgba(183,121,31,0.15)', Icon: PiggyBank     },
   ]
 
-  // Breakdown patrimônio (a partir dos dados existentes — investimentos/imóveis/caixa/outros)
-  const breakdown = [
-    { label: 'Investimentos', pct: 45, cor: '#6EE7B7' },
-    { label: 'Caixa',         pct: 30, cor: '#A7F3D0' },
-    { label: 'Imóveis',       pct: 20, cor: '#FCD34D' },
-    { label: 'Outros',        pct: 5,  cor: 'rgba(255,255,255,0.3)' },
-  ]
+  // Breakdown patrimônio — calculado a partir de dados reais (bens + investimentos)
+  const breakdown = totalAtivos > 0 ? [
+    { label: 'Investimentos', pct: Math.round((investSaldo / totalAtivos) * 100), cor: '#6EE7B7' },
+    { label: 'Caixa',         pct: Math.round((bensCaixa   / totalAtivos) * 100), cor: '#A7F3D0' },
+    { label: 'Imóveis',       pct: Math.round((bensImoveis / totalAtivos) * 100), cor: '#FCD34D' },
+    { label: 'Outros',        pct: Math.round((bensOutros  / totalAtivos) * 100), cor: 'rgba(255,255,255,0.3)' },
+  ] : []
 
   return (
     <>
@@ -472,17 +496,38 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Breakdown por categoria */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {breakdown.map(b => (
-                    <div key={b.label} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <span style={{ fontSize: '12.5px', color: 'rgba(255,255,255,0.55)', width: '92px', flexShrink: 0 }}>{b.label}</span>
-                      <div style={{ flex: 1, height: '6px', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${b.pct}%`, backgroundColor: b.cor, borderRadius: '4px', transition: 'width 0.4s ease' }} />
-                      </div>
-                      <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#fff', width: '32px', textAlign: 'right' }}>{b.pct}%</span>
+                {breakdown.length === 0 ? (
+                  <div style={{ padding: '10px 0' }}>
+                    <p style={{ fontSize: '12.5px', color: 'rgba(255,255,255,0.5)', marginBottom: '8px' }}>
+                      Cadastre seus bens e investimentos pra ver a composição do patrimônio.
+                    </p>
+                    <a href="/dashboard/patrimonio" style={{ fontSize: '12.5px', fontWeight: 600, color: '#6EE7B7', textDecoration: 'none' }}>
+                      Cadastrar patrimônio →
+                    </a>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {breakdown.map(b => (
+                        <div key={b.label} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <span style={{ fontSize: '12.5px', color: 'rgba(255,255,255,0.55)', width: '92px', flexShrink: 0 }}>{b.label}</span>
+                          <div style={{ flex: 1, height: '6px', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${b.pct}%`, backgroundColor: b.cor, borderRadius: '4px', transition: 'width 0.4s ease' }} />
+                          </div>
+                          <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#fff', width: '32px', textAlign: 'right' }}>{b.pct}%</span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                    {bensDividasTotal > 0 && (
+                      <p style={{ fontSize: '11.5px', color: 'rgba(252,165,165,0.9)', marginTop: '10px' }}>
+                        Dívidas descontadas: -{fmtOculto(bensDividasTotal, ocultar)}
+                      </p>
+                    )}
+                    <a href="/dashboard/patrimonio" style={{ display: 'inline-block', marginTop: '10px', fontSize: '12.5px', fontWeight: 600, color: '#6EE7B7', textDecoration: 'none' }}>
+                      Ver detalhes do patrimônio →
+                    </a>
+                  </>
+                )}
               </div>
 
               {/* Direita: mini gráfico glass */}
