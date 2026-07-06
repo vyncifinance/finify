@@ -355,8 +355,8 @@ export default function DashboardPage() {
           </div>
 
           <div className="rounded-2xl border p-4" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0' }}>
-            <p className="text-sm font-semibold mb-1" style={{ color: '#0F172A' }}>Evolução Patrimonial</p>
-            <p className="text-xs mb-4" style={{ color: '#94A3B8' }}>Últimos 6 meses</p>
+            <p className="text-sm font-semibold mb-1" style={{ color: '#0F172A' }}>Resultado Mensal</p>
+            <p className="text-xs mb-4" style={{ color: '#94A3B8' }}>Receitas − despesas · últimos 6 meses</p>
             <ResponsiveContainer width="100%" height={160}>
               <AreaChart data={evolucao}>
                 <defs>
@@ -530,8 +530,8 @@ export default function DashboardPage() {
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px) scale(1.01)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 16px 48px rgba(15,23,42,0.08)' }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0) scale(1)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 12px 40px rgba(15,23,42,0.05)' }}
               >
-                <div style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: card.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '18px' }}>
-                  <card.Icon size={19} color={card.cor} strokeWidth={1.75} />
+                <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: card.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px' }}>
+                  <card.Icon size={17} color={card.cor} strokeWidth={1.75} />
                 </div>
                 <p style={{ fontSize: '13px', fontWeight: 500, color: '#64748B', marginBottom: '6px' }}>{card.label}</p>
                 <p style={{ fontSize: '15px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.3px', marginBottom: '2px' }}>
@@ -548,8 +548,8 @@ export default function DashboardPage() {
             onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px) scale(1.01)' }}
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0) scale(1)' }}
             >
-              <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#F5F3FF', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px' }}>
-                <Target size={19} color="#8B5CF6" strokeWidth={1.75} />
+              <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#F5F3FF', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px' }}>
+                <Target size={17} color="#8B5CF6" strokeWidth={1.75} />
               </div>
               <p style={{ fontSize: '13px', fontWeight: 500, color: '#64748B', marginBottom: '6px' }}>Metas Ativas</p>
               <p style={{ fontSize: '15px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.3px', marginBottom: '2px' }}>
@@ -559,7 +559,7 @@ export default function DashboardPage() {
             </div>
             {dizimoAtivo && (
               <div style={{
-                borderRadius: '14px', padding: '14px', position: 'relative', backgroundColor: '#fff',
+                borderRadius: '16px', padding: '18px', position: 'relative', backgroundColor: '#fff',
                 border: `1px solid ${dizimoQuitado ? 'rgba(16,185,129,0.18)' : 'rgba(245,158,11,0.18)'}`,
                 boxShadow: '0 12px 40px rgba(15,23,42,0.05)', transition: 'all 0.2s ease',
               }}
@@ -575,11 +575,11 @@ export default function DashboardPage() {
                     {dizimoQuitado ? 'Pago' : 'Pendente'}
                   </span>
                 </div>
-                <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px' }}>
-                  <Church size={19} color="#145A45" strokeWidth={1.75} />
+                <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px' }}>
+                  <Church size={17} color="#145A45" strokeWidth={1.75} />
                 </div>
                 <p style={{ fontSize: '13px', fontWeight: 500, color: '#64748B', marginBottom: '6px' }}>Dízimo do mês</p>
-                <p style={{ fontSize: '18px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.3px', marginBottom: '8px' }}>
+                <p style={{ fontSize: '15px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.3px', marginBottom: '8px' }}>
                   {loading ? '...' : fmtOculto(valorDizimo, ocultar)}
                 </p>
                 <div style={{ height: '5px', borderRadius: '4px', overflow: 'hidden', backgroundColor: '#F1F5F9', marginBottom: '8px' }}>
@@ -598,8 +598,8 @@ export default function DashboardPage() {
               borderRadius: '20px', padding: '24px', backgroundColor: '#fff',
               border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
             }}>
-              <h2 style={{ fontSize: '14px', fontWeight: 600, color: '#0B1F18', marginBottom: '2px', letterSpacing: '-0.2px' }}>Evolução Patrimonial</h2>
-              <p style={{ fontSize: '12px', color: '#64748B', marginBottom: '16px' }}>Últimos 6 meses</p>
+              <h2 style={{ fontSize: '14px', fontWeight: 600, color: '#0B1F18', marginBottom: '2px', letterSpacing: '-0.2px' }}>Resultado Mensal</h2>
+              <p style={{ fontSize: '12px', color: '#64748B', marginBottom: '16px' }}>Receitas − despesas · últimos 6 meses</p>
               <ResponsiveContainer width="100%" height={110}>
                 <AreaChart data={evolucao}>
                   <defs>
@@ -689,7 +689,7 @@ export default function DashboardPage() {
               </a>
             </div>
             {metas.length === 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 0', gap: '12px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 0', gap: '10px' }}>
                 <Target size={28} color="#E2E8F0" strokeWidth={1} />
                 <p style={{ fontSize: '12px', color: '#94A3B8' }}>Nenhuma meta criada ainda.</p>
                 <a href="/dashboard/metas" style={{ fontSize: '13.5px', fontWeight: 600, color: '#145A45', textDecoration: 'none' }}>Criar primeira meta →</a>
