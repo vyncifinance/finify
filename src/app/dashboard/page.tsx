@@ -159,7 +159,7 @@ export default function DashboardPage() {
   const crescimentoPct   = mesAnteriorVal !== 0 ? (crescimentoValor / Math.abs(mesAnteriorVal)) * 100 : 0
   const dizimoAtivo    = dizimista === true
 
-  const mediaEvolucao = evolucao.length > 0 ? evolucao.reduce((s, e) => s + e.valor, 0) / evolucao.length : 0
+  const mediaEvolucao = evolucao.length > 0 ? Math.round((evolucao.reduce((s, e) => s + e.valor, 0) / evolucao.length) * 100) / 100 : 0
   const melhorMes = evolucao.length > 0 ? evolucao.reduce((a, b) => b.valor > a.valor ? b : a) : null
   const piorMes   = evolucao.length > 0 ? evolucao.reduce((a, b) => b.valor < a.valor ? b : a) : null
   const dizimoRestante = Math.max(valorDizimo - dizimoPago, 0)
@@ -635,14 +635,14 @@ export default function DashboardPage() {
                 <div>
                   <p style={{ fontSize: '11px', color: '#94A3B8', marginBottom: '4px' }}>Melhor mês</p>
                   <p style={{ fontSize: '15px', fontWeight: 700, color: '#2F8F68', letterSpacing: '-0.3px' }}>
-                    {loading || !melhorMes ? '...' : `${fmtShortOculto(melhorMes.valor, ocultar)}`}
+                    {loading || !melhorMes ? '...' : fmtOculto(melhorMes.valor, ocultar)}
                   </p>
                   {melhorMes && <p style={{ fontSize: '11px', color: '#94A3B8', marginTop: '2px' }}>{melhorMes.mes}</p>}
                 </div>
                 <div>
                   <p style={{ fontSize: '11px', color: '#94A3B8', marginBottom: '4px' }}>Pior mês</p>
                   <p style={{ fontSize: '15px', fontWeight: 700, color: piorMes && piorMes.valor < 0 ? '#DC2626' : '#0B1F18', letterSpacing: '-0.3px' }}>
-                    {loading || !piorMes ? '...' : `${fmtShortOculto(piorMes.valor, ocultar)}`}
+                    {loading || !piorMes ? '...' : fmtOculto(piorMes.valor, ocultar)}
                   </p>
                   {piorMes && <p style={{ fontSize: '11px', color: '#94A3B8', marginTop: '2px' }}>{piorMes.mes}</p>}
                 </div>
