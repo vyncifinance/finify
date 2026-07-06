@@ -158,6 +158,10 @@ export default function DashboardPage() {
   const crescimentoValor = totalEco - mesAnteriorVal
   const crescimentoPct   = mesAnteriorVal !== 0 ? (crescimentoValor / Math.abs(mesAnteriorVal)) * 100 : 0
   const dizimoAtivo    = dizimista === true
+
+  const mediaEvolucao = evolucao.length > 0 ? evolucao.reduce((s, e) => s + e.valor, 0) / evolucao.length : 0
+  const melhorMes = evolucao.length > 0 ? evolucao.reduce((a, b) => b.valor > a.valor ? b : a) : null
+  const piorMes   = evolucao.length > 0 ? evolucao.reduce((a, b) => b.valor < a.valor ? b : a) : null
   const dizimoRestante = Math.max(valorDizimo - dizimoPago, 0)
   const dizimoPctPago  = valorDizimo > 0 ? Math.min(Math.round((dizimoPago / valorDizimo) * 100), 100) : 0
   const dizimoQuitado  = dizimoPago >= valorDizimo && valorDizimo > 0
@@ -620,6 +624,29 @@ export default function DashboardPage() {
                   />
                 </AreaChart>
               </ResponsiveContainer>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '20px', paddingTop: '18px', borderTop: '1px solid #F1F5F9' }}>
+                <div>
+                  <p style={{ fontSize: '11px', color: '#94A3B8', marginBottom: '4px' }}>Média do período</p>
+                  <p style={{ fontSize: '15px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.3px' }}>
+                    {loading ? '...' : fmtOculto(mediaEvolucao, ocultar)}
+                  </p>
+                </div>
+                <div>
+                  <p style={{ fontSize: '11px', color: '#94A3B8', marginBottom: '4px' }}>Melhor mês</p>
+                  <p style={{ fontSize: '15px', fontWeight: 700, color: '#2F8F68', letterSpacing: '-0.3px' }}>
+                    {loading || !melhorMes ? '...' : `${fmtShortOculto(melhorMes.valor, ocultar)}`}
+                  </p>
+                  {melhorMes && <p style={{ fontSize: '11px', color: '#94A3B8', marginTop: '2px' }}>{melhorMes.mes}</p>}
+                </div>
+                <div>
+                  <p style={{ fontSize: '11px', color: '#94A3B8', marginBottom: '4px' }}>Pior mês</p>
+                  <p style={{ fontSize: '15px', fontWeight: 700, color: piorMes && piorMes.valor < 0 ? '#DC2626' : '#0B1F18', letterSpacing: '-0.3px' }}>
+                    {loading || !piorMes ? '...' : `${fmtShortOculto(piorMes.valor, ocultar)}`}
+                  </p>
+                  {piorMes && <p style={{ fontSize: '11px', color: '#94A3B8', marginTop: '2px' }}>{piorMes.mes}</p>}
+                </div>
+              </div>
             </div>
 
             <div style={{
@@ -676,10 +703,10 @@ export default function DashboardPage() {
 
           {/* Metas */}
           <div style={{
-            borderRadius: '20px', padding: '28px', marginBottom: '24px', backgroundColor: '#fff',
+            borderRadius: '20px', padding: metas.length === 0 ? '20px 28px' : '28px', marginBottom: '24px', backgroundColor: '#fff',
             border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: metas.length === 0 ? '0' : '24px' }}>
               <div>
                 <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#0B1F18', letterSpacing: '-0.3px' }}>Metas da Família</h2>
                 <p style={{ fontSize: '12px', color: '#64748B', marginTop: '1px' }}>Progresso dos objetivos</p>
@@ -689,10 +716,10 @@ export default function DashboardPage() {
               </a>
             </div>
             {metas.length === 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 0', gap: '10px' }}>
-                <Target size={28} color="#E2E8F0" strokeWidth={1} />
-                <p style={{ fontSize: '12px', color: '#94A3B8' }}>Nenhuma meta criada ainda.</p>
-                <a href="/dashboard/metas" style={{ fontSize: '13.5px', fontWeight: 600, color: '#145A45', textDecoration: 'none' }}>Criar primeira meta →</a>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingTop: '18px', marginTop: '18px', borderTop: '1px solid #F1F5F9' }}>
+                <Target size={18} color="#E2E8F0" strokeWidth={1.5} />
+                <p style={{ fontSize: '12.5px', color: '#94A3B8', flex: 1 }}>Nenhuma meta criada ainda.</p>
+                <a href="/dashboard/metas" style={{ fontSize: '13px', fontWeight: 600, color: '#145A45', textDecoration: 'none', whiteSpace: 'nowrap' }}>Criar primeira meta →</a>
               </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
