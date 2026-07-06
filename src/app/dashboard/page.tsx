@@ -67,6 +67,7 @@ export default function DashboardPage() {
   const [metas, setMetas]       = useState<any[]>([])
   const [lancamentos, setLancamentos] = useState<any[]>([])
   const [evolucao, setEvolucao]       = useState<any[]>([])
+  const [despesasFixas, setDespesasFixas] = useState<any[]>([])
   const [dizimista, setDizimista]     = useState(true)
   const [baseDizimo, setBaseDizimo]   = useState(0)
   const [valorDizimo, setValorDizimo] = useState(0)
@@ -144,6 +145,22 @@ export default function DashboardPage() {
     const { data: metasData } = await supabase.from('metas').select('*')
       .eq('familia_id', fid).order('created_at', { ascending: false }).limit(3)
     if (metasData) setMetas(metasData)
+
+    // Próximas despesas fixas — as que ainda não foram pagas esse mês
+    const { data: fixasData } = await supabase.from('despesas_fixas').select('*')
+      .eq('familia_id', fid).eq('ativo', true).order('dia_vencimento', { ascending: true })
+    if (fixasData) {
+      const fixasDespesa = fixasData.filter((f: any) => f.tipo !== 'receita')
+      const { data: lancFixos } = await supabase.from('lancamentos').select('despesa_fixa_id')
+        .eq('familia_id', fid).not('despesa_fixa_id', 'is', null).gte('data', ini).lte('data', fim)
+      const pagosIds = new Set((lancFixos || []).map((l: any) => l.despesa_fixa_id))
+      const hojeDia = agora.getDate()
+      const pendentes = fixasDespesa
+        .filter((f: any) => !pagosIds.has(f.id))
+        .map((f: any) => ({ ...f, atrasada: hojeDia > f.dia_vencimento, diasAte: f.dia_vencimento - hojeDia }))
+        .sort((a: any, b: any) => a.diasAte - b.diasAte)
+      setDespesasFixas(pendentes.slice(0, 3))
+    }
   }
 
   const mesAtual     = `${MESES[agora.getMonth()]} ${agora.getFullYear()}`
@@ -594,6 +611,7 @@ export default function DashboardPage() {
 
           {/* Metas + Saúde Financeira */}
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px', marginBottom: '10px', alignItems: 'start' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div style={{
               borderRadius: '20px', padding: '24px', backgroundColor: '#fff',
               border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
@@ -645,6 +663,54 @@ export default function DashboardPage() {
                   })}
                 </div>
               )}
+            </div>
+
+            {/* Próximas Despesas Fixas */}
+            <div style={{
+              borderRadius: '20px', padding: '24px', backgroundColor: '#fff',
+              border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: despesasFixas.length === 0 ? '0' : '14px' }}>
+                <div>
+                  <h2 style={{ fontSize: '14px', fontWeight: 600, color: '#0B1F18', marginBottom: '2px', letterSpacing: '-0.2px' }}>Próximas Despesas Fixas</h2>
+                  <p style={{ fontSize: '12px', color: '#64748B' }}>O que ainda falta pagar</p>
+                </div>
+                <a href="/dashboard/movimentos" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px', fontWeight: 600, color: '#145A45', textDecoration: 'none', flexShrink: 0 }}>
+                  Ver todas <ArrowRight size={13} strokeWidth={2} />
+                </a>
+              </div>
+              {despesasFixas.length === 0 ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingTop: '18px', marginTop: '18px', borderTop: '1px solid #F1F5F9' }}>
+                  <CheckCircle2 size={18} color="#2F8F68" strokeWidth={1.5} />
+                  <p style={{ fontSize: '12.5px', color: '#94A3B8', flex: 1 }}>Nenhuma despesa fixa pendente.</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {despesasFixas.map((df: any) => {
+                    const Icon = ICONES_CAT[df.categoria] || MoreHorizontal
+                    return (
+                      <div key={df.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', borderRadius: '12px', padding: '10px', border: '1px solid rgba(15,23,42,0.05)' }}>
+                        <div style={{ width: '36px', height: '36px', borderRadius: '10px', flexShrink: 0, backgroundColor: 'rgba(20,90,69,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Icon size={16} color="#145A45" strokeWidth={1.75} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: '13.5px', fontWeight: 600, color: '#0B1F18', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{df.nome}</p>
+                          <p style={{ fontSize: '12px', color: '#94A3B8', margin: 0 }}>Vence dia {df.dia_vencimento} · {fmtOculto(Number(df.valor), ocultar)}</p>
+                        </div>
+                        <span style={{
+                          fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '999px', flexShrink: 0,
+                          backgroundColor: df.atrasada ? 'rgba(239,68,68,0.10)' : '#F7F8FA',
+                          border: df.atrasada ? '1px solid rgba(239,68,68,0.25)' : '1px solid #E5E7EB',
+                          color: df.atrasada ? '#EF4444' : '#64748B',
+                        }}>
+                          {df.atrasada ? 'Atrasada' : 'A pagar'}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
             </div>
 
             <div style={{
