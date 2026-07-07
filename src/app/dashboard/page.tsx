@@ -104,13 +104,13 @@ export default function DashboardPage() {
       setNome(profile.nome || '')
       setFamilia((profile.familias as any)?.nome || '')
       setDizimista((profile.familias as any)?.dizimista !== false)
-      await carregarDados(profile.familia_id)
+      await carregarDados(profile.familia_id, session.user.id)
     }
     setLoading(false)
     setAtualizadoHa(0)
   }
 
-  async function carregarDados(fid: string) {
+  async function carregarDados(fid: string, uid: string) {
     const ini = new Date(agora.getFullYear(), agora.getMonth(), 1).toISOString().split('T')[0]
     const fim = new Date(agora.getFullYear(), agora.getMonth() + 1, 0).toISOString().split('T')[0]
     const { data: lanc } = await supabase.from('lancamentos').select('*')
@@ -139,6 +139,7 @@ export default function DashboardPage() {
     }
 
     const evo = []
+    const despesasPorMes: number[] = []
     for (let i = 5; i >= 0; i--) {
       const d2 = new Date(agora.getFullYear(), agora.getMonth() - i, 1)
       const i2 = new Date(d2.getFullYear(), d2.getMonth(), 1).toISOString().split('T')[0]
@@ -148,11 +149,39 @@ export default function DashboardPage() {
       const r2 = (mes || []).filter((l: any) => l.tipo === 'receita').reduce((s: number, l: any) => s + Number(l.valor), 0)
       const d3 = (mes || []).filter((l: any) => l.tipo === 'despesa').reduce((s: number, l: any) => s + Number(l.valor), 0)
       evo.push({ mes: MESES[d2.getMonth()].substring(0, 3), valor: r2 - d3 })
+      despesasPorMes.push(d3)
     }
     setEvolucao(evo)
 
+    // Média de despesas dos últimos 6 meses que de fato têm lançamento (evita distorcer com meses "vazios" de antes de você começar a usar o app)
+    const despesasComDados = despesasPorMes.filter(d => d > 0)
+    const ultimos6ComDados = despesasComDados.slice(-6)
+    const media6MesesDespesas = ultimos6ComDados.length > 0 ? ultimos6ComDados.reduce((s, d) => s + d, 0) / ultimos6ComDados.length : 0
+
+    // Caixa cadastrado em Patrimônio — valor atual da reserva de emergência
+    const { data: bensCaixaData } = await supabase.from('bens').select('valor, eh_divida')
+      .eq('familia_id', fid).eq('tipo', 'caixa')
+    const caixaTotal = (bensCaixaData || []).filter((b: any) => !b.eh_divida).reduce((s: number, b: any) => s + Number(b.valor), 0)
+
+    // Meta automática "Reserva de Emergência" — criada pelo sistema, alvo = média dos últimos 6 meses de despesa
+    if (media6MesesDespesas > 0) {
+      const { data: reservaExistente } = await supabase.from('metas').select('id')
+        .eq('familia_id', fid).eq('automatica', true).maybeSingle()
+      if (!reservaExistente) {
+        await supabase.from('metas').insert({
+          familia_id: fid, user_id: uid, nome: 'Reserva de Emergência',
+          valor_alvo: media6MesesDespesas, valor_atual: caixaTotal,
+          icone: 'shield', cor: '#0B3B2E', automatica: true,
+        })
+      } else {
+        await supabase.from('metas').update({
+          valor_alvo: media6MesesDespesas, valor_atual: caixaTotal,
+        }).eq('id', reservaExistente.id)
+      }
+    }
+
     const { data: metasData } = await supabase.from('metas').select('*')
-      .eq('familia_id', fid).order('created_at', { ascending: false }).limit(3)
+      .eq('familia_id', fid).order('automatica', { ascending: false }).order('created_at', { ascending: false }).limit(3)
     if (metasData) setMetas(metasData)
 
     // Próximas despesas fixas — as que ainda não foram pagas esse mês
@@ -189,17 +218,15 @@ export default function DashboardPage() {
   const dizimoQuitado  = dizimoPago >= valorDizimo && valorDizimo > 0
 
   let score = 0
-  if (totalEco > 0)     score += 30
-  if (pctGasto < 80)    score += 25
-  if (metas.length > 0) score += 25
-  if (pctGuard >= 10)   score += 20
+  if (pctGasto < 80)     score += 35
+  if (metas.length > 0)  score += 35
+  if (pctGuard >= 10)    score += 30
   score = Math.min(score, 100)
 
   const scoreLabel = score >= 80 ? 'Excelente' : score >= 60 ? 'Bom' : score >= 35 ? 'Atenção' : 'Crítico'
   const scoreCor   = score >= 80 ? '#2F8F68' : score >= 60 ? '#F59E0B' : score >= 35 ? '#F97316' : '#EF4444'
 
   const saude = [
-    { label: 'Reserva de Emergência',   ok: totalEco > 0,     desc: totalEco > 0 ? 'Guardando este mês' : 'Sem economia este mês' },
     { label: 'Orçamento Controlado',    ok: pctGasto < 80,    desc: pctGasto < 80 ? `${pctGasto}% comprometido` : 'Gastos elevados' },
     { label: 'Metas em Andamento',      ok: metas.length > 0, desc: metas.length > 0 ? `${metas.length} meta(s) ativa(s)` : 'Nenhuma meta criada' },
     { label: 'Crescimento Patrimonial', ok: totalEco > 0,     desc: totalEco > 0 ? `+${fmtOculto(totalEco, ocultar)} este mês` : 'Sem crescimento' },
