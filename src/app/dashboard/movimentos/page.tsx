@@ -10,19 +10,22 @@ import {
   Plus, Wallet, X, UtensilsCrossed, Home, Car, Smile,
   Heart, BookOpen, ShoppingBag, Church, MoreHorizontal,
   Briefcase, TrendingUp, Laptop, DollarSign, Trash2, Pencil,
-  CreditCard, FileText, AlignLeft, Repeat, CheckCircle2
+  CreditCard, FileText, AlignLeft, Repeat, CheckCircle2,
+  Pill, Gift, Sparkles, GraduationCap, Smartphone, Shirt, Wrench, ClipboardList, Filter
 } from 'lucide-react'
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 
-const CATEGORIAS_DESPESA = ['Alimentação','Moradia','Transporte','Lazer','Saúde','Educação','Compras','Cartão de Crédito','Dízimo','Outros']
+const CATEGORIAS_DESPESA = ['Alimentação','Moradia','Transporte','Lazer','Saúde','Educação','Compras','Cartão de Crédito','Dízimo','Farmácia','Presente','Estética','Estudos','Eletrônicos','Vestuário','Consertos','Serviços','Outros']
 const CATEGORIAS_RECEITA = ['Salário','Renda Extra','Freelance','Investimento','Outros']
 
 const ICONES_CAT: Record<string, any> = {
   'Alimentação': UtensilsCrossed, 'Moradia': Home, 'Transporte': Car, 'Lazer': Smile,
   'Saúde': Heart, 'Educação': BookOpen, 'Compras': ShoppingBag, 'Dízimo': Church,
   'Cartão de Crédito': CreditCard, 'Outros': MoreHorizontal,
+  'Farmácia': Pill, 'Presente': Gift, 'Estética': Sparkles, 'Estudos': GraduationCap,
+  'Eletrônicos': Smartphone, 'Vestuário': Shirt, 'Consertos': Wrench, 'Serviços': ClipboardList,
   'Salário': Briefcase, 'Renda Extra': DollarSign, 'Freelance': Laptop, 'Investimento': TrendingUp,
 }
 
@@ -55,6 +58,7 @@ export default function MovimentosPage() {
   const [lancamentos, setLancamentos]   = useState<any[]>([])
   const [filtro, setFiltro]             = useState<'todos'|'receita'|'despesa'>('todos')
   const [filtroMembro, setFiltroMembro] = useState('todos')
+  const [filtroCategoria, setFiltroCategoria] = useState('todos')
   const [membros, setMembros]           = useState<string[]>([])
   const [membrosFamilia, setMembrosFamilia] = useState<string[]>([])
 
@@ -66,6 +70,7 @@ export default function MovimentosPage() {
   const [dfCategoria, setDfCategoria]     = useState('Moradia')
   const [dfDia, setDfDia]                 = useState('5')
   const [dfVariavel, setDfVariavel]       = useState(false)
+  const [dfTipo, setDfTipo]               = useState<'despesa'|'receita'>('despesa')
   const [dfSalvando, setDfSalvando]       = useState(false)
   const [dfDeletando, setDfDeletando]     = useState(false)
   const [dfConfirmDelete, setDfConfirmDelete] = useState(false)
@@ -256,7 +261,7 @@ export default function MovimentosPage() {
 
   function abrirDfModalNovo() {
     setDfEditando(null); setDfNome(''); setDfValor(''); setDfCategoria('Moradia'); setDfDia('5')
-    setDfVariavel(false)
+    setDfVariavel(false); setDfTipo('despesa')
     setDfConfirmDelete(false); setDfModalOpen(true)
   }
 
@@ -264,8 +269,13 @@ export default function MovimentosPage() {
     setDfEditando(df); setDfNome(df.nome)
     setDfValor(Number(df.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
     setDfCategoria(df.categoria); setDfDia(String(df.dia_vencimento))
-    setDfVariavel(!!df.valor_variavel)
+    setDfVariavel(!!df.valor_variavel); setDfTipo(df.tipo === 'receita' ? 'receita' : 'despesa')
     setDfConfirmDelete(false); setDfModalOpen(true)
+  }
+
+  function handleDfTipo(t: 'despesa' | 'receita') {
+    setDfTipo(t)
+    setDfCategoria(t === 'despesa' ? 'Moradia' : 'Salário')
   }
 
   async function handleSalvarDf() {
@@ -277,14 +287,14 @@ export default function MovimentosPage() {
 
     if (dfEditando) {
       const { error } = await supabase.from('despesas_fixas').update({
-        nome: dfNome.trim(), valor: valorNum, categoria: dfCategoria, dia_vencimento: diaNum, valor_variavel: dfVariavel,
+        nome: dfNome.trim(), valor: valorNum, categoria: dfCategoria, dia_vencimento: diaNum, valor_variavel: dfVariavel, tipo: dfTipo,
       }).eq('id', dfEditando.id)
       setDfSalvando(false)
       if (!error) { setDfModalOpen(false); await recarregarDespesasFixas(fid) }
     } else {
       const { error } = await supabase.from('despesas_fixas').insert({
         familia_id: fid, user_id: userId, nome: dfNome.trim(), valor: valorNum,
-        categoria: dfCategoria, dia_vencimento: diaNum, valor_variavel: dfVariavel, ativo: true,
+        categoria: dfCategoria, dia_vencimento: diaNum, valor_variavel: dfVariavel, tipo: dfTipo, ativo: true,
       })
       setDfSalvando(false)
       if (!error) { setDfModalOpen(false); await recarregarDespesasFixas(fid) }
@@ -319,13 +329,14 @@ export default function MovimentosPage() {
     const agora = new Date()
     const hora  = `${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}`
     const dataStr = `${mesRef.getFullYear()}-${String(mesRef.getMonth() + 1).padStart(2, '0')}-${String(df.dia_vencimento).padStart(2, '0')}`
+    const ehReceita = df.tipo === 'receita'
     const { error } = await supabase.from('lancamentos').insert({
-      familia_id: fid, user_id: userId, tipo: 'despesa', valor,
+      familia_id: fid, user_id: userId, tipo: ehReceita ? 'receita' : 'despesa', valor,
       categoria: df.categoria, membro: membroAtual, data: dataStr, hora,
-      dizimar: false, descricao: null, despesa_fixa_id: df.id,
+      dizimar: ehReceita, descricao: null, despesa_fixa_id: df.id,
     })
     if (!error) {
-      // Para despesas variáveis, o valor confirmado vira a nova referência do próximo mês
+      // Para valores variáveis, o valor confirmado vira a nova referência do próximo mês
       if (df.valor_variavel && valor !== Number(df.valor)) {
         await supabase.from('despesas_fixas').update({ valor }).eq('id', df.id)
         await recarregarDespesasFixas(fid)
@@ -354,15 +365,31 @@ export default function MovimentosPage() {
     const hoje = new Date()
     const ehMesAtual = hoje.getFullYear() === mesRef.getFullYear() && hoje.getMonth() === mesRef.getMonth()
     const atrasada = !lanc && ehMesAtual && hoje.getDate() > df.dia_vencimento
-    return { ...df, lancamento: lanc, pago: !!lanc, atrasada }
+    return { ...df, tipo: df.tipo === 'receita' ? 'receita' : 'despesa', lancamento: lanc, pago: !!lanc, atrasada }
   })
-  const totalFixasPendentes = fixasDoMes.filter((f: any) => !f.pago).reduce((s: number, f: any) => s + Number(f.valor), 0)
+  const fixasDespesas = fixasDoMes.filter((f: any) => f.tipo === 'despesa')
+  const fixasReceitas = fixasDoMes.filter((f: any) => f.tipo === 'receita')
+  const totalDespesasFixasPendentes = fixasDespesas.filter((f: any) => !f.pago).reduce((s: number, f: any) => s + Number(f.valor), 0)
+  const totalReceitasFixasPendentes = fixasReceitas.filter((f: any) => !f.pago).reduce((s: number, f: any) => s + Number(f.valor), 0)
+
+  // Fluxo de caixa projetado do mês
+  const hojeProj      = new Date()
+  const diasNoMes     = new Date(mesRef.getFullYear(), mesRef.getMonth() + 1, 0).getDate()
+  const ehMesAtualProj = hojeProj.getFullYear() === mesRef.getFullYear() && hojeProj.getMonth() === mesRef.getMonth()
+  const percorridoMes = ehMesAtualProj ? Math.round((Math.min(hojeProj.getDate(), diasNoMes) / diasNoMes) * 100) : 100
 
   const filtrados = lancamentos.filter(l => {
     if (filtro !== 'todos' && l.tipo !== filtro) return false
     if (filtroMembro !== 'todos' && l.membro !== filtroMembro) return false
+    if (filtroCategoria !== 'todos' && l.categoria !== filtroCategoria) return false
     return true
   })
+
+  const categoriasPresentes = Array.from(new Set(
+    lancamentos
+      .filter(l => filtro === 'todos' || l.tipo === filtro)
+      .map(l => l.categoria)
+  )).sort()
 
   const grupos: Record<string, any[]> = {}
   filtrados.forEach(l => {
@@ -374,6 +401,7 @@ export default function MovimentosPage() {
   const totalRec = lancamentos.filter(l => l.tipo === 'receita').reduce((s, l) => s + Number(l.valor), 0)
   const totalDes = lancamentos.filter(l => l.tipo === 'despesa').reduce((s, l) => s + Number(l.valor), 0)
   const resultado = totalRec - totalDes
+  const saldoProjetado = resultado + totalReceitasFixasPendentes - totalDespesasFixasPendentes
   const mesLabel  = `${MESES[mesRef.getMonth()]} ${mesRef.getFullYear()}`
   const categorias = tipo === 'despesa' ? CATEGORIAS_DESPESA : CATEGORIAS_RECEITA
 
@@ -468,6 +496,16 @@ export default function MovimentosPage() {
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '18px 24px 8px' }}>
 
+        {/* Tipo */}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+          {[{ key: 'despesa', label: 'Despesa', cor: '#EF4444' }, { key: 'receita', label: 'Receita', cor: '#10B981' }].map(t => (
+            <button key={t.key} onClick={() => handleDfTipo(t.key as any)}
+              style={{ flex: 1, padding: '10px', borderRadius: '12px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', border: `2px solid ${dfTipo === t.key ? t.cor : '#E2E8F0'}`, backgroundColor: dfTipo === t.key ? t.cor + '12' : '#fff', color: dfTipo === t.key ? t.cor : '#64748B' }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
         <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Nome</p>
         <input value={dfNome} onChange={e => setDfNome(e.target.value)} placeholder="Ex: Aluguel" className="df-input"
           style={{ width: '100%', height: '52px', padding: '0 16px', borderRadius: '14px', border: '1.5px solid #E5E7EB', backgroundColor: '#FAFAFA', fontSize: '14px', color: '#111827', marginBottom: '16px', boxSizing: 'border-box' }} />
@@ -497,13 +535,13 @@ export default function MovimentosPage() {
         </button>
 
         <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Categoria</p>
-        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', marginBottom: '16px', paddingBottom: '4px' }}>
-          {CATEGORIAS_DESPESA.map(c => {
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '16px' }}>
+          {(dfTipo === 'despesa' ? CATEGORIAS_DESPESA : CATEGORIAS_RECEITA).map(c => {
             const Icon = ICONES_CAT[c] || MoreHorizontal
             const ativo = dfCategoria === c
             return (
               <button key={c} onClick={() => setDfCategoria(c)} className="df-chip"
-                style={{ padding: '8px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', border: ativo ? '1.5px solid #2FB36A' : '1.5px solid #E5E7EB', backgroundColor: ativo ? '#F0FDF4' : '#fff', color: ativo ? '#0B3B2E' : '#64748B', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flexShrink: 0, minWidth: '64px' }}>
+                style={{ padding: '8px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', border: ativo ? '1.5px solid #2FB36A' : '1.5px solid #E5E7EB', backgroundColor: ativo ? '#F0FDF4' : '#fff', color: ativo ? '#0B3B2E' : '#64748B', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', minWidth: '64px' }}>
                 <Icon size={14} strokeWidth={1.75} color={ativo ? '#2FB36A' : '#94A3B8'} />
                 {c}
               </button>
@@ -651,12 +689,12 @@ export default function MovimentosPage() {
 
         {/* Categoria */}
         <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Categoria</p>
-        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', marginBottom: '10px', paddingBottom: '4px' }}>
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
           {categorias.map(c => {
             const Icon = ICONES_CAT[c] || MoreHorizontal
             return (
               <button key={c} onClick={() => setCategoria(c)}
-                style={{ padding: '8px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 500, cursor: 'pointer', border: `1px solid ${categoria === c ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: categoria === c ? '#F0FDF4' : '#fff', color: categoria === c ? '#0E3B2E' : '#64748B', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flexShrink: 0, minWidth: '64px' }}>
+                style={{ padding: '8px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 500, cursor: 'pointer', border: `1px solid ${categoria === c ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: categoria === c ? '#F0FDF4' : '#fff', color: categoria === c ? '#0E3B2E' : '#64748B', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', minWidth: '64px' }}>
                 <Icon size={14} strokeWidth={1.75} color={categoria === c ? '#0E3B2E' : '#94A3B8'} />
                 {c}
               </button>
@@ -805,7 +843,7 @@ export default function MovimentosPage() {
 
         <div style={{ display: 'flex', gap: '8px', padding: '0 16px 8px', overflowX: 'auto' }}>
           {[{ key: 'todos', label: 'Todos' }, { key: 'receita', label: 'Receitas' }, { key: 'despesa', label: 'Despesas' }].map(f => (
-            <button key={f.key} onClick={() => setFiltro(f.key as any)}
+            <button key={f.key} onClick={() => { setFiltro(f.key as any); setFiltroCategoria('todos') }}
               style={{ padding: '6px 16px', borderRadius: '999px', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap', border: `1px solid ${filtro === f.key ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: filtro === f.key ? '#0E3B2E' : '#fff', color: filtro === f.key ? '#fff' : '#64748B', cursor: 'pointer' }}>
               {f.label}
             </button>
@@ -817,6 +855,22 @@ export default function MovimentosPage() {
             </button>
           ))}
         </div>
+
+        {categoriasPresentes.length > 0 && (
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', padding: '0 16px 12px' }}>
+            {categoriasPresentes.map(c => {
+              const Icon = ICONES_CAT[c] || MoreHorizontal
+              const ativo = filtroCategoria === c
+              return (
+                <button key={c} onClick={() => setFiltroCategoria(ativo ? 'todos' : c)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 12px', borderRadius: '999px', fontSize: '11.5px', fontWeight: 600, whiteSpace: 'nowrap', border: `1px solid ${ativo ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: ativo ? '#0E3B2E' : '#fff', color: ativo ? '#fff' : '#64748B', cursor: 'pointer' }}>
+                  <Icon size={12} strokeWidth={1.75} color={ativo ? '#fff' : '#94A3B8'} />
+                  {c}
+                </button>
+              )
+            })}
+          </div>
+        )}
 
         <div style={{ padding: '0 16px' }}>
           {loading ? (
@@ -919,7 +973,7 @@ export default function MovimentosPage() {
         <div className="flex items-center gap-3 mb-5 flex-wrap">
           <div className="flex items-center gap-1 p-1 rounded-xl" style={{ backgroundColor: '#F1F5F9' }}>
             {[{ key: 'todos', label: 'Todos' }, { key: 'receita', label: 'Receitas' }, { key: 'despesa', label: 'Despesas' }].map(f => (
-              <button key={f.key} onClick={() => setFiltro(f.key as any)}
+              <button key={f.key} onClick={() => { setFiltro(f.key as any); setFiltroCategoria('todos') }}
                 className="px-4 py-2 rounded-lg text-sm font-medium"
                 style={{ backgroundColor: filtro === f.key ? '#fff' : 'transparent', color: filtro === f.key ? '#0F172A' : '#64748B', boxShadow: filtro === f.key ? '0 1px 3px rgba(0,0,0,0.08)' : 'none', border: 'none', cursor: 'pointer' }}>
                 {f.label}
@@ -941,6 +995,23 @@ export default function MovimentosPage() {
             ))}
           </div>
         </div>
+
+        {categoriasPresentes.length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap mb-5">
+            {categoriasPresentes.map(c => {
+              const Icon = ICONES_CAT[c] || MoreHorizontal
+              const ativo = filtroCategoria === c
+              return (
+                <button key={c} onClick={() => setFiltroCategoria(ativo ? 'todos' : c)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
+                  style={{ border: `1px solid ${ativo ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: ativo ? '#0E3B2E' : '#fff', color: ativo ? '#fff' : '#64748B', cursor: 'pointer' }}>
+                  <Icon size={12} strokeWidth={1.75} color={ativo ? '#fff' : '#94A3B8'} />
+                  {c}
+                </button>
+              )
+            })}
+          </div>
+        )}
 
         <div className="rounded-[20px] border overflow-hidden" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
           {loading ? (

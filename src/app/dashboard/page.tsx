@@ -10,7 +10,8 @@ import {
   ArrowRight, ArrowUp, CheckCircle2, AlertCircle, Bell,
   Home, BookOpen, Shield, TrendingUp, Send, Heart, Star, Church,
   ChevronRight, Wallet, Building2, Sparkles, UtensilsCrossed, Car,
-  Smile, ShoppingBag, CreditCard, MoreHorizontal, Briefcase
+  Smile, ShoppingBag, CreditCard, MoreHorizontal, Briefcase,
+  Pill, Gift, GraduationCap, Smartphone, Shirt, Wrench, ClipboardList
 } from 'lucide-react'
 
 const ICONES_CAT: Record<string, any> = {
@@ -23,6 +24,14 @@ const ICONES_CAT: Record<string, any> = {
   'Compras': ShoppingBag,
   'Cartão de Crédito': CreditCard,
   'Dízimo': Church,
+  'Farmácia': Pill,
+  'Presente': Gift,
+  'Estética': Sparkles,
+  'Estudos': GraduationCap,
+  'Eletrônicos': Smartphone,
+  'Vestuário': Shirt,
+  'Consertos': Wrench,
+  'Serviços': ClipboardList,
   'Outros': MoreHorizontal,
   'Salário': Briefcase,
   'Investimento': TrendingUp,
