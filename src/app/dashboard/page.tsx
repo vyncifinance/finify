@@ -166,13 +166,22 @@ export default function DashboardPage() {
     // Meta automática "Reserva de Emergência" — criada pelo sistema, alvo = média dos últimos 6 meses de despesa
     if (media6MesesDespesas > 0) {
       const { data: reservaExistente } = await supabase.from('metas').select('id')
-        .eq('familia_id', fid).eq('automatica', true).maybeSingle()
+        .eq('familia_id', fid).eq('automatica', true).order('created_at', { ascending: true }).limit(1).maybeSingle()
       if (!reservaExistente) {
-        await supabase.from('metas').insert({
+        const { error: erroInsertReserva } = await supabase.from('metas').insert({
           familia_id: fid, user_id: uid, nome: 'Reserva de Emergência',
           valor_alvo: media6MesesDespesas, valor_atual: caixaTotal,
           icone: 'shield', cor: '#0B3B2E', automatica: true,
         })
+        if (erroInsertReserva) {
+          // Provável corrida entre abas/carregamentos simultâneos: alguém já criou nesse meio-tempo.
+          // Graças ao índice único no banco, o insert falha em vez de duplicar — só busca a que já existe e atualiza.
+          const { data: jaCriada } = await supabase.from('metas').select('id')
+            .eq('familia_id', fid).eq('automatica', true).order('created_at', { ascending: true }).limit(1).maybeSingle()
+          if (jaCriada) {
+            await supabase.from('metas').update({ valor_alvo: media6MesesDespesas, valor_atual: caixaTotal }).eq('id', jaCriada.id)
+          }
+        }
       } else {
         await supabase.from('metas').update({
           valor_alvo: media6MesesDespesas, valor_atual: caixaTotal,
@@ -184,7 +193,7 @@ export default function DashboardPage() {
       .eq('familia_id', fid).order('automatica', { ascending: false }).order('created_at', { ascending: false }).limit(3)
     if (metasData) setMetas(metasData)
 
-    // Próximas despesas fixas — as que ainda não foram pagas esse mês
+    // Despesas fixas do mês — todas, pagas e pendentes, com pendentes/atrasadas priorizadas no topo
     const { data: fixasData } = await supabase.from('despesas_fixas').select('*')
       .eq('familia_id', fid).eq('ativo', true).order('dia_vencimento', { ascending: true })
     if (fixasData) {
@@ -193,11 +202,16 @@ export default function DashboardPage() {
         .eq('familia_id', fid).not('despesa_fixa_id', 'is', null).gte('data', ini).lte('data', fim)
       const pagosIds = new Set((lancFixos || []).map((l: any) => l.despesa_fixa_id))
       const hojeDia = agora.getDate()
-      const pendentes = fixasDespesa
-        .filter((f: any) => !pagosIds.has(f.id))
-        .map((f: any) => ({ ...f, atrasada: hojeDia > f.dia_vencimento, diasAte: f.dia_vencimento - hojeDia }))
-        .sort((a: any, b: any) => a.diasAte - b.diasAte)
-      setDespesasFixas(pendentes.slice(0, 3))
+      const todas = fixasDespesa
+        .map((f: any) => {
+          const pago = pagosIds.has(f.id)
+          return { ...f, pago, atrasada: !pago && hojeDia > f.dia_vencimento, diasAte: f.dia_vencimento - hojeDia }
+        })
+        .sort((a: any, b: any) => {
+          if (a.pago !== b.pago) return a.pago ? 1 : -1  // pendentes primeiro, pagas por último
+          return a.diasAte - b.diasAte
+        })
+      setDespesasFixas(todas.slice(0, 5))
     }
   }
 
@@ -701,15 +715,15 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* Próximas Despesas Fixas */}
+            {/* Despesas Fixas do Mês */}
             <div style={{
               borderRadius: '20px', padding: '24px', backgroundColor: '#fff',
               border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: despesasFixas.length === 0 ? '0' : '14px' }}>
                 <div>
-                  <h2 style={{ fontSize: '14px', fontWeight: 600, color: '#0B1F18', marginBottom: '2px', letterSpacing: '-0.2px' }}>Próximas Despesas Fixas</h2>
-                  <p style={{ fontSize: '12px', color: '#64748B' }}>O que ainda falta pagar</p>
+                  <h2 style={{ fontSize: '14px', fontWeight: 600, color: '#0B1F18', marginBottom: '2px', letterSpacing: '-0.2px' }}>Despesas Fixas do Mês</h2>
+                  <p style={{ fontSize: '12px', color: '#64748B' }}>Pagas e pendentes</p>
                 </div>
                 <a href="/dashboard/movimentos" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px', fontWeight: 600, color: '#145A45', textDecoration: 'none', flexShrink: 0 }}>
                   Ver todas <ArrowRight size={13} strokeWidth={2} />
@@ -718,14 +732,14 @@ export default function DashboardPage() {
               {despesasFixas.length === 0 ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingTop: '18px', marginTop: '18px', borderTop: '1px solid #F1F5F9' }}>
                   <CheckCircle2 size={18} color="#2F8F68" strokeWidth={1.5} />
-                  <p style={{ fontSize: '12.5px', color: '#94A3B8', flex: 1 }}>Nenhuma despesa fixa pendente.</p>
+                  <p style={{ fontSize: '12.5px', color: '#94A3B8', flex: 1 }}>Nenhuma despesa fixa cadastrada.</p>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {despesasFixas.map((df: any) => {
                     const Icon = ICONES_CAT[df.categoria] || MoreHorizontal
                     return (
-                      <div key={df.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', borderRadius: '12px', padding: '10px', border: '1px solid rgba(15,23,42,0.05)' }}>
+                      <div key={df.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', borderRadius: '12px', padding: '10px', border: '1px solid rgba(15,23,42,0.05)', opacity: df.pago ? 0.55 : 1 }}>
                         <div style={{ width: '36px', height: '36px', borderRadius: '10px', flexShrink: 0, backgroundColor: 'rgba(20,90,69,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           <Icon size={16} color="#145A45" strokeWidth={1.75} />
                         </div>
@@ -734,12 +748,14 @@ export default function DashboardPage() {
                           <p style={{ fontSize: '12px', color: '#94A3B8', margin: 0 }}>Vence dia {df.dia_vencimento} · {fmtOculto(Number(df.valor), ocultar)}</p>
                         </div>
                         <span style={{
+                          display: 'flex', alignItems: 'center', gap: '4px',
                           fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '999px', flexShrink: 0,
-                          backgroundColor: df.atrasada ? 'rgba(239,68,68,0.10)' : '#F7F8FA',
-                          border: df.atrasada ? '1px solid rgba(239,68,68,0.25)' : '1px solid #E5E7EB',
-                          color: df.atrasada ? '#EF4444' : '#64748B',
+                          backgroundColor: df.pago ? 'rgba(47,143,104,0.10)' : df.atrasada ? 'rgba(239,68,68,0.10)' : '#F7F8FA',
+                          border: df.pago ? '1px solid rgba(47,143,104,0.25)' : df.atrasada ? '1px solid rgba(239,68,68,0.25)' : '1px solid #E5E7EB',
+                          color: df.pago ? '#2F8F68' : df.atrasada ? '#EF4444' : '#64748B',
                         }}>
-                          {df.atrasada ? 'Atrasada' : 'A pagar'}
+                          {df.pago && <CheckCircle2 size={11} strokeWidth={2} />}
+                          {df.pago ? 'Pago' : df.atrasada ? 'Atrasada' : 'A pagar'}
                         </span>
                       </div>
                     )
