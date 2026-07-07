@@ -77,6 +77,7 @@ export default function DashboardPage() {
   const [lancamentos, setLancamentos] = useState<any[]>([])
   const [evolucao, setEvolucao]       = useState<any[]>([])
   const [despesasFixas, setDespesasFixas] = useState<any[]>([])
+  const [mesesReservaConsiderados, setMesesReservaConsiderados] = useState(0)
   const [dizimista, setDizimista]     = useState(true)
   const [baseDizimo, setBaseDizimo]   = useState(0)
   const [valorDizimo, setValorDizimo] = useState(0)
@@ -155,22 +156,24 @@ export default function DashboardPage() {
 
     // Média de despesas dos últimos 6 meses que de fato têm lançamento (evita distorcer com meses "vazios" de antes de você começar a usar o app)
     const despesasComDados = despesasPorMes.filter(d => d > 0)
-    const ultimos6ComDados = despesasComDados.slice(-6)
-    const media6MesesDespesas = ultimos6ComDados.length > 0 ? ultimos6ComDados.reduce((s, d) => s + d, 0) / ultimos6ComDados.length : 0
+    const ultimos3ComDados = despesasComDados.slice(-3)
+    const media3MesesDespesas = ultimos3ComDados.length > 0 ? ultimos3ComDados.reduce((s, d) => s + d, 0) / ultimos3ComDados.length : 0
+    const metaReservaEmergencia = media3MesesDespesas * 6 // amostra de 3 meses, alvo de 6 meses de despesas guardados
+    setMesesReservaConsiderados(ultimos3ComDados.length)
 
     // Caixa cadastrado em Patrimônio — valor atual da reserva de emergência
     const { data: bensCaixaData } = await supabase.from('bens').select('valor, eh_divida')
       .eq('familia_id', fid).eq('tipo', 'caixa')
     const caixaTotal = (bensCaixaData || []).filter((b: any) => !b.eh_divida).reduce((s: number, b: any) => s + Number(b.valor), 0)
 
-    // Meta automática "Reserva de Emergência" — criada pelo sistema, alvo = média dos últimos 6 meses de despesa
-    if (media6MesesDespesas > 0) {
+    // Meta automática "Reserva de Emergência" — criada pelo sistema, alvo = 6x a média mensal de despesa (6 meses de reserva)
+    if (metaReservaEmergencia > 0) {
       const { data: reservaExistente } = await supabase.from('metas').select('id')
         .eq('familia_id', fid).eq('automatica', true).order('created_at', { ascending: true }).limit(1).maybeSingle()
       if (!reservaExistente) {
         const { error: erroInsertReserva } = await supabase.from('metas').insert({
           familia_id: fid, user_id: uid, nome: 'Reserva de Emergência',
-          valor_alvo: media6MesesDespesas, valor_atual: caixaTotal,
+          valor_alvo: metaReservaEmergencia, valor_atual: caixaTotal,
           icone: 'shield', cor: '#0B3B2E', automatica: true,
         })
         if (erroInsertReserva) {
@@ -179,12 +182,12 @@ export default function DashboardPage() {
           const { data: jaCriada } = await supabase.from('metas').select('id')
             .eq('familia_id', fid).eq('automatica', true).order('created_at', { ascending: true }).limit(1).maybeSingle()
           if (jaCriada) {
-            await supabase.from('metas').update({ valor_alvo: media6MesesDespesas, valor_atual: caixaTotal }).eq('id', jaCriada.id)
+            await supabase.from('metas').update({ valor_alvo: metaReservaEmergencia, valor_atual: caixaTotal }).eq('id', jaCriada.id)
           }
         }
       } else {
         await supabase.from('metas').update({
-          valor_alvo: media6MesesDespesas, valor_atual: caixaTotal,
+          valor_alvo: metaReservaEmergencia, valor_atual: caixaTotal,
         }).eq('id', reservaExistente.id)
       }
     }
@@ -384,6 +387,11 @@ export default function DashboardPage() {
                   <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: '#F1F5F9' }}>
                     <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: cor }} />
                   </div>
+                  {m.automatica && mesesReservaConsiderados < 3 && (
+                    <p style={{ fontSize: '10.5px', color: '#94A3B8', marginTop: '5px' }}>
+                      Baseado em {mesesReservaConsiderados} {mesesReservaConsiderados === 1 ? 'mês' : 'meses'} de dados — fica mais precisa com o tempo
+                    </p>
+                  )}
                 </div>
               )
             })}
@@ -690,6 +698,11 @@ export default function DashboardPage() {
                           <div style={{ height: '5px', borderRadius: '4px', overflow: 'hidden', backgroundColor: '#F1F5F9' }}>
                             <div style={{ height: '100%', width: `${pct}%`, backgroundColor: cor, borderRadius: '4px', transition: 'width 0.4s ease' }} />
                           </div>
+                          {m.automatica && mesesReservaConsiderados < 3 && (
+                            <p style={{ fontSize: '10.5px', color: '#94A3B8', marginTop: '5px' }}>
+                              Baseado em {mesesReservaConsiderados} {mesesReservaConsiderados === 1 ? 'mês' : 'meses'} de dados — fica mais precisa com o tempo
+                            </p>
+                          )}
                         </div>
                       </div>
                     )
