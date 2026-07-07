@@ -114,6 +114,7 @@ export default function MetasPage() {
   }
 
   function abrirModalEditar(m: any) {
+    if (m.automatica) return
     setEditandoMeta(m)
     setNome(m.nome)
     setValorAlvo(String(m.valor_alvo))
@@ -151,7 +152,7 @@ export default function MetasPage() {
   }
 
   async function handleDeletarMeta() {
-    if (!editandoMeta) return
+    if (!editandoMeta || editandoMeta.automatica) return
     if (!confirmDelete) { setConfirmDelete(true); return }
     setDeletando(true)
     const { error } = await supabase.from('metas').delete().eq('id', editandoMeta.id)
@@ -167,7 +168,7 @@ export default function MetasPage() {
   }
 
   async function handleAporte() {
-    if (!valorAporte || !metaSelecionada) return
+    if (!valorAporte || !metaSelecionada || metaSelecionada.automatica) return
     setSalvandoAporte(true)
     const valor = parseFloat(valorAporte.replace(',', '.'))
     const novoValorAtual = Number(metaSelecionada.valor_atual) + valor
@@ -269,11 +270,17 @@ export default function MetasPage() {
                     <div className="px-2 py-1 rounded-lg" style={{ backgroundColor: corM + '18' }}>
                       <span className="text-sm font-bold" style={{ color: corM }}>{pct}%</span>
                     </div>
-                    <button onClick={() => abrirModalEditar(m)}
-                      className="w-8 h-8 rounded-lg flex items-center justify-center"
-                      style={{ backgroundColor: '#F1F5F9', border: 'none', cursor: 'pointer' }}>
-                      <Pencil size={13} color="#64748B" strokeWidth={1.75} />
-                    </button>
+                    {m.automatica ? (
+                      <div className="flex items-center gap-1 px-2 h-8 rounded-lg" style={{ backgroundColor: '#F1F5F9' }} title="Gerenciada automaticamente pelo sistema">
+                        <Shield size={12} color="#94A3B8" strokeWidth={1.75} />
+                      </div>
+                    ) : (
+                      <button onClick={() => abrirModalEditar(m)}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center"
+                        style={{ backgroundColor: '#F1F5F9', border: 'none', cursor: 'pointer' }}>
+                        <Pencil size={13} color="#64748B" strokeWidth={1.75} />
+                      </button>
+                    )}
                   </div>
                 </div>
                 <div className="h-1.5 rounded-full overflow-hidden mb-3" style={{ backgroundColor: '#F1F5F9' }}>
@@ -298,11 +305,17 @@ export default function MetasPage() {
                   )}
                 </div>
                 {!concluida && (
-                  <button onClick={() => abrirAporte(m)}
-                    className="w-full py-2.5 rounded-xl text-sm font-semibold"
-                    style={{ backgroundColor: corM + '12', color: corM, border: 'none', cursor: 'pointer' }}>
-                    + Adicionar valor
-                  </button>
+                  m.automatica ? (
+                    <p className="text-xs text-center py-1" style={{ color: '#94A3B8' }}>
+                      Atualizada automaticamente com base no Caixa e nas despesas dos últimos 6 meses
+                    </p>
+                  ) : (
+                    <button onClick={() => abrirAporte(m)}
+                      className="w-full py-2.5 rounded-xl text-sm font-semibold"
+                      style={{ backgroundColor: corM + '12', color: corM, border: 'none', cursor: 'pointer' }}>
+                      + Adicionar valor
+                    </button>
+                  )
                 )}
               </div>
             )
@@ -383,11 +396,17 @@ export default function MetasPage() {
                       <div className="px-2.5 py-1 rounded-lg" style={{ backgroundColor: corM + '18' }}>
                         <span className="text-sm font-bold" style={{ color: corM }}>{pct}%</span>
                       </div>
-                      <button onClick={() => abrirModalEditar(m)}
-                        className="w-8 h-8 rounded-lg flex items-center justify-center hover:opacity-80"
-                        style={{ backgroundColor: '#F1F5F9', border: 'none', cursor: 'pointer' }}>
-                        <Pencil size={13} color="#64748B" strokeWidth={1.75} />
-                      </button>
+                      {m.automatica ? (
+                        <div className="flex items-center gap-1 px-2 h-8 rounded-lg" style={{ backgroundColor: '#F1F5F9' }} title="Gerenciada automaticamente pelo sistema">
+                          <Shield size={12} color="#94A3B8" strokeWidth={1.75} />
+                        </div>
+                      ) : (
+                        <button onClick={() => abrirModalEditar(m)}
+                          className="w-8 h-8 rounded-lg flex items-center justify-center hover:opacity-80"
+                          style={{ backgroundColor: '#F1F5F9', border: 'none', cursor: 'pointer' }}>
+                          <Pencil size={13} color="#64748B" strokeWidth={1.75} />
+                        </button>
+                      )}
                     </div>
                   </div>
                   <div className="h-1.5 rounded-full overflow-hidden mb-4" style={{ backgroundColor: '#F1F5F9' }}>
@@ -412,11 +431,17 @@ export default function MetasPage() {
                     )}
                   </div>
                   {!concluida && (
-                    <button onClick={() => abrirAporte(m)}
-                      className="w-full py-2.5 rounded-xl text-sm font-semibold transition-colors hover:opacity-90"
-                      style={{ backgroundColor: corM + '12', color: corM, border: 'none', cursor: 'pointer' }}>
-                      + Adicionar valor
-                    </button>
+                    m.automatica ? (
+                      <p className="text-xs text-center py-1" style={{ color: '#94A3B8' }}>
+                        Atualizada automaticamente com base no Caixa e nas despesas dos últimos 6 meses
+                      </p>
+                    ) : (
+                      <button onClick={() => abrirAporte(m)}
+                        className="w-full py-2.5 rounded-xl text-sm font-semibold transition-colors hover:opacity-90"
+                        style={{ backgroundColor: corM + '12', color: corM, border: 'none', cursor: 'pointer' }}>
+                        + Adicionar valor
+                      </button>
+                    )
                   )}
                 </div>
               )
