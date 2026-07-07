@@ -412,9 +412,9 @@ export default function MovimentosPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Repeat size={isMob ? 14 : 16} color="#64748B" strokeWidth={1.75} />
           <span style={{ fontSize: isMob ? '13px' : '15px', fontWeight: 700, color: '#0B3B2E', letterSpacing: '-0.2px' }}>Despesas Fixas</span>
-          {totalFixasPendentes > 0 && (
+          {totalDespesasFixasPendentes > 0 && (
             <span style={{ fontSize: '11px', fontWeight: 700, color: '#EF4444', backgroundColor: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.25)', padding: '5px 12px', borderRadius: '999px' }}>
-              {fmt(totalFixasPendentes)} a pagar
+              {fmt(totalDespesasFixasPendentes)} a pagar
             </span>
           )}
         </div>
@@ -424,13 +424,13 @@ export default function MovimentosPage() {
         </button>
       </div>
 
-      {fixasDoMes.length === 0 ? (
+      {fixasDespesas.length === 0 ? (
         <div style={{ backgroundColor: '#fff', border: '1px solid #ECEFF3', borderRadius: '20px', padding: '24px', textAlign: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 12px 40px rgba(0,0,0,0.07)' }}>
           <p style={{ fontSize: '13px', color: '#94A3B8', margin: 0 }}>Nenhuma despesa fixa cadastrada.</p>
         </div>
       ) : (
         <div style={{ backgroundColor: '#fff', border: '1px solid #ECEFF3', borderRadius: '20px', overflow: 'hidden', boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 12px 40px rgba(0,0,0,0.07)' }}>
-          {fixasDoMes.map((df: any, i: number) => {
+          {fixasDespesas.map((df: any, i: number) => {
             const Icon = ICONES_CAT[df.categoria] || MoreHorizontal
             return (
               <div key={df.id} className="df-card"
