@@ -11,13 +11,13 @@ import {
   Heart, BookOpen, ShoppingBag, Church, MoreHorizontal,
   Briefcase, TrendingUp, Laptop, DollarSign, Trash2, Pencil,
   CreditCard, FileText, AlignLeft, Repeat, CheckCircle2,
-  Pill, Gift, Sparkles, GraduationCap, Smartphone, Shirt, Wrench, ClipboardList, Filter, Search
+  Pill, Gift, Sparkles, GraduationCap, Smartphone, Shirt, Wrench, ClipboardList, Filter, Search, PawPrint
 } from 'lucide-react'
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 
-const CATEGORIAS_DESPESA = ['Alimentação','Moradia','Transporte','Lazer','Saúde','Educação','Cartão de Crédito','Dízimo','Farmácia','Presente','Estética','Estudos','Eletrônicos','Vestuário','Consertos','Serviços','Outros']
+const CATEGORIAS_DESPESA = ['Alimentação','Moradia','Transporte','Lazer','Saúde','Educação','Cartão de Crédito','Dízimo','Farmácia','Presente','Estética','Estudos','Eletrônicos','Vestuário','Consertos','Serviços','Pet','Outros']
 const CATEGORIAS_RECEITA = ['Salário','Renda Extra','Freelance','Investimento','Outros']
 
 const ICONES_CAT: Record<string, any> = {
@@ -26,6 +26,7 @@ const ICONES_CAT: Record<string, any> = {
   'Cartão de Crédito': CreditCard, 'Outros': MoreHorizontal,
   'Farmácia': Pill, 'Presente': Gift, 'Estética': Sparkles, 'Estudos': GraduationCap,
   'Eletrônicos': Smartphone, 'Vestuário': Shirt, 'Consertos': Wrench, 'Serviços': ClipboardList,
+  'Pet': PawPrint,
   'Salário': Briefcase, 'Renda Extra': DollarSign, 'Freelance': Laptop, 'Investimento': TrendingUp,
 }
 

@@ -11,7 +11,7 @@ import {
   Home, BookOpen, Shield, TrendingUp, Send, Heart, Star, Church,
   ChevronRight, Wallet, Building2, Sparkles, UtensilsCrossed, Car,
   Smile, ShoppingBag, CreditCard, MoreHorizontal, Briefcase,
-  Pill, Gift, GraduationCap, Smartphone, Shirt, Wrench, ClipboardList
+  Pill, Gift, GraduationCap, Smartphone, Shirt, Wrench, ClipboardList, PawPrint
 } from 'lucide-react'
 
 const ICONES_CAT: Record<string, any> = {
@@ -32,6 +32,7 @@ const ICONES_CAT: Record<string, any> = {
   'Vestuário': Shirt,
   'Consertos': Wrench,
   'Serviços': ClipboardList,
+  'Pet': PawPrint,
   'Outros': MoreHorizontal,
   'Salário': Briefcase,
   'Investimento': TrendingUp,
