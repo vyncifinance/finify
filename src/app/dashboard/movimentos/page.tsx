@@ -17,7 +17,7 @@ import {
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 
-const CATEGORIAS_DESPESA = ['Alimentação','Moradia','Transporte','Lazer','Saúde','Educação','Compras','Cartão de Crédito','Dízimo','Farmácia','Presente','Estética','Estudos','Eletrônicos','Vestuário','Consertos','Serviços','Outros']
+const CATEGORIAS_DESPESA = ['Alimentação','Moradia','Transporte','Lazer','Saúde','Educação','Cartão de Crédito','Dízimo','Farmácia','Presente','Estética','Estudos','Eletrônicos','Vestuário','Consertos','Serviços','Outros']
 const CATEGORIAS_RECEITA = ['Salário','Renda Extra','Freelance','Investimento','Outros']
 
 const ICONES_CAT: Record<string, any> = {
@@ -74,6 +74,7 @@ export default function MovimentosPage() {
   const [dfSalvando, setDfSalvando]       = useState(false)
   const [dfDeletando, setDfDeletando]     = useState(false)
   const [dfConfirmDelete, setDfConfirmDelete] = useState(false)
+  const [dfErro, setDfErro] = useState('')
 
   const [pagarModalOpen, setPagarModalOpen] = useState(false)
   const [dfPagando, setDfPagando]           = useState<any>(null)
@@ -262,7 +263,7 @@ export default function MovimentosPage() {
   function abrirDfModalNovo() {
     setDfEditando(null); setDfNome(''); setDfValor(''); setDfCategoria('Moradia'); setDfDia('5')
     setDfVariavel(false); setDfTipo('despesa')
-    setDfConfirmDelete(false); setDfModalOpen(true)
+    setDfConfirmDelete(false); setDfErro(''); setDfModalOpen(true)
   }
 
   function abrirDfModalEditar(df: any) {
@@ -270,7 +271,7 @@ export default function MovimentosPage() {
     setDfValor(Number(df.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
     setDfCategoria(df.categoria); setDfDia(String(df.dia_vencimento))
     setDfVariavel(!!df.valor_variavel); setDfTipo(df.tipo === 'receita' ? 'receita' : 'despesa')
-    setDfConfirmDelete(false); setDfModalOpen(true)
+    setDfConfirmDelete(false); setDfErro(''); setDfModalOpen(true)
   }
 
   function handleDfTipo(t: 'despesa' | 'receita') {
@@ -281,6 +282,7 @@ export default function MovimentosPage() {
   async function handleSalvarDf() {
     if (!dfNome.trim() || !dfValor) return
     setDfSalvando(true)
+    setDfErro('')
     const valorNum = parseFloat(dfValor.replace(/\./g, '').replace(',', '.'))
     const diaNum   = Math.min(31, Math.max(1, parseInt(dfDia) || 1))
     const fid = familiaIdRef.current
@@ -291,6 +293,7 @@ export default function MovimentosPage() {
       }).eq('id', dfEditando.id)
       setDfSalvando(false)
       if (!error) { setDfModalOpen(false); await recarregarDespesasFixas(fid) }
+      else { console.error('Erro ao atualizar despesa fixa:', error); setDfErro(error.message || 'Não foi possível salvar. Tente novamente.') }
     } else {
       const { error } = await supabase.from('despesas_fixas').insert({
         familia_id: fid, user_id: userId, nome: dfNome.trim(), valor: valorNum,
@@ -298,6 +301,7 @@ export default function MovimentosPage() {
       })
       setDfSalvando(false)
       if (!error) { setDfModalOpen(false); await recarregarDespesasFixas(fid) }
+      else { console.error('Erro ao criar despesa fixa:', error); setDfErro(error.message || 'Não foi possível salvar. Tente novamente.') }
     }
   }
 
@@ -305,15 +309,20 @@ export default function MovimentosPage() {
     if (!dfEditando) return
     if (!dfConfirmDelete) { setDfConfirmDelete(true); return }
     setDfDeletando(true)
+    setDfErro('')
     const { error } = await supabase.from('despesas_fixas').update({ ativo: false }).eq('id', dfEditando.id)
     setDfDeletando(false)
     if (!error) {
       setDespesasFixas(prev => prev.filter((d: any) => d.id !== dfEditando.id))
       setDfModalOpen(false)
+    } else {
+      console.error('Erro ao deletar despesa fixa:', error)
+      setDfErro(error.message || 'Não foi possível deletar. Tente novamente.')
     }
   }
 
   function iniciarPagamento(df: any) {
+    setDfErro('')
     if (df.valor_variavel) {
       setDfPagando(df)
       setValorPagar(Number(df.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
@@ -342,9 +351,12 @@ export default function MovimentosPage() {
         await recarregarDespesasFixas(fid)
       }
       await carregarLancamentos(fid)
+    } else {
+      console.error('Erro ao registrar pagamento:', error)
+      setDfErro(error.message || 'Não foi possível registrar o pagamento. Tente novamente.')
     }
     setPagando(false)
-    setPagarModalOpen(false)
+    if (!error) setPagarModalOpen(false)
   }
 
   async function confirmarPagamentoVariavel() {
@@ -358,6 +370,7 @@ export default function MovimentosPage() {
     if (!df.lancamento) return
     const { error } = await supabase.from('lancamentos').delete().eq('id', df.lancamento.id)
     if (!error) await carregarLancamentos(familiaIdRef.current)
+    else console.error('Erro ao desfazer pagamento:', error)
   }
 
   const fixasDoMes = despesasFixas.map((df: any) => {
@@ -561,6 +574,11 @@ export default function MovimentosPage() {
       </div>
 
       <div style={{ padding: '14px 24px 24px', borderTop: '1px solid #F1F5F9', backgroundColor: '#fff', flexShrink: 0 }}>
+        {dfErro && (
+          <p style={{ fontSize: '12.5px', color: '#DC2626', textAlign: 'center', marginBottom: '10px', backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', padding: '8px 12px' }}>
+            {dfErro}
+          </p>
+        )}
         <button onClick={handleSalvarDf} disabled={dfSalvando || !dfNome.trim() || !dfValor} className="df-cta"
           style={{
             width: '100%', height: '56px', borderRadius: '16px', border: 'none', fontSize: '15px', fontWeight: 700, color: '#fff',
@@ -609,6 +627,11 @@ export default function MovimentosPage() {
       </div>
 
       <div style={{ padding: '14px 24px 24px', borderTop: '1px solid #F1F5F9', backgroundColor: '#fff', flexShrink: 0 }}>
+        {dfErro && (
+          <p style={{ fontSize: '12.5px', color: '#DC2626', textAlign: 'center', marginBottom: '10px', backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', padding: '8px 12px' }}>
+            {dfErro}
+          </p>
+        )}
         <button onClick={confirmarPagamentoVariavel} disabled={pagando || !valorPagar} className="df-cta"
           style={{
             width: '100%', height: '56px', borderRadius: '16px', border: 'none', fontSize: '15px', fontWeight: 700, color: '#fff',
