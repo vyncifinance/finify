@@ -51,7 +51,7 @@ const ICONES_META: Record<string, any> = {
 }
 
 function fmt(val: number) {
-  return `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+  return `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 function fmtShort(val: number) {
   const abs = Math.abs(val)
@@ -586,7 +586,7 @@ export default function DashboardPage() {
           </div>
 
           {/* KPI Cards — identidade própria */}
-          <div style={{ display: 'grid', gap: '8px', marginBottom: '10px', gridTemplateColumns: dizimoAtivo ? 'repeat(5, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))' }}>
+          <div style={{ display: 'grid', gap: '8px', marginBottom: '10px', gridTemplateColumns: dizimoAtivo ? 'repeat(4, minmax(0, 1fr))' : 'repeat(3, minmax(0, 1fr))' }}>
             {kpis.map(card => (
               <div key={card.label} style={{
                 borderRadius: '16px', padding: '18px', backgroundColor: '#fff',
@@ -607,23 +607,6 @@ export default function DashboardPage() {
                 <span style={{ fontSize: '12.5px', fontWeight: 500, color: card.cor }}>Este mês</span>
               </div>
             ))}
-            <div style={{
-              borderRadius: '16px', padding: '18px', backgroundColor: '#fff',
-              border: '1px solid rgba(139,92,246,0.15)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
-              transition: 'all 0.2s ease',
-            }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px) scale(1.01)' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0) scale(1)' }}
-            >
-              <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#F5F3FF', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px' }}>
-                <Target size={17} color="#8B5CF6" strokeWidth={1.75} />
-              </div>
-              <p style={{ fontSize: '13px', fontWeight: 500, color: '#64748B', marginBottom: '6px' }}>Metas Ativas</p>
-              <p style={{ fontSize: '15px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.3px', marginBottom: '2px' }}>
-                {metas.length} {metas.length === 1 ? 'meta' : 'metas'}
-              </p>
-              <a href="/dashboard/metas" style={{ fontSize: '12.5px', fontWeight: 500, color: '#8B5CF6', textDecoration: 'none' }}>Ver detalhes →</a>
-            </div>
             {dizimoAtivo && (
               <div style={{
                 borderRadius: '16px', padding: '18px', position: 'relative', backgroundColor: '#fff',

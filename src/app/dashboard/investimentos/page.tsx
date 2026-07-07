@@ -18,7 +18,7 @@ const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 
 function fmt(val: number) {
-  return `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+  return `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 function fmtShort(val: number) {
   const abs = Math.abs(val)

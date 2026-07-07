@@ -23,7 +23,7 @@ export function useOcultarValores() {
 
 export function fmtOculto(val: number, ocultar: boolean): string {
   if (ocultar) return 'R$ ••••••'
-  return `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+  return `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 export function fmtShortOculto(val: number, ocultar: boolean): string {
@@ -31,5 +31,5 @@ export function fmtShortOculto(val: number, ocultar: boolean): string {
   const abs = Math.abs(val)
   if (abs >= 1000000) return `R$ ${(val / 1000000).toFixed(1)}M`
   if (abs >= 1000) return `R$ ${(val / 1000).toFixed(1)}k`
-  return `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+  return `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }

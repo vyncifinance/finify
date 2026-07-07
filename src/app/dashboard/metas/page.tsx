@@ -3,915 +3,594 @@
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useState } from 'react'
-import { useOcultarValores, fmtOculto, fmtShortOculto } from '@/hooks/useOcultarValores'
 import { createClient } from '@/lib/supabase'
+import { useOcultarValores, fmtOculto } from '@/hooks/useOcultarValores'
 import {
-  ArrowDownLeft, ArrowUpRight, PiggyBank, Target,
-  ArrowRight, ArrowUp, CheckCircle2, AlertCircle, Bell,
-  Home, BookOpen, Shield, TrendingUp, Send, Heart, Star, Church,
-  ChevronRight, Wallet, Building2, Sparkles, UtensilsCrossed, Car,
-  Smile, ShoppingBag, CreditCard, MoreHorizontal, Briefcase,
-  Pill, Gift, GraduationCap, Smartphone, Shirt, Wrench, ClipboardList
+  Home, BookOpen, Shield, TrendingUp, Send, Heart, Star, Target,
+  Plus, X, Calendar, ArrowUp, CheckCircle2, Pencil, Trash2
 } from 'lucide-react'
-
-const ICONES_CAT: Record<string, any> = {
-  'Alimentação': UtensilsCrossed,
-  'Moradia': Home,
-  'Transporte': Car,
-  'Lazer': Smile,
-  'Saúde': Heart,
-  'Educação': BookOpen,
-  'Compras': ShoppingBag,
-  'Cartão de Crédito': CreditCard,
-  'Dízimo': Church,
-  'Farmácia': Pill,
-  'Presente': Gift,
-  'Estética': Sparkles,
-  'Estudos': GraduationCap,
-  'Eletrônicos': Smartphone,
-  'Vestuário': Shirt,
-  'Consertos': Wrench,
-  'Serviços': ClipboardList,
-  'Outros': MoreHorizontal,
-  'Salário': Briefcase,
-  'Investimento': TrendingUp,
-}
-import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, PieChart, Pie, Cell, RadialBarChart, RadialBar
-} from 'recharts'
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
-const agora = new Date()
 
-const ICONES_META: Record<string, any> = {
-  home: Home, book: BookOpen, shield: Shield, 'trending-up': TrendingUp,
-  send: Send, heart: Heart, star: Star, target: Target,
+const ICONES = [
+  { nome: 'home',        label: 'Casa',         Icon: Home },
+  { nome: 'book',        label: 'Educação',     Icon: BookOpen },
+  { nome: 'shield',      label: 'Reserva',      Icon: Shield },
+  { nome: 'trending-up', label: 'Investimento', Icon: TrendingUp },
+  { nome: 'send',        label: 'Viagem',       Icon: Send },
+  { nome: 'heart',       label: 'Saúde',        Icon: Heart },
+  { nome: 'star',        label: 'Sonho',        Icon: Star },
+  { nome: 'target',      label: 'Meta',         Icon: Target },
+]
+
+const CORES = [
+  '#145A45', '#C7A15A', '#10B981', '#3B82F6',
+  '#8B5CF6', '#EC4899', '#EF4444', '#64748B',
+]
+
+function getIcon(nome: string) {
+  return (ICONES.find(i => i.nome === nome) || ICONES[ICONES.length - 1]).Icon
 }
 
 function fmt(val: number) {
-  return `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+  return `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 function fmtShort(val: number) {
-  const abs = Math.abs(val)
-  if (abs >= 1000) return `R$ ${(val / 1000).toFixed(1)}k`
+  if (val >= 1000000) return `R$ ${(val / 1000000).toFixed(1)}M`
+  if (val >= 1000) return `R$ ${(val / 1000).toFixed(1)}k`
   return fmt(val)
 }
-function getSaudacao() {
-  const h = agora.getHours()
-  if (h < 12) return 'Bom dia'
-  if (h < 18) return 'Boa tarde'
-  return 'Boa noite'
+function formatPrazo(prazo: string | null) {
+  if (!prazo) return null
+  const d = new Date(prazo + 'T12:00:00')
+  return `${MESES[d.getMonth()]} ${d.getFullYear()}`
+}
+function calcMesesRestantes(prazo: string | null) {
+  if (!prazo) return null
+  const hoje = new Date()
+  const fim  = new Date(prazo + 'T12:00:00')
+  const diff = (fim.getFullYear() - hoje.getFullYear()) * 12 + (fim.getMonth() - hoje.getMonth())
+  return diff > 0 ? diff : 0
 }
 
-export default function DashboardPage() {
-  const [nome, setNome]       = useState('')
-  const [familia, setFamilia] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [totalRec, setTotalRec] = useState(0)
-  const [totalDes, setTotalDes] = useState(0)
-  const [totalEco, setTotalEco] = useState(0)
-  const [cats, setCats]         = useState<any[]>([])
-  const [metas, setMetas]       = useState<any[]>([])
-  const [lancamentos, setLancamentos] = useState<any[]>([])
-  const [evolucao, setEvolucao]       = useState<any[]>([])
-  const [despesasFixas, setDespesasFixas] = useState<any[]>([])
-  const [dizimista, setDizimista]     = useState(true)
-  const [baseDizimo, setBaseDizimo]   = useState(0)
-  const [valorDizimo, setValorDizimo] = useState(0)
-  const [dizimoPago, setDizimoPago]   = useState(0)
-  const [atualizadoHa, setAtualizadoHa] = useState(0)
+export default function MetasPage() {
+  const [loading, setLoading]         = useState(true)
+  const [familiaId, setFamiliaId]     = useState('')
+  const [familiaNome, setFamiliaNome] = useState('')
+  const [userId, setUserId]           = useState('')
+  const [membroAtual, setMembroAtual] = useState('')
+  const [metas, setMetas]             = useState<any[]>([])
+
+  const [modalOpen, setModalOpen]         = useState(false)
+  const [editandoMeta, setEditandoMeta]   = useState<any>(null)
+  const [nome, setNome]                   = useState('')
+  const [valorAlvo, setValorAlvo]         = useState('')
+  const [prazo, setPrazo]                 = useState('')
+  const [icone, setIcone]                 = useState('target')
+  const [cor, setCor]                     = useState('#145A45')
+  const [salvando, setSalvando]           = useState(false)
+  const [deletando, setDeletando]         = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
+  const [aporteOpen, setAporteOpen]           = useState(false)
+  const [metaSelecionada, setMetaSelecionada] = useState<any>(null)
+  const [valorAporte, setValorAporte]         = useState('')
+  const [salvandoAporte, setSalvandoAporte]   = useState(false)
 
   const ocultar  = useOcultarValores()
   const supabase = createClient()
 
-  useEffect(() => { carregar() }, [])
+  useEffect(() => { init() }, [])
 
-  useEffect(() => {
-    const interval = setInterval(() => setAtualizadoHa(prev => prev + 1), 60000)
-    return () => clearInterval(interval)
-  }, [])
-
-  async function carregar() {
+  async function init() {
     setLoading(true)
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.user) return
+    setUserId(session.user.id)
     const { data: profile } = await supabase
-      .from('profiles').select('nome, familia_id, familias(nome, dizimista)')
+      .from('profiles').select('nome, familia_id, familias(nome)')
       .eq('id', session.user.id).single()
     if (profile) {
-      setNome(profile.nome || '')
-      setFamilia((profile.familias as any)?.nome || '')
-      setDizimista((profile.familias as any)?.dizimista !== false)
-      await carregarDados(profile.familia_id, session.user.id)
+      setMembroAtual(profile.nome || '')
+      setFamiliaId(profile.familia_id)
+      setFamiliaNome((profile.familias as any)?.nome || '')
+      await carregarMetas(profile.familia_id)
     }
     setLoading(false)
-    setAtualizadoHa(0)
   }
 
-  async function carregarDados(fid: string, uid: string) {
-    const ini = new Date(agora.getFullYear(), agora.getMonth(), 1).toISOString().split('T')[0]
-    const fim = new Date(agora.getFullYear(), agora.getMonth() + 1, 0).toISOString().split('T')[0]
-    const { data: lanc } = await supabase.from('lancamentos').select('*')
-      .eq('familia_id', fid).gte('data', ini).lte('data', fim)
-      .order('data', { ascending: false })
+  async function carregarMetas(fid: string) {
+    const { data } = await supabase.from('metas').select('*')
+      .eq('familia_id', fid).order('created_at', { ascending: false })
+    if (data) setMetas(data)
+  }
 
-    if (lanc) {
-      const r = lanc.filter((l: any) => l.tipo === 'receita').reduce((s: number, l: any) => s + Number(l.valor), 0)
-      const d = lanc.filter((l: any) => l.tipo === 'despesa').reduce((s: number, l: any) => s + Number(l.valor), 0)
-      setTotalRec(r); setTotalDes(d); setTotalEco(r - d)
-      setLancamentos(lanc.slice(0, 5))
+  function abrirModalNova() {
+    setEditandoMeta(null)
+    setNome(''); setValorAlvo(''); setPrazo(''); setIcone('target'); setCor('#145A45')
+    setConfirmDelete(false)
+    setModalOpen(true)
+  }
 
-      const base = lanc.filter((l: any) => l.tipo === 'receita' && l.dizimar !== false).reduce((s: number, l: any) => s + Number(l.valor), 0)
-      const pago = lanc.filter((l: any) => l.tipo === 'despesa' && l.categoria === 'Dízimo').reduce((s: number, l: any) => s + Number(l.valor), 0)
-      setBaseDizimo(base); setValorDizimo(base * 0.1); setDizimoPago(pago)
+  function abrirModalEditar(m: any) {
+    if (m.automatica) return
+    setEditandoMeta(m)
+    setNome(m.nome)
+    setValorAlvo(String(m.valor_alvo))
+    setPrazo(m.prazo ? m.prazo.substring(0, 7) : '')
+    setIcone(m.icone || 'target')
+    setCor(m.cor || '#145A45')
+    setConfirmDelete(false)
+    setModalOpen(true)
+  }
 
-      const porCat: any = {}
-      lanc.filter((l: any) => l.tipo === 'despesa').forEach((l: any) => {
-        porCat[l.categoria] = (porCat[l.categoria] || 0) + Number(l.valor)
+  async function handleSalvarMeta() {
+    if (!nome.trim() || !valorAlvo) return
+    setSalvando(true)
+    if (editandoMeta) {
+      const { error } = await supabase.from('metas').update({
+        nome: nome.trim(),
+        valor_alvo: parseFloat(valorAlvo.replace(',', '.')),
+        prazo: prazo ? `${prazo}-01` : null,
+        icone, cor,
+      }).eq('id', editandoMeta.id)
+      setSalvando(false)
+      if (!error) { setModalOpen(false); await carregarMetas(familiaId) }
+    } else {
+      const { error } = await supabase.from('metas').insert({
+        familia_id: familiaId, user_id: userId,
+        nome: nome.trim(),
+        valor_alvo: parseFloat(valorAlvo.replace(',', '.')),
+        valor_atual: 0,
+        prazo: prazo ? `${prazo}-01` : null,
+        icone, cor,
       })
-      const cores = ['#145A45','#3B82F6','#F59E0B','#8B5CF6','#EF4444','#EC4899','#10B981','#64748B']
-      setCats(Object.entries(porCat).map(([nome, val], i) => ({
-        nome, val: Number(val), cor: cores[i % cores.length],
-        pct: d > 0 ? Math.round((Number(val) / d) * 100) : 0
-      })))
-    }
-
-    const evo = []
-    const despesasPorMes: number[] = []
-    for (let i = 5; i >= 0; i--) {
-      const d2 = new Date(agora.getFullYear(), agora.getMonth() - i, 1)
-      const i2 = new Date(d2.getFullYear(), d2.getMonth(), 1).toISOString().split('T')[0]
-      const f2 = new Date(d2.getFullYear(), d2.getMonth() + 1, 0).toISOString().split('T')[0]
-      const { data: mes } = await supabase.from('lancamentos').select('tipo, valor')
-        .eq('familia_id', fid).gte('data', i2).lte('data', f2)
-      const r2 = (mes || []).filter((l: any) => l.tipo === 'receita').reduce((s: number, l: any) => s + Number(l.valor), 0)
-      const d3 = (mes || []).filter((l: any) => l.tipo === 'despesa').reduce((s: number, l: any) => s + Number(l.valor), 0)
-      evo.push({ mes: MESES[d2.getMonth()].substring(0, 3), valor: r2 - d3 })
-      despesasPorMes.push(d3)
-    }
-    setEvolucao(evo)
-
-    // Média de despesas dos últimos 6 meses que de fato têm lançamento (evita distorcer com meses "vazios" de antes de você começar a usar o app)
-    const despesasComDados = despesasPorMes.filter(d => d > 0)
-    const ultimos6ComDados = despesasComDados.slice(-6)
-    const media6MesesDespesas = ultimos6ComDados.length > 0 ? ultimos6ComDados.reduce((s, d) => s + d, 0) / ultimos6ComDados.length : 0
-
-    // Caixa cadastrado em Patrimônio — valor atual da reserva de emergência
-    const { data: bensCaixaData } = await supabase.from('bens').select('valor, eh_divida')
-      .eq('familia_id', fid).eq('tipo', 'caixa')
-    const caixaTotal = (bensCaixaData || []).filter((b: any) => !b.eh_divida).reduce((s: number, b: any) => s + Number(b.valor), 0)
-
-    // Meta automática "Reserva de Emergência" — criada pelo sistema, alvo = média dos últimos 6 meses de despesa
-    if (media6MesesDespesas > 0) {
-      const { data: reservaExistente } = await supabase.from('metas').select('id')
-        .eq('familia_id', fid).eq('automatica', true).order('created_at', { ascending: true }).limit(1).maybeSingle()
-      if (!reservaExistente) {
-        const { error: erroInsertReserva } = await supabase.from('metas').insert({
-          familia_id: fid, user_id: uid, nome: 'Reserva de Emergência',
-          valor_alvo: media6MesesDespesas, valor_atual: caixaTotal,
-          icone: 'shield', cor: '#0B3B2E', automatica: true,
-        })
-        if (erroInsertReserva) {
-          // Provável corrida entre abas/carregamentos simultâneos: alguém já criou nesse meio-tempo.
-          // Graças ao índice único no banco, o insert falha em vez de duplicar — só busca a que já existe e atualiza.
-          const { data: jaCriada } = await supabase.from('metas').select('id')
-            .eq('familia_id', fid).eq('automatica', true).order('created_at', { ascending: true }).limit(1).maybeSingle()
-          if (jaCriada) {
-            await supabase.from('metas').update({ valor_alvo: media6MesesDespesas, valor_atual: caixaTotal }).eq('id', jaCriada.id)
-          }
-        }
-      } else {
-        await supabase.from('metas').update({
-          valor_alvo: media6MesesDespesas, valor_atual: caixaTotal,
-        }).eq('id', reservaExistente.id)
-      }
-    }
-
-    const { data: metasData } = await supabase.from('metas').select('*')
-      .eq('familia_id', fid).order('automatica', { ascending: false }).order('created_at', { ascending: false }).limit(3)
-    if (metasData) setMetas(metasData)
-
-    // Próximas despesas fixas — as que ainda não foram pagas esse mês
-    const { data: fixasData } = await supabase.from('despesas_fixas').select('*')
-      .eq('familia_id', fid).eq('ativo', true).order('dia_vencimento', { ascending: true })
-    if (fixasData) {
-      const fixasDespesa = fixasData.filter((f: any) => f.tipo !== 'receita')
-      const { data: lancFixos } = await supabase.from('lancamentos').select('despesa_fixa_id')
-        .eq('familia_id', fid).not('despesa_fixa_id', 'is', null).gte('data', ini).lte('data', fim)
-      const pagosIds = new Set((lancFixos || []).map((l: any) => l.despesa_fixa_id))
-      const hojeDia = agora.getDate()
-      const pendentes = fixasDespesa
-        .filter((f: any) => !pagosIds.has(f.id))
-        .map((f: any) => ({ ...f, atrasada: hojeDia > f.dia_vencimento, diasAte: f.dia_vencimento - hojeDia }))
-        .sort((a: any, b: any) => a.diasAte - b.diasAte)
-      setDespesasFixas(pendentes.slice(0, 3))
+      setSalvando(false)
+      if (!error) { setModalOpen(false); await carregarMetas(familiaId) }
     }
   }
 
-  const mesAtual     = `${MESES[agora.getMonth()]} ${agora.getFullYear()}`
-  const pctGasto     = totalRec > 0 ? Math.round((totalDes / totalRec) * 100) : 0
-  const pctGuard     = totalRec > 0 ? Math.round((totalEco / totalRec) * 100) : 0
-  const semDados     = totalRec === 0 && totalDes === 0
-  const primeiroNome = nome.trim().split(' ')[0]
+  async function handleDeletarMeta() {
+    if (!editandoMeta || editandoMeta.automatica) return
+    if (!confirmDelete) { setConfirmDelete(true); return }
+    setDeletando(true)
+    const { error } = await supabase.from('metas').delete().eq('id', editandoMeta.id)
+    setDeletando(false)
+    if (!error) {
+      setMetas(prev => prev.filter((m: any) => m.id !== editandoMeta.id))
+      setModalOpen(false)
+    }
+  }
 
-  // Resultado do mês (recebeu - gastou), com comparação ao mês anterior
-  const resultadoExibir = totalEco
-  const mesAnteriorVal   = evolucao.length > 1 ? evolucao[evolucao.length - 2].valor : totalEco
-  const crescimentoValor = totalEco - mesAnteriorVal
-  const crescimentoPct   = mesAnteriorVal !== 0 ? (crescimentoValor / Math.abs(mesAnteriorVal)) * 100 : 0
-  const dizimoAtivo    = dizimista === true
-  const dizimoRestante = Math.max(valorDizimo - dizimoPago, 0)
-  const dizimoPctPago  = valorDizimo > 0 ? Math.min(Math.round((dizimoPago / valorDizimo) * 100), 100) : 0
-  const dizimoQuitado  = dizimoPago >= valorDizimo && valorDizimo > 0
+  function abrirAporte(m: any) {
+    setMetaSelecionada(m); setValorAporte(''); setAporteOpen(true)
+  }
 
-  let score = 0
-  if (pctGasto < 80)     score += 35
-  if (metas.length > 0)  score += 35
-  if (pctGuard >= 10)    score += 30
-  score = Math.min(score, 100)
+  async function handleAporte() {
+    if (!valorAporte || !metaSelecionada || metaSelecionada.automatica) return
+    setSalvandoAporte(true)
+    const valor = parseFloat(valorAporte.replace(',', '.'))
+    const novoValorAtual = Number(metaSelecionada.valor_atual) + valor
+    const { error } = await supabase.from('metas').update({ valor_atual: novoValorAtual }).eq('id', metaSelecionada.id)
+    if (!error) {
+      const agora = new Date()
+      const hora  = `${String(agora.getHours()).padStart(2,'0')}:${String(agora.getMinutes()).padStart(2,'0')}`
+      await supabase.from('lancamentos').insert({
+        familia_id: familiaId, user_id: userId, tipo: 'despesa', valor,
+        categoria: 'Investimento', membro: membroAtual,
+        data: agora.toISOString().split('T')[0], hora,
+        descricao: `Aporte para meta: ${metaSelecionada.nome}`,
+      })
+      setAporteOpen(false); await carregarMetas(familiaId)
+    }
+    setSalvandoAporte(false)
+  }
 
-  const scoreLabel = score >= 80 ? 'Excelente' : score >= 60 ? 'Bom' : score >= 35 ? 'Atenção' : 'Crítico'
-  const scoreCor   = score >= 80 ? '#2F8F68' : score >= 60 ? '#F59E0B' : score >= 35 ? '#F97316' : '#EF4444'
-
-  const saude = [
-    { label: 'Orçamento Controlado',    ok: pctGasto < 80,    desc: pctGasto < 80 ? `${pctGasto}% comprometido` : 'Gastos elevados' },
-    { label: 'Metas em Andamento',      ok: metas.length > 0, desc: metas.length > 0 ? `${metas.length} meta(s) ativa(s)` : 'Nenhuma meta criada' },
-    { label: 'Crescimento Patrimonial', ok: totalEco > 0,     desc: totalEco > 0 ? `+${fmtOculto(totalEco, ocultar)} este mês` : 'Sem crescimento' },
-  ]
+  const totalMetas      = metas.length
+  const metasConcluidas = metas.filter(m => Number(m.valor_atual) >= Number(m.valor_alvo)).length
+  const totalGuardado   = metas.reduce((s, m) => s + Number(m.valor_atual), 0)
+  const totalAlvo       = metas.reduce((s, m) => s + Number(m.valor_alvo), 0)
 
   const kpis = [
-    { label: 'Receitas', val: totalRec, cor: '#2F8F68', bg: '#ECFDF5', borderTint: 'rgba(47,143,104,0.15)', Icon: ArrowDownLeft },
-    { label: 'Despesas', val: totalDes, cor: '#DC2626', bg: '#FEF2F2', borderTint: 'rgba(220,38,38,0.12)', Icon: ArrowUpRight  },
-    { label: 'Economia', val: totalEco, cor: '#B7791F', bg: '#FFFBEB', borderTint: 'rgba(183,121,31,0.15)', Icon: PiggyBank     },
+    { label: 'Criadas',    val: totalMetas,      cor: '#3B82F6', bg: '#EFF6FF', Icon: Target,      isNum: true },
+    { label: 'Concluídas', val: metasConcluidas, cor: '#10B981', bg: '#ECFDF5', Icon: CheckCircle2, isNum: true },
+    { label: 'Guardado',   val: totalGuardado,   cor: '#C7A15A', bg: '#FFFBEB', Icon: ArrowUp,      isNum: false },
   ]
 
   return (
     <>
-      {/* ── MOBILE (mantido) ── */}
-      <div className="lg:hidden min-h-screen" style={{ backgroundColor: '#F8FAFC', paddingBottom: '32px' }}>
+      {/* ── MOBILE ── */}
+      <div className="lg:hidden min-h-screen" style={{ backgroundColor: '#F8FAFC', paddingBottom: '100px' }}>
         <div style={{ background: 'linear-gradient(135deg, #07271F 0%, #145A45 100%)', padding: '24px 20px 48px' }}>
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-2">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                {getSaudacao()}, {primeiroNome || 'Família'}
+              <h1 className="text-lg font-semibold text-white">Metas da Família</h1>
+              <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                {familiaNome ? `Família ${familiaNome}` : 'Acompanhe seus sonhos'}
               </p>
-              <p className="text-2xl font-bold text-white" style={{ letterSpacing: '-1px' }}>
-                {loading ? '...' : fmtShortOculto(resultadoExibir, ocultar)}
-              </p>
-              <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.5)' }}>Resultado do mês · {mesAtual}</p>
             </div>
-            <div className="flex items-center gap-2">
-              {!semDados && (
-                <div className="flex items-center gap-1 px-3 py-1.5 rounded-full"
-                  style={{ backgroundColor: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.3)' }}>
-                  <ArrowUp size={11} color="#6EE7B7" strokeWidth={2.5} />
-                  <span className="text-xs font-semibold" style={{ color: '#6EE7B7' }}>{pctGuard}%</span>
-                </div>
-              )}
-              <button className="w-9 h-9 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: 'rgba(255,255,255,0.1)' }}>
-                <Bell size={16} color="rgba(255,255,255,0.7)" strokeWidth={1.5} />
-              </button>
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-2 px-4 -mb-6">
-            {kpis.map(c => (
-              <div key={c.label} className="rounded-2xl p-3"
-                style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
-                <div className="w-8 h-8 rounded-full flex items-center justify-center mb-2"
-                  style={{ backgroundColor: c.bg }}>
-                  <c.Icon size={14} color={c.cor} strokeWidth={1.75} />
-                </div>
-                <p className="text-xs font-medium mb-1" style={{ color: '#64748B' }}>{c.label}</p>
-                <p className="text-sm font-semibold leading-tight" style={{ color: c.cor }}>
-                  {loading ? '...' : fmtShortOculto(c.val, ocultar)}
-                </p>
-              </div>
-            ))}
+            <button onClick={abrirModalNova}
+              className="w-10 h-10 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: 'rgba(255,255,255,0.15)', border: 'none', cursor: 'pointer' }}>
+              <Plus size={20} color="#fff" strokeWidth={2} />
+            </button>
           </div>
         </div>
 
-        <div className="px-4 mt-10 flex flex-col gap-4">
-          {dizimoAtivo && (
-            <div className="rounded-2xl p-4 border"
-              style={{ backgroundColor: '#fff', borderColor: dizimoQuitado ? '#D1FAE5' : '#FEF3C7' }}>
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#F0FDF4' }}>
-                    <Church size={15} color="#145A45" strokeWidth={1.75} />
+        <div className="grid grid-cols-3 gap-2 px-4 -mt-6 mb-4">
+          {kpis.map(c => (
+            <div key={c.label} className="rounded-2xl p-3"
+              style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+              <div className="w-8 h-8 rounded-full flex items-center justify-center mb-2" style={{ backgroundColor: c.bg }}>
+                <c.Icon size={14} color={c.cor} strokeWidth={1.75} />
+              </div>
+              <p className="text-xs font-medium mb-0.5" style={{ color: '#64748B' }}>{c.label}</p>
+              <p className="text-sm font-semibold leading-tight" style={{ color: c.cor }}>
+                {loading ? '...' : c.isNum ? c.val : ocultar ? 'R$ •••' : fmtShort(c.val)}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        <div className="px-4 flex flex-col gap-3">
+          {loading ? (
+            <p className="text-sm text-center py-16" style={{ color: '#94A3B8' }}>Carregando...</p>
+          ) : metas.length === 0 ? (
+            <div className="rounded-2xl border flex flex-col items-center justify-center py-12 gap-3"
+              style={{ backgroundColor: '#fff', borderColor: '#E2E8F0' }}>
+              <Target size={28} color="#E2E8F0" strokeWidth={1} />
+              <p className="text-sm" style={{ color: '#94A3B8' }}>Nenhuma meta criada ainda.</p>
+              <button onClick={abrirModalNova} className="text-sm font-semibold" style={{ color: '#145A45', background: 'none', border: 'none', cursor: 'pointer' }}>
+                Criar primeira meta →
+              </button>
+            </div>
+          ) : metas.map(m => {
+            const pct        = Math.min(Math.round((Number(m.valor_atual) / Number(m.valor_alvo)) * 100), 100)
+            const mesesRest  = calcMesesRestantes(m.prazo)
+            const concluida  = pct >= 100
+            const faltaValor = Math.max(Number(m.valor_alvo) - Number(m.valor_atual), 0)
+            const Icon       = getIcon(m.icone)
+            const corM       = m.cor || '#145A45'
+            return (
+              <div key={m.id} className="rounded-2xl border p-4"
+                style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: corM + '18' }}>
+                    <Icon size={17} color={corM} strokeWidth={1.75} />
                   </div>
-                  <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>Dízimo do mês</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold truncate" style={{ color: '#0F172A' }}>{m.nome}</p>
+                    <p className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>
+                      {fmtOculto(Number(m.valor_atual), ocultar)} de {fmtOculto(Number(m.valor_alvo), ocultar)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="px-2 py-1 rounded-lg" style={{ backgroundColor: corM + '18' }}>
+                      <span className="text-sm font-bold" style={{ color: corM }}>{pct}%</span>
+                    </div>
+                    {m.automatica ? (
+                      <div className="flex items-center gap-1 px-2 h-8 rounded-lg" style={{ backgroundColor: '#F1F5F9' }} title="Gerenciada automaticamente pelo sistema">
+                        <Shield size={12} color="#94A3B8" strokeWidth={1.75} />
+                      </div>
+                    ) : (
+                      <button onClick={() => abrirModalEditar(m)}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center"
+                        style={{ backgroundColor: '#F1F5F9', border: 'none', cursor: 'pointer' }}>
+                        <Pencil size={13} color="#64748B" strokeWidth={1.75} />
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <span className="text-xs font-bold px-2 py-1 rounded-full"
-                  style={{ backgroundColor: dizimoQuitado ? '#D1FAE5' : '#FEF3C7', color: dizimoQuitado ? '#059669' : '#D97706' }}>
-                  {dizimoQuitado ? 'Pago' : 'Pendente'}
-                </span>
+                <div className="h-1.5 rounded-full overflow-hidden mb-3" style={{ backgroundColor: '#F1F5F9' }}>
+                  <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: corM }} />
+                </div>
+                <div className="flex items-center justify-between mb-3">
+                  {concluida ? (
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle2 size={13} color="#10B981" strokeWidth={2} />
+                      <span className="text-xs font-semibold" style={{ color: '#10B981' }}>Concluída</span>
+                    </div>
+                  ) : (
+                    <span className="text-xs" style={{ color: '#64748B' }}>Falta {fmtOculto(faltaValor, ocultar)}</span>
+                  )}
+                  {m.prazo && (
+                    <div className="flex items-center gap-1">
+                      <Calendar size={11} color="#94A3B8" strokeWidth={1.75} />
+                      <span className="text-xs" style={{ color: '#94A3B8' }}>
+                        {formatPrazo(m.prazo)}{mesesRest !== null && mesesRest > 0 ? ` · ${mesesRest}m` : ''}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                {!concluida && (
+                  m.automatica ? (
+                    <p className="text-xs text-center py-1" style={{ color: '#94A3B8' }}>
+                      Atualizada automaticamente com base no Caixa e nas despesas dos últimos 6 meses
+                    </p>
+                  ) : (
+                    <button onClick={() => abrirAporte(m)}
+                      className="w-full py-2.5 rounded-xl text-sm font-semibold"
+                      style={{ backgroundColor: corM + '12', color: corM, border: 'none', cursor: 'pointer' }}>
+                      + Adicionar valor
+                    </button>
+                  )
+                )}
               </div>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xl font-bold" style={{ color: '#0F172A' }}>{loading ? '...' : fmtOculto(valorDizimo, ocultar)}</p>
-                <p className="text-xs" style={{ color: '#94A3B8' }}>10% de {loading ? '...' : fmtShort(baseDizimo)}</p>
-              </div>
-              <div className="h-1.5 rounded-full overflow-hidden mb-1" style={{ backgroundColor: '#F1F5F9' }}>
-                <div className="h-full rounded-full" style={{ width: `${dizimoPctPago}%`, backgroundColor: dizimoQuitado ? '#10B981' : '#F59E0B' }} />
-              </div>
-              <div className="flex justify-between">
-                <span className="text-xs" style={{ color: '#94A3B8' }}>Pago: {fmtOculto(dizimoPago, ocultar)}</span>
-                <span className="text-xs font-semibold" style={{ color: dizimoQuitado ? '#10B981' : '#D97706' }}>
-                  {dizimoQuitado ? 'Completo!' : `Falta ${fmtOculto(dizimoRestante, ocultar)}`}
-                </span>
-              </div>
-            </div>
-          )}
+            )
+          })}
+        </div>
+      </div>
 
-          <div className="rounded-2xl p-4 border" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0' }}>
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>Saúde Financeira</p>
-              <span className="text-2xl font-bold" style={{ color: scoreCor }}>
-                {score}<span className="text-xs font-normal text-gray-400">/100</span>
-              </span>
-            </div>
-            <div className="h-2 rounded-full overflow-hidden mb-3" style={{ backgroundColor: '#F1F5F9' }}>
-              <div className="h-full rounded-full transition-all" style={{ width: `${score}%`, backgroundColor: scoreCor }} />
-            </div>
-            <div className="flex flex-col gap-2">
-              {saude.map((s, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  {s.ok
-                    ? <CheckCircle2 size={14} color="#10B981" strokeWidth={1.75} className="flex-shrink-0" />
-                    : <AlertCircle  size={14} color="#EF4444" strokeWidth={1.75} className="flex-shrink-0" />
-                  }
-                  <p className="text-xs" style={{ color: '#64748B' }}>{s.label}</p>
-                </div>
-              ))}
-            </div>
+      {/* ── DESKTOP ── */}
+      <div className="hidden lg:block p-8 max-w-[1440px] mx-auto" style={{ backgroundColor: '#F8FAFC' }}>
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', letterSpacing: '-0.5px' }}>Metas da Família</h1>
+            <p className="text-sm mt-1" style={{ color: '#64748B' }}>
+              Acompanhe os sonhos e conquistas{familiaNome ? ` da família ${familiaNome}` : ''}
+            </p>
           </div>
+          <button onClick={abrirModalNova}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90"
+            style={{ backgroundColor: '#145A45', boxShadow: '0 4px 12px rgba(20,90,69,0.3)', border: 'none', cursor: 'pointer' }}>
+            <Plus size={16} strokeWidth={2.5} /> Nova meta
+          </button>
+        </div>
 
-          <div className="rounded-2xl border" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0' }}>
-            <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: '#F1F5F9' }}>
-              <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>Metas da Família</p>
-              <a href="/dashboard/metas" className="flex items-center gap-1 text-xs font-semibold" style={{ color: '#145A45' }}>
-                Ver todas <ChevronRight size={13} strokeWidth={2} />
-              </a>
-            </div>
-            {metas.length === 0 ? (
-              <div className="p-6 text-center">
-                <p className="text-sm" style={{ color: '#94A3B8' }}>Nenhuma meta criada.</p>
-                <a href="/dashboard/metas" className="text-xs font-semibold mt-2 block" style={{ color: '#145A45' }}>Criar meta →</a>
+        <div className="grid grid-cols-3 gap-5 mb-6">
+          {[
+            { label: 'Metas Criadas',    val: totalMetas,      cor: '#3B82F6', bg: '#EFF6FF', Icon: Target,      isNum: true },
+            { label: 'Metas Concluídas', val: metasConcluidas, cor: '#10B981', bg: '#ECFDF5', Icon: CheckCircle2, isNum: true },
+            { label: 'Total Guardado',   val: totalGuardado,   cor: '#C7A15A', bg: '#FFFBEB', Icon: ArrowUp,      isNum: false },
+          ].map(c => (
+            <div key={c.label} className="rounded-[20px] p-6 border"
+              style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+              <div className="w-11 h-11 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: c.bg }}>
+                <c.Icon size={19} color={c.cor} strokeWidth={1.75} />
               </div>
-            ) : metas.map((m: any) => {
-              const pct  = Math.min(Math.round((Number(m.valor_atual) / Number(m.valor_alvo)) * 100), 100)
-              const Icon = ICONES_META[m.icone] || Target
-              const cor  = m.cor || '#145A45'
+              <p className="text-sm font-medium mb-1" style={{ color: '#64748B' }}>{c.label}</p>
+              <p className="text-2xl font-semibold" style={{ color: '#0F172A', letterSpacing: '-0.5px' }}>
+                {loading ? '...' : c.isNum ? c.val : ocultar ? 'R$ •••••• de R$ ••••••' : `${fmt(totalGuardado)} de ${fmt(totalAlvo)}`}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        {loading ? (
+          <p className="text-sm text-center py-16" style={{ color: '#94A3B8' }}>Carregando...</p>
+        ) : metas.length === 0 ? (
+          <div className="rounded-[20px] border flex flex-col items-center justify-center py-16 gap-3"
+            style={{ backgroundColor: '#fff', borderColor: '#E2E8F0' }}>
+            <Target size={32} color="#E2E8F0" strokeWidth={1} />
+            <p className="text-sm" style={{ color: '#94A3B8' }}>Nenhuma meta criada ainda.</p>
+            <button onClick={abrirModalNova} className="text-sm font-semibold hover:underline" style={{ color: '#145A45', background: 'none', border: 'none', cursor: 'pointer' }}>
+              Criar primeira meta →
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-5">
+            {metas.map(m => {
+              const pct        = Math.min(Math.round((Number(m.valor_atual) / Number(m.valor_alvo)) * 100), 100)
+              const mesesRest  = calcMesesRestantes(m.prazo)
+              const concluida  = pct >= 100
+              const faltaValor = Math.max(Number(m.valor_alvo) - Number(m.valor_atual), 0)
+              const Icon       = getIcon(m.icone)
+              const corM       = m.cor || '#145A45'
               return (
-                <div key={m.id} className="p-4 border-t" style={{ borderColor: '#F1F5F9' }}>
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: cor + '18' }}>
-                      <Icon size={14} color={cor} strokeWidth={1.75} />
+                <div key={m.id} className="rounded-[20px] border p-6"
+                  style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: corM + '18' }}>
+                      <Icon size={19} color={corM} strokeWidth={1.75} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate" style={{ color: '#0F172A' }}>{m.nome}</p>
-                      <p className="text-xs" style={{ color: '#94A3B8' }}>{fmtOculto(Number(m.valor_atual), ocultar)} de {fmtOculto(Number(m.valor_alvo), ocultar)}</p>
+                      <p className="text-sm font-semibold truncate" style={{ color: '#0F172A' }}>{m.nome}</p>
+                      <p className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>
+                        {fmtOculto(Number(m.valor_atual), ocultar)} de {fmtOculto(Number(m.valor_alvo), ocultar)}
+                      </p>
                     </div>
-                    <span className="text-sm font-bold" style={{ color: cor }}>{pct}%</span>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="px-2.5 py-1 rounded-lg" style={{ backgroundColor: corM + '18' }}>
+                        <span className="text-sm font-bold" style={{ color: corM }}>{pct}%</span>
+                      </div>
+                      {m.automatica ? (
+                        <div className="flex items-center gap-1 px-2 h-8 rounded-lg" style={{ backgroundColor: '#F1F5F9' }} title="Gerenciada automaticamente pelo sistema">
+                          <Shield size={12} color="#94A3B8" strokeWidth={1.75} />
+                        </div>
+                      ) : (
+                        <button onClick={() => abrirModalEditar(m)}
+                          className="w-8 h-8 rounded-lg flex items-center justify-center hover:opacity-80"
+                          style={{ backgroundColor: '#F1F5F9', border: 'none', cursor: 'pointer' }}>
+                          <Pencil size={13} color="#64748B" strokeWidth={1.75} />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: '#F1F5F9' }}>
-                    <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: cor }} />
+                  <div className="h-1.5 rounded-full overflow-hidden mb-4" style={{ backgroundColor: '#F1F5F9' }}>
+                    <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: corM }} />
                   </div>
+                  <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                    {concluida ? (
+                      <div className="flex items-center gap-1.5">
+                        <CheckCircle2 size={13} color="#10B981" strokeWidth={2} />
+                        <span className="text-xs font-semibold" style={{ color: '#10B981' }}>Concluída</span>
+                      </div>
+                    ) : (
+                      <span className="text-xs" style={{ color: '#64748B' }}>Falta {fmtOculto(faltaValor, ocultar)}</span>
+                    )}
+                    {m.prazo && (
+                      <div className="flex items-center gap-1.5">
+                        <Calendar size={12} color="#94A3B8" strokeWidth={1.75} />
+                        <span className="text-xs" style={{ color: '#94A3B8' }}>
+                          {formatPrazo(m.prazo)}{mesesRest !== null && mesesRest > 0 ? ` · ${mesesRest}m` : ''}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  {!concluida && (
+                    m.automatica ? (
+                      <p className="text-xs text-center py-1" style={{ color: '#94A3B8' }}>
+                        Atualizada automaticamente com base no Caixa e nas despesas dos últimos 6 meses
+                      </p>
+                    ) : (
+                      <button onClick={() => abrirAporte(m)}
+                        className="w-full py-2.5 rounded-xl text-sm font-semibold transition-colors hover:opacity-90"
+                        style={{ backgroundColor: corM + '12', color: corM, border: 'none', cursor: 'pointer' }}>
+                        + Adicionar valor
+                      </button>
+                    )
+                  )}
                 </div>
               )
             })}
           </div>
-
-          <div className="rounded-2xl border" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0' }}>
-            <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: '#F1F5F9' }}>
-              <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>Últimos Lançamentos</p>
-              <a href="/dashboard/movimentos" className="flex items-center gap-1 text-xs font-semibold" style={{ color: '#145A45' }}>
-                Ver todos <ChevronRight size={13} strokeWidth={2} />
-              </a>
-            </div>
-            {lancamentos.length === 0 ? (
-              <div className="p-6 text-center">
-                <p className="text-sm" style={{ color: '#94A3B8' }}>Nenhum lançamento ainda.</p>
-              </div>
-            ) : lancamentos.map((l: any) => (
-              <div key={l.id} className="flex items-center gap-3 px-4 py-3 border-t" style={{ borderColor: '#F1F5F9' }}>
-                <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: l.tipo === 'receita' ? '#ECFDF5' : '#FEF2F2' }}>
-                  {l.tipo === 'receita'
-                    ? <ArrowDownLeft size={14} color="#10B981" strokeWidth={1.75} />
-                    : <ArrowUpRight  size={14} color="#EF4444" strokeWidth={1.75} />
-                  }
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate" style={{ color: '#0F172A' }}>{l.categoria}</p>
-                  <p className="text-xs" style={{ color: '#94A3B8' }}>{l.membro?.split(' ')[0]} · {l.hora}</p>
-                </div>
-                <p className="text-sm font-semibold flex-shrink-0"
-                  style={{ color: l.tipo === 'receita' ? '#10B981' : '#EF4444' }}>
-                  {l.tipo === 'receita' ? '+' : '-'} {fmtShort(Number(l.valor))}
-                </p>
-              </div>
-            ))}
-          </div>
-
-          <div className="rounded-2xl border p-4" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0' }}>
-            <p className="text-sm font-semibold mb-1" style={{ color: '#0F172A' }}>Resultado Mensal</p>
-            <p className="text-xs mb-4" style={{ color: '#94A3B8' }}>Receitas − despesas · últimos 6 meses</p>
-            <ResponsiveContainer width="100%" height={160}>
-              <AreaChart data={evolucao}>
-                <defs>
-                  <linearGradient id="evoGradMobile" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#145A45" stopOpacity={0.18} />
-                    <stop offset="100%" stopColor="#145A45" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
-                <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
-                <Tooltip formatter={(v: any) => fmt(v)} contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', fontSize: '12px' }} />
-                <Area type="monotone" dataKey="valor" stroke="#145A45" strokeWidth={2} fill="url(#evoGradMobile)"
-                  dot={{ fill: '#fff', stroke: '#145A45', strokeWidth: 2, r: 3 }} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+        )}
       </div>
 
-      {/* ── DESKTOP — REDESIGN PREMIUM ── */}
-      <div className="hidden lg:block" style={{ backgroundColor: '#F7F9FB', minHeight: '100vh' }}>
-        <div style={{ maxWidth: '1080px', margin: '0 auto', padding: '16px 20px 24px' }}>
+      {/* ── MODAL NOVA/EDITAR META (inline, sem subcomponente) ── */}
+      {modalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center"
+          style={{ backgroundColor: 'rgba(15,23,42,0.5)' }}
+          onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}>
+          <div className="w-full lg:max-w-md rounded-t-[28px] lg:rounded-[20px] overflow-hidden flex flex-col"
+            style={{ backgroundColor: '#fff', maxHeight: '90vh' }}>
 
-          {/* Header premium */}
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '10px' }}>
-            <div>
-              <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.5px', marginBottom: '4px' }}>
-                {getSaudacao()}, {primeiroNome || 'Família'}
-              </h1>
-              <p style={{ fontSize: '12px', color: '#64748B', marginBottom: '4px' }}>
-                Veja como seu patrimônio evoluiu hoje.
-              </p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#2F8F68' }} />
-                <span style={{ fontSize: '12.5px', color: '#94A3B8' }}>
-                  Atualizado {atualizadoHa === 0 ? 'agora' : `há ${atualizadoHa} min`}
-                </span>
+            <div className="w-10 h-1 rounded-full mx-auto mt-3 mb-1 lg:hidden flex-shrink-0" style={{ backgroundColor: '#E2E8F0' }} />
+
+            <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0" style={{ borderColor: '#F1F5F9' }}>
+              <h2 className="font-semibold text-lg" style={{ color: '#0F172A' }}>
+                {editandoMeta ? 'Editar meta' : 'Nova meta'}
+              </h2>
+              <div className="flex items-center gap-2">
+                {editandoMeta && (
+                  <button onClick={handleDeletarMeta} disabled={deletando}
+                    className="flex items-center gap-1.5 px-3 h-8 rounded-lg text-xs font-semibold"
+                    style={{ backgroundColor: confirmDelete ? '#EF4444' : '#FEF2F2', color: confirmDelete ? '#fff' : '#DC2626', border: 'none', cursor: 'pointer' }}>
+                    <Trash2 size={13} strokeWidth={2} />
+                    {deletando ? 'Deletando...' : confirmDelete ? 'Confirmar' : 'Deletar'}
+                  </button>
+                )}
+                <button onClick={() => setModalOpen(false)} style={{ color: '#94A3B8', background: 'none', border: 'none', cursor: 'pointer' }}>
+                  <X size={20} strokeWidth={2} />
+                </button>
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{
-                padding: '10px 18px', borderRadius: '999px', fontSize: '13.5px', fontWeight: 500,
-                backgroundColor: '#fff', border: '1px solid rgba(15,23,42,0.06)', color: '#0F172A',
-                boxShadow: '0 1px 2px rgba(15,23,42,0.03)',
-              }}>
-                {mesAtual}
-              </div>
-              <button style={{
-                width: '34px', height: '34px', borderRadius: '50%',
-                backgroundColor: '#fff', border: '1px solid rgba(15,23,42,0.06)', color: '#64748B',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-                boxShadow: '0 1px 2px rgba(15,23,42,0.03)', transition: 'all 0.2s',
-              }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1.04)' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)' }}
-              >
-                <Bell size={18} strokeWidth={1.5} />
-              </button>
-              <div style={{
-                width: '34px', height: '34px', borderRadius: '50%',
-                background: 'linear-gradient(135deg, #145A45 0%, #2F8F68 100%)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: '#fff', fontSize: '15px', fontWeight: 600,
-                boxShadow: '0 4px 12px rgba(20,90,69,0.25)',
-              }}>
-                {primeiroNome ? primeiroNome[0].toUpperCase() : 'F'}
-              </div>
-            </div>
-          </div>
 
-          {/* Hero — Resumo Executivo */}
-          <div style={{
-            borderRadius: '16px', padding: '16px', marginBottom: '10px', position: 'relative', overflow: 'hidden',
-            background: 'linear-gradient(135deg, #06261F 0%, #0B3B2E 45%, #0D3F31 100%)',
-            boxShadow: '0 20px 60px -16px rgba(6,38,31,0.45)',
-          }}>
-            <div style={{ position: 'absolute', top: '-100px', right: '-60px', width: '360px', height: '360px', borderRadius: '50%', background: 'rgba(110,231,183,0.08)', filter: 'blur(50px)' }} />
-            <div style={{ position: 'absolute', bottom: '-120px', left: '20%', width: '320px', height: '320px', borderRadius: '50%', background: 'rgba(47,143,104,0.12)', filter: 'blur(60px)' }} />
+            <div className="overflow-y-auto flex-1 px-6 pt-4 pb-2">
+              <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Nome da meta</label>
+              <input
+                type="text"
+                value={nome}
+                onChange={e => setNome(e.target.value)}
+                placeholder="Ex: Casa própria"
+                className="w-full px-4 h-12 rounded-xl border text-sm mb-4 outline-none"
+                style={{ borderColor: '#E2E8F0', color: '#0F172A' }}
+              />
 
-            <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: '16px', alignItems: 'center' }}>
-              {/* Esquerda: número + indicadores do mês */}
-              <div>
-                <p style={{ fontSize: '13px', fontWeight: 600, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>
-                  Resultado do mês
-                </p>
-                <p style={{ fontSize: '22px', fontWeight: 700, color: '#fff', letterSpacing: '-1.5px', lineHeight: 1, marginBottom: '14px' }}>
-                  {loading ? '...' : fmtOculto(resultadoExibir, ocultar)}
-                </p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' }}>
-                  {!semDados && (
-                    <div style={{
-                      display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 12px', borderRadius: '999px',
-                      backgroundColor: crescimentoPct >= 0 ? 'rgba(110,231,183,0.15)' : 'rgba(239,68,68,0.15)',
-                      border: `1px solid ${crescimentoPct >= 0 ? 'rgba(110,231,183,0.3)' : 'rgba(239,68,68,0.3)'}`,
-                    }}>
-                      <ArrowUp size={11} color={crescimentoPct >= 0 ? '#6EE7B7' : '#FCA5A5'} strokeWidth={2.5} style={{ transform: crescimentoPct < 0 ? 'rotate(180deg)' : 'none' }} />
-                      <span style={{ fontSize: '12.5px', fontWeight: 600, color: crescimentoPct >= 0 ? '#6EE7B7' : '#FCA5A5' }}>
-                        {Math.abs(crescimentoPct).toFixed(1)}% vs. mês anterior
-                      </span>
-                    </div>
-                  )}
-                  <div style={{ padding: '5px 12px', borderRadius: '999px', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                    <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>
-                      {familia ? `Família ${familia}` : ''} · {mesAtual}
-                    </span>
-                  </div>
-                </div>
+              <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Valor alvo (R$)</label>
+              <input
+                type="text"
+                value={valorAlvo}
+                onChange={e => setValorAlvo(e.target.value)}
+                placeholder="0,00"
+                className="w-full px-4 h-12 rounded-xl border text-sm mb-4 outline-none"
+                style={{ borderColor: '#E2E8F0', color: '#0F172A' }}
+              />
 
-                {/* Receitas x Despesas do mês */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span style={{ fontSize: '12.5px', color: 'rgba(255,255,255,0.55)', width: '76px', flexShrink: 0 }}>Recebeu</span>
-                    <div style={{ flex: 1, height: '6px', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: '100%', backgroundColor: '#6EE7B7', borderRadius: '4px' }} />
-                    </div>
-                    <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#fff', minWidth: '78px', textAlign: 'right' }}>{fmtOculto(totalRec, ocultar)}</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span style={{ fontSize: '12.5px', color: 'rgba(255,255,255,0.55)', width: '76px', flexShrink: 0 }}>Gastou</span>
-                    <div style={{ flex: 1, height: '6px', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${pctGasto}%`, backgroundColor: '#FCA5A5', borderRadius: '4px' }} />
-                    </div>
-                    <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#fff', minWidth: '78px', textAlign: 'right' }}>{fmtOculto(totalDes, ocultar)}</span>
-                  </div>
-                </div>
-              </div>
+              <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Prazo (opcional)</label>
+              <input
+                type="month"
+                value={prazo}
+                onChange={e => setPrazo(e.target.value)}
+                className="w-full px-4 h-12 rounded-xl border text-sm mb-4 outline-none"
+                style={{ borderColor: '#E2E8F0', color: '#0F172A' }}
+              />
 
-              {/* Direita: mini gráfico glass */}
-              <div style={{
-                borderRadius: '18px', padding: '22px',
-                backgroundColor: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(12px)',
-                border: '1px solid rgba(255,255,255,0.1)',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <p style={{ fontSize: '12.5px', fontWeight: 500, color: 'rgba(255,255,255,0.5)' }}>Resultado · 6 meses</p>
-                  <Sparkles size={14} color="rgba(255,255,255,0.3)" strokeWidth={1.75} />
-                </div>
-                <ResponsiveContainer width="100%" height={90}>
-                  <AreaChart data={evolucao}>
-                    <defs>
-                      <linearGradient id="heroGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#6EE7B7" stopOpacity={0.45} />
-                        <stop offset="100%" stopColor="#6EE7B7" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <Tooltip
-                      formatter={(v: any) => fmt(Number(v))}
-                      contentStyle={{ borderRadius: '12px', border: 'none', backgroundColor: '#0B3B2E', fontSize: '12px', color: '#fff', boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}
-                      labelStyle={{ color: 'rgba(255,255,255,0.6)' }}
-                      itemStyle={{ color: '#6EE7B7' }}
-                    />
-                    <Area type="monotone" dataKey="valor" stroke="#6EE7B7" strokeWidth={2.5} fill="url(#heroGrad)"
-                      dot={{ fill: '#0B3B2E', stroke: '#6EE7B7', strokeWidth: 2, r: 3 }}
-                      activeDot={{ r: 5, fill: '#6EE7B7', strokeWidth: 0 }}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
-
-          {/* KPI Cards — identidade própria */}
-          <div style={{ display: 'grid', gap: '8px', marginBottom: '10px', gridTemplateColumns: dizimoAtivo ? 'repeat(5, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))' }}>
-            {kpis.map(card => (
-              <div key={card.label} style={{
-                borderRadius: '16px', padding: '18px', backgroundColor: '#fff',
-                border: `1px solid ${card.borderTint}`,
-                boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
-                transition: 'all 0.2s ease', cursor: 'default',
-              }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px) scale(1.01)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 16px 48px rgba(15,23,42,0.08)' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0) scale(1)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 12px 40px rgba(15,23,42,0.05)' }}
-              >
-                <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: card.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px' }}>
-                  <card.Icon size={17} color={card.cor} strokeWidth={1.75} />
-                </div>
-                <p style={{ fontSize: '13px', fontWeight: 500, color: '#64748B', marginBottom: '6px' }}>{card.label}</p>
-                <p style={{ fontSize: '15px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.3px', marginBottom: '2px' }}>
-                  {loading ? '...' : fmtOculto(card.val, ocultar)}
-                </p>
-                <span style={{ fontSize: '12.5px', fontWeight: 500, color: card.cor }}>Este mês</span>
-              </div>
-            ))}
-            <div style={{
-              borderRadius: '16px', padding: '18px', backgroundColor: '#fff',
-              border: '1px solid rgba(139,92,246,0.15)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
-              transition: 'all 0.2s ease',
-            }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px) scale(1.01)' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0) scale(1)' }}
-            >
-              <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#F5F3FF', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px' }}>
-                <Target size={17} color="#8B5CF6" strokeWidth={1.75} />
-              </div>
-              <p style={{ fontSize: '13px', fontWeight: 500, color: '#64748B', marginBottom: '6px' }}>Metas Ativas</p>
-              <p style={{ fontSize: '15px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.3px', marginBottom: '2px' }}>
-                {metas.length} {metas.length === 1 ? 'meta' : 'metas'}
-              </p>
-              <a href="/dashboard/metas" style={{ fontSize: '12.5px', fontWeight: 500, color: '#8B5CF6', textDecoration: 'none' }}>Ver detalhes →</a>
-            </div>
-            {dizimoAtivo && (
-              <div style={{
-                borderRadius: '16px', padding: '18px', position: 'relative', backgroundColor: '#fff',
-                border: `1px solid ${dizimoQuitado ? 'rgba(16,185,129,0.18)' : 'rgba(245,158,11,0.18)'}`,
-                boxShadow: '0 12px 40px rgba(15,23,42,0.05)', transition: 'all 0.2s ease',
-              }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px) scale(1.01)' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0) scale(1)' }}
-              >
-                <div style={{ position: 'absolute', top: '18px', right: '18px' }}>
-                  <span style={{
-                    fontSize: '11px', fontWeight: 600, padding: '4px 10px', borderRadius: '999px',
-                    backgroundColor: dizimoQuitado ? '#ECFDF5' : '#FFFBEB',
-                    color: dizimoQuitado ? '#2F8F68' : '#B7791F',
-                  }}>
-                    {dizimoQuitado ? 'Pago' : 'Pendente'}
-                  </span>
-                </div>
-                <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px' }}>
-                  <Church size={17} color="#145A45" strokeWidth={1.75} />
-                </div>
-                <p style={{ fontSize: '13px', fontWeight: 500, color: '#64748B', marginBottom: '6px' }}>Dízimo do mês</p>
-                <p style={{ fontSize: '15px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.3px', marginBottom: '8px' }}>
-                  {loading ? '...' : fmtOculto(valorDizimo, ocultar)}
-                </p>
-                <div style={{ height: '5px', borderRadius: '4px', overflow: 'hidden', backgroundColor: '#F1F5F9', marginBottom: '8px' }}>
-                  <div style={{ height: '100%', width: `${dizimoPctPago}%`, backgroundColor: dizimoQuitado ? '#2F8F68' : '#F59E0B', borderRadius: '4px' }} />
-                </div>
-                <span style={{ fontSize: '12px', fontWeight: 500, color: dizimoQuitado ? '#2F8F68' : '#B7791F' }}>
-                  {dizimoQuitado ? 'Completo!' : `Falta ${fmtOculto(dizimoRestante, ocultar)}`}
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Metas + Saúde Financeira */}
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px', marginBottom: '10px', alignItems: 'start' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{
-              borderRadius: '20px', padding: '24px', backgroundColor: '#fff',
-              border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: metas.length === 0 ? '0' : '16px' }}>
-                <div>
-                  <h2 style={{ fontSize: '14px', fontWeight: 600, color: '#0B1F18', marginBottom: '2px', letterSpacing: '-0.2px' }}>Metas da Família</h2>
-                  <p style={{ fontSize: '12px', color: '#64748B' }}>Progresso dos objetivos</p>
-                </div>
-                <a href="/dashboard/metas" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px', fontWeight: 600, color: '#145A45', textDecoration: 'none', flexShrink: 0 }}>
-                  Ver todas <ArrowRight size={13} strokeWidth={2} />
-                </a>
-              </div>
-              {metas.length === 0 ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingTop: '18px', marginTop: '18px', borderTop: '1px solid #F1F5F9' }}>
-                  <Target size={18} color="#E2E8F0" strokeWidth={1.5} />
-                  <p style={{ fontSize: '12.5px', color: '#94A3B8', flex: 1 }}>Nenhuma meta criada ainda.</p>
-                  <a href="/dashboard/metas" style={{ fontSize: '13px', fontWeight: 600, color: '#145A45', textDecoration: 'none', whiteSpace: 'nowrap' }}>Criar primeira meta →</a>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {metas.map((m: any) => {
-                    const pct  = Math.min(Math.round((Number(m.valor_atual) / Number(m.valor_alvo)) * 100), 100)
-                    const Icon = ICONES_META[m.icone] || Target
-                    const cor  = m.cor || '#145A45'
-                    return (
-                      <div key={m.id} style={{
-                        display: 'flex', alignItems: 'center', gap: '12px',
-                        borderRadius: '12px', padding: '10px', border: '1px solid rgba(15,23,42,0.05)',
-                        transition: 'all 0.2s',
-                      }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 24px rgba(15,23,42,0.06)' }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none' }}
-                      >
-                        <div style={{ width: '40px', height: '40px', borderRadius: '12px', flexShrink: 0, backgroundColor: cor + '18', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Icon size={17} color={cor} strokeWidth={1.75} />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                            <p style={{ fontSize: '13.5px', fontWeight: 600, color: '#0B1F18', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.nome}</p>
-                            <span style={{ fontSize: '13px', fontWeight: 700, color: cor, flexShrink: 0, marginLeft: '8px' }}>{pct}%</span>
-                          </div>
-                          <div style={{ height: '5px', borderRadius: '4px', overflow: 'hidden', backgroundColor: '#F1F5F9' }}>
-                            <div style={{ height: '100%', width: `${pct}%`, backgroundColor: cor, borderRadius: '4px', transition: 'width 0.4s ease' }} />
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Próximas Despesas Fixas */}
-            <div style={{
-              borderRadius: '20px', padding: '24px', backgroundColor: '#fff',
-              border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: despesasFixas.length === 0 ? '0' : '14px' }}>
-                <div>
-                  <h2 style={{ fontSize: '14px', fontWeight: 600, color: '#0B1F18', marginBottom: '2px', letterSpacing: '-0.2px' }}>Próximas Despesas Fixas</h2>
-                  <p style={{ fontSize: '12px', color: '#64748B' }}>O que ainda falta pagar</p>
-                </div>
-                <a href="/dashboard/movimentos" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px', fontWeight: 600, color: '#145A45', textDecoration: 'none', flexShrink: 0 }}>
-                  Ver todas <ArrowRight size={13} strokeWidth={2} />
-                </a>
-              </div>
-              {despesasFixas.length === 0 ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingTop: '18px', marginTop: '18px', borderTop: '1px solid #F1F5F9' }}>
-                  <CheckCircle2 size={18} color="#2F8F68" strokeWidth={1.5} />
-                  <p style={{ fontSize: '12.5px', color: '#94A3B8', flex: 1 }}>Nenhuma despesa fixa pendente.</p>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {despesasFixas.map((df: any) => {
-                    const Icon = ICONES_CAT[df.categoria] || MoreHorizontal
-                    return (
-                      <div key={df.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', borderRadius: '12px', padding: '10px', border: '1px solid rgba(15,23,42,0.05)' }}>
-                        <div style={{ width: '36px', height: '36px', borderRadius: '10px', flexShrink: 0, backgroundColor: 'rgba(20,90,69,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Icon size={16} color="#145A45" strokeWidth={1.75} />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ fontSize: '13.5px', fontWeight: 600, color: '#0B1F18', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{df.nome}</p>
-                          <p style={{ fontSize: '12px', color: '#94A3B8', margin: 0 }}>Vence dia {df.dia_vencimento} · {fmtOculto(Number(df.valor), ocultar)}</p>
-                        </div>
-                        <span style={{
-                          fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '999px', flexShrink: 0,
-                          backgroundColor: df.atrasada ? 'rgba(239,68,68,0.10)' : '#F7F8FA',
-                          border: df.atrasada ? '1px solid rgba(239,68,68,0.25)' : '1px solid #E5E7EB',
-                          color: df.atrasada ? '#EF4444' : '#64748B',
-                        }}>
-                          {df.atrasada ? 'Atrasada' : 'A pagar'}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-            </div>
-
-            <div style={{
-              borderRadius: '20px', padding: '28px', backgroundColor: '#fff', display: 'flex', flexDirection: 'column',
-              border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
-            }}>
-              <h2 style={{ fontSize: '14px', fontWeight: 600, color: '#0B1F18', marginBottom: '2px', letterSpacing: '-0.2px' }}>Saúde Financeira</h2>
-              <p style={{ fontSize: '12px', color: '#64748B', marginBottom: '12px' }}>Score geral</p>
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px', height: '150px' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <RadialBarChart innerRadius="78%" outerRadius="100%" data={[{ value: score, fill: scoreCor }]} startAngle={90} endAngle={-270}>
-                    <RadialBar background={{ fill: '#F1F5F9' }} dataKey="value" cornerRadius={20} />
-                  </RadialBarChart>
-                </ResponsiveContainer>
-                <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                  <span style={{ fontSize: '34px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-1px', lineHeight: 1 }}>{score}</span>
-                  <span style={{ fontSize: '12px', color: '#94A3B8', marginTop: '2px' }}>de 100</span>
-                </div>
-              </div>
-              <div style={{ textAlign: 'center', marginBottom: '10px' }}>
-                <span style={{
-                  fontSize: '12.5px', fontWeight: 600, padding: '5px 14px', borderRadius: '999px',
-                  backgroundColor: scoreCor + '15', color: scoreCor,
-                }}>
-                  {scoreLabel}
-                </span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flex: 1 }}>
-                {saude.map((s, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                    {s.ok
-                      ? <CheckCircle2 size={16} color="#2F8F68" strokeWidth={1.75} style={{ flexShrink: 0, marginTop: '2px' }} />
-                      : <AlertCircle  size={16} color="#EF4444" strokeWidth={1.75} style={{ flexShrink: 0, marginTop: '2px' }} />
-                    }
-                    <div>
-                      <p style={{ fontSize: '12.5px', fontWeight: 600, color: '#0B1F18' }}>{s.label}</p>
-                      <p style={{ fontSize: '12px', color: '#94A3B8' }}>{s.desc}</p>
-                    </div>
-                  </div>
+              <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Ícone</label>
+              <div className="grid grid-cols-4 gap-2 mb-4">
+                {ICONES.map(ic => (
+                  <button key={ic.nome} onClick={() => setIcone(ic.nome)}
+                    className="flex flex-col items-center gap-1 py-2.5 rounded-xl border transition-all"
+                    style={{ borderColor: icone === ic.nome ? cor : '#E2E8F0', backgroundColor: icone === ic.nome ? cor + '12' : '#fff', borderWidth: icone === ic.nome ? 2 : 1, cursor: 'pointer' }}>
+                    <ic.Icon size={18} color={icone === ic.nome ? cor : '#64748B'} strokeWidth={1.75} />
+                    <span className="text-[10px]" style={{ color: icone === ic.nome ? cor : '#94A3B8' }}>{ic.label}</span>
+                  </button>
                 ))}
               </div>
-              <a href="/dashboard/movimentos" style={{
-                marginTop: '20px', textAlign: 'center', fontSize: '13.5px', fontWeight: 600, padding: '11px',
-                borderRadius: '13px', backgroundColor: '#F0FDF4', color: '#145A45', textDecoration: 'none',
-                transition: 'all 0.2s',
-              }}
-              onMouseEnter={e => (e.currentTarget as HTMLElement).style.opacity = '0.85'}
-              onMouseLeave={e => (e.currentTarget as HTMLElement).style.opacity = '1'}
-              >
-                Ver detalhes
-              </a>
-            </div>
-          </div>
 
-          {/* Categorias + Lançamentos */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-            <div style={{
-              borderRadius: '20px', padding: '28px', backgroundColor: '#fff',
-              border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
-            }}>
-              <h2 style={{ fontSize: '14px', fontWeight: 600, color: '#0B1F18', marginBottom: '2px', letterSpacing: '-0.2px' }}>Despesas por Categoria</h2>
-              <p style={{ fontSize: '12px', color: '#64748B', marginBottom: '14px' }}>Distribuição do mês</p>
-              {cats.length === 0 ? (
-                <p style={{ fontSize: '13.5px', textAlign: 'center', padding: '48px 0', color: '#94A3B8' }}>Sem despesas ainda.</p>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
-                  <div style={{ position: 'relative', width: '160px', height: '160px', flexShrink: 0 }}>
-                    <PieChart width={160} height={160}>
-                      <Pie data={cats} cx={80} cy={80} innerRadius={52} outerRadius={75} dataKey="val" strokeWidth={2} stroke="#fff" paddingAngle={2}>
-                        {cats.map((c: any, i: number) => <Cell key={i} fill={c.cor} />)}
-                      </Pie>
-                      <Tooltip formatter={(v: any) => fmt(Number(v))} contentStyle={{ borderRadius: '12px', border: '1px solid rgba(15,23,42,0.06)' }} />
-                    </PieChart>
-                    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-                      <span style={{ fontSize: '10px', color: '#94A3B8' }}>Total</span>
-                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#0B1F18' }}>{ocultar ? '••••' : `R$${(totalDes/1000).toFixed(1)}k`}</span>
-                    </div>
-                  </div>
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {cats.map((c: any) => {
-                      const Icon = ICONES_CAT[c.nome] || MoreHorizontal
-                      return (
-                        <div key={c.nome}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
-                            <div style={{ width: '24px', height: '24px', borderRadius: '6px', backgroundColor: c.cor + '18', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                              <Icon size={12} color={c.cor} strokeWidth={1.75} />
-                            </div>
-                            <span style={{ fontSize: '12px', fontWeight: 500, color: '#0B1F18', flex: 1 }}>{c.nome}</span>
-                            <span style={{ fontSize: '12px', fontWeight: 700, color: '#0B1F18' }}>{fmtOculto(c.val, ocultar)}</span>
-                            <span style={{ fontSize: '10px', color: '#94A3B8', minWidth: '26px', textAlign: 'right' }}>{c.pct}%</span>
-                          </div>
-                          <div style={{ marginLeft: '32px', height: '3px', borderRadius: '2px', backgroundColor: '#F1F5F9', overflow: 'hidden' }}>
-                            <div style={{ height: '100%', width: `${c.pct}%`, backgroundColor: c.cor, borderRadius: '2px' }} />
-                          </div>
-                        </div>
-                      )
-                    })}
-                    {cats.length > 0 && (
-                      <div style={{ marginTop: '4px', padding: '7px 10px', borderRadius: '9px', backgroundColor: cats[0].cor + '10', border: `1px solid ${cats[0].cor}25`, display: 'flex', alignItems: 'center', gap: '7px' }}>
-                        <ArrowUp size={11} color={cats[0].cor} strokeWidth={2.5} />
-                        <p style={{ fontSize: '10px', color: '#64748B', margin: 0 }}>
-                          <strong style={{ color: '#0B1F18' }}>{cats[0].nome}</strong> representa {cats[0].pct}% do total.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
+              <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Cor</label>
+              <div className="flex gap-2.5 flex-wrap mb-4">
+                {CORES.map(c => (
+                  <button key={c} onClick={() => setCor(c)}
+                    className="w-8 h-8 rounded-full flex items-center justify-center transition-all"
+                    style={{ backgroundColor: c, border: cor === c ? '3px solid #fff' : 'none', boxShadow: cor === c ? `0 0 0 2px ${c}` : 'none', cursor: 'pointer' }}>
+                    {cor === c && <CheckCircle2 size={14} color="#fff" strokeWidth={2.5} />}
+                  </button>
+                ))}
+              </div>
+
+              {confirmDelete && (
+                <p className="text-xs text-center mb-2" style={{ color: '#EF4444' }}>
+                  Toque em "Confirmar" para deletar permanentemente.
+                </p>
               )}
             </div>
 
-            <div style={{
-              borderRadius: '20px', overflow: 'hidden', backgroundColor: '#fff',
-              border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px 10px' }}>
-                <div>
-                  <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#0B1F18', letterSpacing: '-0.3px' }}>Últimos Lançamentos</h2>
-                  <p style={{ fontSize: '12px', color: '#64748B', marginTop: '1px' }}>Atividade recente</p>
-                </div>
-                <a href="/dashboard/movimentos" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13.5px', fontWeight: 600, color: '#145A45', textDecoration: 'none' }}>
-                  Ver todos <ArrowRight size={13} strokeWidth={2} />
-                </a>
-              </div>
-              {lancamentos.length === 0 ? (
-                <p style={{ fontSize: '13.5px', textAlign: 'center', padding: '48px 0', color: '#94A3B8' }}>Nenhum lançamento ainda.</p>
-              ) : lancamentos.map((l: any) => (
-                <div key={l.id} style={{
-                  display: 'flex', alignItems: 'center', gap: '14px', padding: '8px 16px',
-                  borderTop: '1px solid rgba(15,23,42,0.04)', transition: 'background 0.15s',
-                }}
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.backgroundColor = '#FAFBFC'}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'}
-                >
-                  <div style={{
-                    width: '34px', height: '34px', borderRadius: '50%', flexShrink: 0,
-                    backgroundColor: l.tipo === 'receita' ? '#ECFDF5' : '#FEF2F2',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    {l.tipo === 'receita'
-                      ? <ArrowDownLeft size={16} color="#2F8F68" strokeWidth={1.75} />
-                      : <ArrowUpRight  size={16} color="#DC2626" strokeWidth={1.75} />
-                    }
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: '14px', fontWeight: 500, color: '#0B1F18', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.categoria}</p>
-                    <p style={{ fontSize: '12.5px', color: '#94A3B8' }}>{l.membro} · {l.hora}</p>
-                  </div>
-                  <p style={{ fontSize: '14px', fontWeight: 600, flexShrink: 0, color: l.tipo === 'receita' ? '#2F8F68' : '#DC2626' }}>
-                    {l.tipo === 'receita' ? '+' : '-'} {fmtOculto(Number(l.valor), ocultar)}
-                  </p>
-                </div>
-              ))}
+            <div className="px-6 py-4 border-t flex-shrink-0" style={{ borderColor: '#F1F5F9', backgroundColor: '#fff' }}>
+              <button onClick={handleSalvarMeta} disabled={salvando || !nome.trim() || !valorAlvo}
+                className="w-full h-12 rounded-xl text-white font-semibold text-base transition-opacity"
+                style={{ backgroundColor: '#145A45', opacity: (salvando || !nome.trim() || !valorAlvo) ? 0.6 : 1, border: 'none', cursor: 'pointer' }}>
+                {salvando ? 'Salvando...' : editandoMeta ? 'Salvar alterações' : 'Criar meta'}
+              </button>
             </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* ── MODAL APORTE (inline) ── */}
+      {aporteOpen && metaSelecionada && (
+        <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center"
+          style={{ backgroundColor: 'rgba(15,23,42,0.5)' }}
+          onClick={e => { if (e.target === e.currentTarget) setAporteOpen(false) }}>
+          <div className="w-full lg:max-w-sm rounded-t-[28px] lg:rounded-[20px] p-6"
+            style={{ backgroundColor: '#fff', paddingBottom: '32px' }}>
+            <div className="w-10 h-1 rounded-full mx-auto mb-4 lg:hidden" style={{ backgroundColor: '#E2E8F0' }} />
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-semibold text-lg" style={{ color: '#0F172A' }}>Adicionar valor</h2>
+              <button onClick={() => setAporteOpen(false)} style={{ color: '#94A3B8', background: 'none', border: 'none', cursor: 'pointer' }}>
+                <X size={20} strokeWidth={2} />
+              </button>
+            </div>
+            <p className="text-sm mb-4" style={{ color: '#64748B' }}>
+              Meta: <span className="font-semibold" style={{ color: '#0F172A' }}>{metaSelecionada.nome}</span>
+            </p>
+            <div className="rounded-2xl p-4 mb-4 text-center" style={{ backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+              <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#94A3B8' }}>Valor (R$)</p>
+              <input
+                type="number"
+                inputMode="decimal"
+                value={valorAporte}
+                onChange={e => setValorAporte(e.target.value)}
+                placeholder="0,00"
+                autoFocus
+                className="w-full text-center text-4xl font-bold outline-none bg-transparent"
+                style={{ color: metaSelecionada.cor || '#145A45' }}
+              />
+            </div>
+            <p className="text-xs mb-5" style={{ color: '#94A3B8' }}>
+              Esse valor também será registrado como despesa (Investimento) no fluxo patrimonial.
+            </p>
+            <button onClick={handleAporte} disabled={salvandoAporte || !valorAporte}
+              className="w-full h-14 rounded-xl text-white font-semibold text-base transition-opacity"
+              style={{ backgroundColor: metaSelecionada.cor || '#145A45', opacity: (salvandoAporte || !valorAporte) ? 0.6 : 1, border: 'none', cursor: 'pointer' }}>
+              {salvandoAporte ? 'Salvando...' : 'Confirmar aporte'}
+            </button>
+          </div>
+        </div>
+      )}
     </>
   )
 }

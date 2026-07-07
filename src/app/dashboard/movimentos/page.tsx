@@ -30,7 +30,7 @@ const ICONES_CAT: Record<string, any> = {
 }
 
 function fmt(val: number) {
-  return `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+  return `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 function formatDiaLabel(dataStr: string) {
@@ -854,7 +854,7 @@ export default function MovimentosPage() {
               </div>
               <p style={{ fontSize: '11px', fontWeight: 500, color: '#64748B', marginBottom: '4px' }}>{c.label}</p>
               <p style={{ fontSize: '13px', fontWeight: 600, color: c.cor, lineHeight: 1.2 }}>
-                {loading ? '...' : `R$ ${Math.abs(c.val).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                {loading ? '...' : `R$ ${Math.abs(c.val).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
               </p>
             </div>
           ))}

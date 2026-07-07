@@ -18,7 +18,7 @@ const TIPOS = [
 ]
 
 function fmt(val: number) {
-  return `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+  return `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 export default function PatrimonioPage() {
