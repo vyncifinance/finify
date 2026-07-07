@@ -11,7 +11,7 @@ import {
   Heart, BookOpen, ShoppingBag, Church, MoreHorizontal,
   Briefcase, TrendingUp, Laptop, DollarSign, Trash2, Pencil,
   CreditCard, FileText, AlignLeft, Repeat, CheckCircle2,
-  Pill, Gift, Sparkles, GraduationCap, Smartphone, Shirt, Wrench, ClipboardList, Filter
+  Pill, Gift, Sparkles, GraduationCap, Smartphone, Shirt, Wrench, ClipboardList, Filter, Search
 } from 'lucide-react'
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
@@ -59,6 +59,7 @@ export default function MovimentosPage() {
   const [filtro, setFiltro]             = useState<'todos'|'receita'|'despesa'>('todos')
   const [filtroMembro, setFiltroMembro] = useState('todos')
   const [filtroCategoria, setFiltroCategoria] = useState('todos')
+  const [busca, setBusca]               = useState('')
   const [membros, setMembros]           = useState<string[]>([])
   const [membrosFamilia, setMembrosFamilia] = useState<string[]>([])
 
@@ -395,6 +396,7 @@ export default function MovimentosPage() {
     if (filtro !== 'todos' && l.tipo !== filtro) return false
     if (filtroMembro !== 'todos' && l.membro !== filtroMembro) return false
     if (filtroCategoria !== 'todos' && l.categoria !== filtroCategoria) return false
+    if (busca.trim() && !(l.descricao || '').toLowerCase().includes(busca.trim().toLowerCase())) return false
     return true
   })
 
@@ -864,6 +866,22 @@ export default function MovimentosPage() {
           {despesasFixasSection(true)}
         </div>
 
+        <div style={{ padding: '0 16px 10px' }}>
+          <div style={{ position: 'relative' }}>
+            <Search size={15} color="#94A3B8" strokeWidth={1.75} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
+            <input
+              type="text" value={busca} onChange={e => setBusca(e.target.value)}
+              placeholder="Buscar por observação..."
+              style={{ width: '100%', height: '42px', paddingLeft: '38px', paddingRight: busca ? '38px' : '14px', borderRadius: '12px', border: '1px solid #E2E8F0', backgroundColor: '#fff', fontSize: '13px', color: '#0F172A', outline: 'none', boxSizing: 'border-box' }} />
+            {busca && (
+              <button onClick={() => setBusca('')}
+                style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}>
+                <X size={15} strokeWidth={2} />
+              </button>
+            )}
+          </div>
+        </div>
+
         <div style={{ display: 'flex', gap: '8px', padding: '0 16px 8px', overflowX: 'auto' }}>
           {[{ key: 'todos', label: 'Todos' }, { key: 'receita', label: 'Receitas' }, { key: 'despesa', label: 'Despesas' }].map(f => (
             <button key={f.key} onClick={() => { setFiltro(f.key as any); setFiltroCategoria('todos') }}
@@ -1016,6 +1034,20 @@ export default function MovimentosPage() {
                 {m}
               </button>
             ))}
+          </div>
+
+          <div style={{ position: 'relative', marginLeft: 'auto', minWidth: '260px' }}>
+            <Search size={15} color="#94A3B8" strokeWidth={1.75} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
+            <input
+              type="text" value={busca} onChange={e => setBusca(e.target.value)}
+              placeholder="Buscar por observação..."
+              style={{ width: '100%', height: '38px', paddingLeft: '38px', paddingRight: busca ? '38px' : '14px', borderRadius: '10px', border: '1px solid #E2E8F0', backgroundColor: '#fff', fontSize: '13px', color: '#0F172A', outline: 'none', boxSizing: 'border-box' }} />
+            {busca && (
+              <button onClick={() => setBusca('')}
+                style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}>
+                <X size={15} strokeWidth={2} />
+              </button>
+            )}
           </div>
         </div>
 
