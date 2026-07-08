@@ -106,7 +106,7 @@ export default function LoginPage() {
         <div className="w-full" style={{ display: 'flex', alignItems: 'center', gap: '40px', maxWidth: '1360px', margin: '0 auto', width: '100%' }}>
 
           {/* ── NARRATIVA ── */}
-          <div className="w-full lg:w-[40%]" style={{ flexShrink: 0 }}>
+          <div className="hidden lg:block" style={{ flexShrink: 0, width: '40%' }}>
             <div style={{
               display: 'inline-flex', alignItems: 'center', gap: '7px',
               padding: '5px 14px', borderRadius: '999px', marginBottom: '24px',
