@@ -168,9 +168,32 @@ export default function MetasPage() {
   }
 
   async function handleAporte() {
-    if (!valorAporte || !metaSelecionada || metaSelecionada.automatica) return
+    if (!valorAporte || !metaSelecionada) return
     setSalvandoAporte(true)
     const valor = parseFloat(valorAporte.replace(',', '.'))
+
+    if (metaSelecionada.automatica) {
+      // Meta automática: o aporte vira/soma um registro de Caixa em Patrimônio, não um lançamento de despesa
+      const NOME_BEM_RESERVA = 'Reserva de Emergência (aportes)'
+      const { data: bemExistente } = await supabase.from('bens').select('id, valor')
+        .eq('familia_id', familiaId).eq('tipo', 'caixa').eq('nome', NOME_BEM_RESERVA).maybeSingle()
+
+      if (bemExistente) {
+        await supabase.from('bens').update({ valor: Number(bemExistente.valor) + valor }).eq('id', bemExistente.id)
+      } else {
+        await supabase.from('bens').insert({
+          familia_id: familiaId, user_id: userId, nome: NOME_BEM_RESERVA,
+          tipo: 'caixa', valor, eh_divida: false,
+        })
+      }
+
+      const novoValorAtual = Number(metaSelecionada.valor_atual) + valor
+      const { error } = await supabase.from('metas').update({ valor_atual: novoValorAtual }).eq('id', metaSelecionada.id)
+      if (!error) { setAporteOpen(false); await carregarMetas(familiaId) }
+      setSalvandoAporte(false)
+      return
+    }
+
     const novoValorAtual = Number(metaSelecionada.valor_atual) + valor
     const { error } = await supabase.from('metas').update({ valor_atual: novoValorAtual }).eq('id', metaSelecionada.id)
     if (!error) {
@@ -305,17 +328,18 @@ export default function MetasPage() {
                   )}
                 </div>
                 {!concluida && (
-                  m.automatica ? (
-                    <p className="text-xs text-center py-1" style={{ color: '#94A3B8' }}>
-                      Atualizada automaticamente com base no Caixa e nas despesas dos últimos 6 meses
-                    </p>
-                  ) : (
+                  <>
                     <button onClick={() => abrirAporte(m)}
                       className="w-full py-2.5 rounded-xl text-sm font-semibold"
                       style={{ backgroundColor: corM + '12', color: corM, border: 'none', cursor: 'pointer' }}>
                       + Adicionar valor
                     </button>
-                  )
+                    {m.automatica && (
+                      <p className="text-xs text-center" style={{ color: '#94A3B8', marginTop: '6px' }}>
+                        O aporte vira um registro de Caixa em Patrimônio automaticamente
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             )
@@ -431,17 +455,18 @@ export default function MetasPage() {
                     )}
                   </div>
                   {!concluida && (
-                    m.automatica ? (
-                      <p className="text-xs text-center py-1" style={{ color: '#94A3B8' }}>
-                        Atualizada automaticamente com base no Caixa e nas despesas dos últimos 6 meses
-                      </p>
-                    ) : (
+                    <>
                       <button onClick={() => abrirAporte(m)}
                         className="w-full py-2.5 rounded-xl text-sm font-semibold transition-colors hover:opacity-90"
                         style={{ backgroundColor: corM + '12', color: corM, border: 'none', cursor: 'pointer' }}>
                         + Adicionar valor
                       </button>
-                    )
+                      {m.automatica && (
+                        <p className="text-xs text-center" style={{ color: '#94A3B8', marginTop: '6px' }}>
+                          O aporte vira um registro de Caixa em Patrimônio automaticamente
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               )
