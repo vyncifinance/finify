@@ -172,7 +172,7 @@ export default function MovimentosPage() {
       setContextoAtivo(contexto)
 
       await carregarLancamentos(fid, profile.nome, nomeFam, contexto)
-      await recarregarDespesasFixas(fid)
+      await recarregarDespesasFixas(fid, contexto)
     }
     setLoading(false)
   }
@@ -182,11 +182,17 @@ export default function MovimentosPage() {
     setContextoAberto(false)
     try { localStorage.setItem('finify_contexto', JSON.stringify(novo)) } catch {}
     carregarLancamentos(familiaIdRef.current, membroAtual, familiaNome, novo)
+    recarregarDespesasFixas(familiaIdRef.current, novo)
   }
 
-  async function recarregarDespesasFixas(fid: string) {
-    const { data } = await supabase.from('despesas_fixas').select('*')
-      .eq('familia_id', fid).eq('ativo', true).order('dia_vencimento', { ascending: true })
+  async function recarregarDespesasFixas(fid: string, contexto?: { tipo: 'pessoal' | 'empresa'; empresaId?: string }) {
+    const ctx = contexto || contextoAtivo
+    let query = supabase.from('despesas_fixas').select('*')
+      .eq('familia_id', fid).eq('ativo', true)
+    query = ctx.tipo === 'empresa' && ctx.empresaId
+      ? query.eq('empresa_id', ctx.empresaId)
+      : query.is('empresa_id', null)
+    const { data } = await query.order('dia_vencimento', { ascending: true })
     if (data) setDespesasFixas(data)
   }
 
@@ -315,7 +321,9 @@ export default function MovimentosPage() {
   }
 
   function abrirDfModalNovo() {
-    setDfEditando(null); setDfNome(''); setDfValor(''); setDfCategoria('Moradia'); setDfDia('5')
+    setDfEditando(null); setDfNome(''); setDfValor('')
+    setDfCategoria(contextoAtivo.tipo === 'empresa' ? CATEGORIAS_EMPRESA_DESPESA[0] : 'Moradia')
+    setDfDia('5')
     setDfVariavel(false); setDfTipo('despesa')
     setDfConfirmDelete(false); setDfErro(''); setDfModalOpen(true)
   }
@@ -330,7 +338,11 @@ export default function MovimentosPage() {
 
   function handleDfTipo(t: 'despesa' | 'receita') {
     setDfTipo(t)
-    setDfCategoria(t === 'despesa' ? 'Moradia' : 'Salário')
+    if (contextoAtivo.tipo === 'empresa') {
+      setDfCategoria(t === 'despesa' ? CATEGORIAS_EMPRESA_DESPESA[0] : CATEGORIAS_EMPRESA_RECEITA[0])
+    } else {
+      setDfCategoria(t === 'despesa' ? 'Moradia' : 'Salário')
+    }
   }
 
   async function handleSalvarDf() {
@@ -340,6 +352,7 @@ export default function MovimentosPage() {
     const valorNum = parseFloat(dfValor.replace(/\./g, '').replace(',', '.'))
     const diaNum   = Math.min(31, Math.max(1, parseInt(dfDia) || 1))
     const fid = familiaIdRef.current
+    const empresaId = contextoAtivo.tipo === 'empresa' ? contextoAtivo.empresaId : null
 
     if (dfEditando) {
       const { error } = await supabase.from('despesas_fixas').update({
@@ -352,6 +365,7 @@ export default function MovimentosPage() {
       const { error } = await supabase.from('despesas_fixas').insert({
         familia_id: fid, user_id: userId, nome: dfNome.trim(), valor: valorNum,
         categoria: dfCategoria, dia_vencimento: diaNum, valor_variavel: dfVariavel, tipo: dfTipo, ativo: true,
+        empresa_id: empresaId,
       })
       setDfSalvando(false)
       if (!error) { setDfModalOpen(false); await recarregarDespesasFixas(fid) }
@@ -396,7 +410,8 @@ export default function MovimentosPage() {
     const { error } = await supabase.from('lancamentos').insert({
       familia_id: fid, user_id: userId, tipo: ehReceita ? 'receita' : 'despesa', valor,
       categoria: df.categoria, membro: membroAtual, data: dataStr, hora,
-      dizimar: ehReceita, descricao: null, despesa_fixa_id: df.id,
+      dizimar: ehReceita && !df.empresa_id, descricao: null, despesa_fixa_id: df.id,
+      empresa_id: df.empresa_id || null,
     })
     if (!error) {
       // Para valores variáveis, o valor confirmado vira a nova referência do próximo mês
@@ -606,7 +621,9 @@ export default function MovimentosPage() {
 
         <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Categoria</p>
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '16px' }}>
-          {(dfTipo === 'despesa' ? CATEGORIAS_DESPESA : CATEGORIAS_RECEITA).map(c => {
+          {(contextoAtivo.tipo === 'empresa'
+              ? (dfTipo === 'despesa' ? CATEGORIAS_EMPRESA_DESPESA : CATEGORIAS_EMPRESA_RECEITA)
+              : (dfTipo === 'despesa' ? CATEGORIAS_DESPESA : CATEGORIAS_RECEITA)).map(c => {
             const Icon = ICONES_CAT[c] || MoreHorizontal
             const ativo = dfCategoria === c
             return (
