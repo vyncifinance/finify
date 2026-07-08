@@ -318,19 +318,19 @@ export default function DashboardPage() {
         <div style={{ background: 'linear-gradient(135deg, #05281F 0%, #0C342A 55%, #0E3B2F 100%)', padding: '24px 20px 48px' }}>
           <div className="flex items-center justify-between mb-6">
             <div style={{ position: 'relative', flex: 1 }}>
-              <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                {getSaudacao()}, {primeiroNome || 'Família'}
-              </p>
               <button onClick={() => setContextoAberto(!contextoAberto)}
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: '2px' }}>
-                <span style={{ fontSize: '12px', fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '140px' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: '3px' }}>
+                <span className="text-sm font-bold" style={{ color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '150px' }}>
                   {contextoAtivo.nome || familia}
                 </span>
                 {contextoAtivo.tipo === 'empresa' && (
                   <span style={{ fontSize: '9px', fontWeight: 700, color: '#0E3B2E', backgroundColor: '#58D68D', padding: '1px 6px', borderRadius: '999px' }}>PJ</span>
                 )}
-                <ChevronDown size={12} color="rgba(255,255,255,0.5)" style={{ transform: contextoAberto ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                <ChevronDown size={13} color="rgba(255,255,255,0.5)" style={{ transform: contextoAberto ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
               </button>
+              <p className="text-xs font-medium mb-1" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                {getSaudacao()}, {primeiroNome || 'Família'}
+              </p>
               <p className="text-2xl font-bold text-white" style={{ letterSpacing: '-1px' }}>
                 {loading ? '...' : fmtShortOculto(resultadoExibir, ocultar)}
               </p>
@@ -586,17 +586,17 @@ export default function DashboardPage() {
           {/* Header premium */}
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '10px' }}>
             <div style={{ position: 'relative' }}>
-              <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.5px', marginBottom: '4px' }}>
-                {getSaudacao()}, {primeiroNome || 'Família'}
-              </h1>
               <button onClick={() => setContextoAberto(!contextoAberto)}
-                style={{ display: 'flex', alignItems: 'center', gap: '7px', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: '6px' }}>
-                <span style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A' }}>{contextoAtivo.nome || familia}</span>
+                style={{ display: 'flex', alignItems: 'center', gap: '9px', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: '2px' }}>
+                <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.5px' }}>{contextoAtivo.nome || familia}</h1>
                 {contextoAtivo.tipo === 'empresa' && (
                   <span style={{ fontSize: '10px', fontWeight: 700, color: '#145A45', backgroundColor: '#D1FAE5', padding: '2px 8px', borderRadius: '999px' }}>PJ</span>
                 )}
-                <ChevronDown size={14} color="#94A3B8" style={{ transform: contextoAberto ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                <ChevronDown size={16} color="#94A3B8" style={{ transform: contextoAberto ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
               </button>
+              <p style={{ fontSize: '12.5px', color: '#64748B', marginBottom: '6px' }}>
+                {getSaudacao()}, {primeiroNome || 'Família'}
+              </p>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#2F8F68' }} />
                 <span style={{ fontSize: '12.5px', color: '#94A3B8' }}>
@@ -691,7 +691,7 @@ export default function DashboardPage() {
                   )}
                   <div style={{ padding: '5px 12px', borderRadius: '999px', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
                     <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>
-                      {familia ? `Família ${familia}` : ''} · {mesAtual}
+                      {contextoAtivo.tipo === 'empresa' ? contextoAtivo.nome : (familia ? `Família ${familia}` : '')} · {mesAtual}
                     </span>
                   </div>
                 </div>
