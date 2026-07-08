@@ -6,12 +6,13 @@ import { useEffect, useState, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import {
-  ArrowDownLeft, ArrowUpRight, ChevronLeft, ChevronRight,
+  ArrowDownLeft, ArrowUpRight, ChevronLeft, ChevronRight, ChevronDown,
   Plus, Wallet, X, UtensilsCrossed, Home, Car, Smile,
   Heart, BookOpen, ShoppingBag, Church, MoreHorizontal,
   Briefcase, TrendingUp, Laptop, DollarSign, Trash2, Pencil,
   CreditCard, FileText, AlignLeft, Repeat, CheckCircle2,
-  Pill, Gift, Sparkles, GraduationCap, Smartphone, Shirt, Wrench, ClipboardList, Filter, Search, PawPrint
+  Pill, Gift, Sparkles, GraduationCap, Smartphone, Shirt, Wrench, ClipboardList, Filter, Search, PawPrint,
+  Building2, Truck, Landmark, Megaphone, Calculator, Users, Check
 } from 'lucide-react'
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
@@ -19,6 +20,9 @@ const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
 
 const CATEGORIAS_DESPESA = ['Alimentação','Moradia','Transporte','Lazer','Saúde','Educação','Cartão de Crédito','Dízimo','Farmácia','Presente','Estética','Estudos','Eletrônicos','Vestuário','Consertos','Serviços','Pet','Outros']
 const CATEGORIAS_RECEITA = ['Salário','Renda Extra','Freelance','Investimento','Outros']
+
+const CATEGORIAS_EMPRESA_DESPESA = ['Fornecedores','Impostos','Pró-labore','Folha de Pagamento','Marketing','Aluguel/Sede','Software/Ferramentas','Contabilidade','Outros']
+const CATEGORIAS_EMPRESA_RECEITA = ['Faturamento','Prestação de Serviço','Outras Receitas']
 
 const ICONES_CAT: Record<string, any> = {
   'Alimentação': UtensilsCrossed, 'Moradia': Home, 'Transporte': Car, 'Lazer': Smile,
@@ -28,6 +32,9 @@ const ICONES_CAT: Record<string, any> = {
   'Eletrônicos': Smartphone, 'Vestuário': Shirt, 'Consertos': Wrench, 'Serviços': ClipboardList,
   'Pet': PawPrint,
   'Salário': Briefcase, 'Renda Extra': DollarSign, 'Freelance': Laptop, 'Investimento': TrendingUp,
+  'Fornecedores': Truck, 'Impostos': Landmark, 'Pró-labore': Wallet, 'Folha de Pagamento': Users,
+  'Marketing': Megaphone, 'Aluguel/Sede': Building2, 'Software/Ferramentas': Laptop, 'Contabilidade': Calculator,
+  'Faturamento': TrendingUp, 'Prestação de Serviço': Briefcase, 'Outras Receitas': DollarSign,
 }
 
 function fmt(val: number) {
@@ -53,6 +60,10 @@ export default function MovimentosPage() {
   const [loading, setLoading]           = useState(true)
   const [familiaId, setFamiliaId]       = useState('')
   const [familiaNome, setFamiliaNome]   = useState('')
+  const [empresas, setEmpresas]         = useState<any[]>([])
+  const [contextoAtivo, setContextoAtivo] = useState<{ tipo: 'pessoal' | 'empresa'; empresaId?: string; nome: string }>({ tipo: 'pessoal', nome: '' })
+  const [contextoAberto, setContextoAberto] = useState(false)
+  const [contextoAbertoHeader, setContextoAbertoHeader] = useState(false)
   const [userId, setUserId]             = useState('')
   const [membroAtual, setMembroAtual]   = useState('')
   const [mesRef, setMesRef]             = useState(new Date())
@@ -131,18 +142,46 @@ export default function MovimentosPage() {
       .eq('id', session.user.id).single()
     if (profile) {
       const fid = profile.familia_id
+      const nomeFam = (profile.familias as any)?.nome || ''
       setMembroAtual(profile.nome || '')
       setFamiliaId(fid)
       familiaIdRef.current = fid
-      setFamiliaNome((profile.familias as any)?.nome || '')
+      setFamiliaNome(nomeFam)
       setMembroForm(profile.nome || '')
       const { data: membrosData } = await supabase
         .from('profiles').select('nome').eq('familia_id', fid)
       if (membrosData) setMembrosFamilia(membrosData.map((m: any) => m.nome).filter(Boolean))
-      await carregarLancamentos(fid, profile.nome, (profile.familias as any)?.nome)
+
+      const { data: empresasData } = await supabase.from('empresas')
+        .select('*').eq('familia_id', fid).order('created_at', { ascending: true })
+      const listaEmpresas = empresasData || []
+      setEmpresas(listaEmpresas)
+
+      // Restaura o último contexto usado nesse dispositivo (se ainda existir)
+      let contexto: { tipo: 'pessoal' | 'empresa'; empresaId?: string; nome: string } = { tipo: 'pessoal', nome: nomeFam }
+      try {
+        const salvo = localStorage.getItem('finify_contexto')
+        if (salvo) {
+          const parsed = JSON.parse(salvo)
+          if (parsed.tipo === 'empresa' && parsed.empresaId) {
+            const emp = listaEmpresas.find((e: any) => e.id === parsed.empresaId)
+            if (emp) contexto = { tipo: 'empresa', empresaId: emp.id, nome: emp.nome }
+          }
+        }
+      } catch {}
+      setContextoAtivo(contexto)
+
+      await carregarLancamentos(fid, profile.nome, nomeFam, contexto)
       await recarregarDespesasFixas(fid)
     }
     setLoading(false)
+  }
+
+  function trocarContexto(novo: { tipo: 'pessoal' | 'empresa'; empresaId?: string; nome: string }) {
+    setContextoAtivo(novo)
+    setContextoAberto(false)
+    try { localStorage.setItem('finify_contexto', JSON.stringify(novo)) } catch {}
+    carregarLancamentos(familiaIdRef.current, membroAtual, familiaNome, novo)
   }
 
   async function recarregarDespesasFixas(fid: string) {
@@ -151,12 +190,17 @@ export default function MovimentosPage() {
     if (data) setDespesasFixas(data)
   }
 
-  async function carregarLancamentos(fid: string, nomeUsuario?: string, nomeFamilia?: string) {
+  async function carregarLancamentos(fid: string, nomeUsuario?: string, nomeFamilia?: string, contexto?: { tipo: 'pessoal' | 'empresa'; empresaId?: string }) {
     if (!fid) return
+    const ctx = contexto || contextoAtivo
     const ini = new Date(mesRef.getFullYear(), mesRef.getMonth(), 1).toISOString().split('T')[0]
     const fim = new Date(mesRef.getFullYear(), mesRef.getMonth() + 1, 0).toISOString().split('T')[0]
-    const { data: lanc } = await supabase.from('lancamentos').select('*')
+    let query = supabase.from('lancamentos').select('*')
       .eq('familia_id', fid).gte('data', ini).lte('data', fim)
+    query = ctx.tipo === 'empresa' && ctx.empresaId
+      ? query.eq('empresa_id', ctx.empresaId)
+      : query.is('empresa_id', null)
+    const { data: lanc } = await query
       .order('data', { ascending: false }).order('hora', { ascending: false })
     if (lanc) {
       setLancamentos(lanc)
@@ -174,9 +218,10 @@ export default function MovimentosPage() {
 
   function abrirModalNovo() {
     setEditando(null)
-    setTipo('despesa'); setValor(''); setCategoria('Alimentação')
+    setTipo('despesa'); setValor('')
+    setCategoria(contextoAtivo.tipo === 'empresa' ? CATEGORIAS_EMPRESA_DESPESA[0] : 'Alimentação')
     setDataLanc(new Date().toISOString().split('T')[0])
-    setMembroForm(membroAtual); setDizimar(true)
+    setMembroForm(membroAtual); setDizimar(false)
     setObservacao(''); setParcelado(false); setNumParcelas('2'); setDiaParcela('1')
     setConfirmDelete(false)
     setModalOpen(true)
@@ -195,8 +240,13 @@ export default function MovimentosPage() {
 
   function handleTipo(t: 'despesa' | 'receita') {
     setTipo(t)
-    setCategoria(t === 'despesa' ? 'Alimentação' : 'Salário')
-    setDizimar(t === 'receita')
+    if (contextoAtivo.tipo === 'empresa') {
+      setCategoria(t === 'despesa' ? CATEGORIAS_EMPRESA_DESPESA[0] : CATEGORIAS_EMPRESA_RECEITA[0])
+      setDizimar(false) // receita de PJ não dizima por padrão — só se marcado manualmente
+    } else {
+      setCategoria(t === 'despesa' ? 'Alimentação' : 'Salário')
+      setDizimar(t === 'receita')
+    }
     setParcelado(false)
   }
 
@@ -208,6 +258,7 @@ export default function MovimentosPage() {
     const fid  = familiaIdRef.current
     const agora = new Date()
     const hora  = `${String(agora.getHours()).padStart(2,'0')}:${String(agora.getMinutes()).padStart(2,'0')}`
+    const empresaId = contextoAtivo.tipo === 'empresa' ? contextoAtivo.empresaId : null
 
     if (editando) {
       const { error } = await supabase.from('lancamentos').update({
@@ -231,7 +282,7 @@ export default function MovimentosPage() {
           familia_id: fid, user_id: userId, tipo: 'despesa',
           valor: Math.round(valorParcela * 100) / 100,
           categoria, membro: membroForm, data: dataStr, hora,
-          dizimar: false,
+          dizimar: false, empresa_id: empresaId,
           descricao: `${observacao ? observacao + ' ' : ''}Parcela ${i + 1}/${n}`,
         })
       }
@@ -243,6 +294,7 @@ export default function MovimentosPage() {
         familia_id: fid, user_id: userId, tipo, valor: valorNum,
         categoria, membro: membroForm, data: dataLanc, hora,
         dizimar: tipo === 'receita' ? dizimar : false,
+        empresa_id: empresaId,
         descricao: observacao || null,
       })
       setSalvando(false)
@@ -419,7 +471,9 @@ export default function MovimentosPage() {
   const resultado = totalRec - totalDes
   const saldoProjetado = resultado + totalReceitasFixasPendentes - totalDespesasFixasPendentes
   const mesLabel  = `${MESES[mesRef.getMonth()]} ${mesRef.getFullYear()}`
-  const categorias = tipo === 'despesa' ? CATEGORIAS_DESPESA : CATEGORIAS_RECEITA
+  const categorias = contextoAtivo.tipo === 'empresa'
+    ? (tipo === 'despesa' ? CATEGORIAS_EMPRESA_DESPESA : CATEGORIAS_EMPRESA_RECEITA)
+    : (tipo === 'despesa' ? CATEGORIAS_DESPESA : CATEGORIAS_RECEITA)
 
   // Seção "Despesas Fixas" — compartilhada entre mobile e desktop
   const despesasFixasSection = (isMob: boolean) => (
@@ -677,6 +731,48 @@ export default function MovimentosPage() {
       {/* Scroll area */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px 8px' }}>
 
+        {/* Lançando em — mini-seletor de contexto */}
+        {!editando && (
+          <div style={{ position: 'relative', marginBottom: '14px' }}>
+            <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Lançando em</p>
+            <button type="button" onClick={() => setContextoAberto(!contextoAberto)}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '12px', border: `1.5px solid ${contextoAtivo.tipo === 'empresa' ? 'rgba(20,90,69,0.35)' : '#E2E8F0'}`, backgroundColor: contextoAtivo.tipo === 'empresa' ? '#F0FDF4' : '#F8FAFC', cursor: 'pointer' }}>
+              <div style={{ width: '28px', height: '28px', borderRadius: '8px', flexShrink: 0, backgroundColor: contextoAtivo.tipo === 'empresa' ? '#14574518' : '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {contextoAtivo.tipo === 'empresa'
+                  ? <Building2 size={14} color="#145A45" strokeWidth={1.75} />
+                  : <Users size={14} color="#64748B" strokeWidth={1.75} />}
+              </div>
+              <span style={{ flex: 1, textAlign: 'left', fontSize: '13.5px', fontWeight: 600, color: '#0F172A' }}>{contextoAtivo.nome}</span>
+              {contextoAtivo.tipo === 'empresa' && (
+                <span style={{ fontSize: '10px', fontWeight: 700, color: '#145A45', backgroundColor: '#D1FAE5', padding: '2px 7px', borderRadius: '999px' }}>PJ</span>
+              )}
+              <ChevronDown size={15} color="#94A3B8" strokeWidth={2} style={{ transform: contextoAberto ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+            </button>
+            {contextoAberto && (
+              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 8px 24px rgba(0,0,0,0.1)', zIndex: 10, overflow: 'hidden' }}>
+                <button type="button" onClick={() => { trocarContexto({ tipo: 'pessoal', nome: familiaNome }); handleTipo(tipo) }}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                  <Users size={14} color="#64748B" strokeWidth={1.75} />
+                  <span style={{ flex: 1, fontSize: '13px', color: '#0F172A' }}>{familiaNome}</span>
+                  {contextoAtivo.tipo === 'pessoal' && <Check size={14} color="#145A45" strokeWidth={2.5} />}
+                </button>
+                {empresas.map((emp: any) => (
+                  <button key={emp.id} type="button" onClick={() => { trocarContexto({ tipo: 'empresa', empresaId: emp.id, nome: emp.nome }); handleTipo(tipo) }}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: 'none', border: 'none', borderTop: '1px solid #F1F5F9', cursor: 'pointer', textAlign: 'left' }}>
+                    <Building2 size={14} color="#145A45" strokeWidth={1.75} />
+                    <span style={{ flex: 1, fontSize: '13px', color: '#0F172A' }}>{emp.nome}</span>
+                    {contextoAtivo.tipo === 'empresa' && contextoAtivo.empresaId === emp.id && <Check size={14} color="#145A45" strokeWidth={2.5} />}
+                  </button>
+                ))}
+                <a href="/dashboard/perfil"
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderTop: '1px solid #F1F5F9', textDecoration: 'none', color: '#145A45', fontSize: '13px', fontWeight: 600 }}>
+                  <Plus size={14} strokeWidth={2.5} /> Adicionar empresa (CNPJ)
+                </a>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Tipo */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
           {[{ key: 'despesa', label: 'Despesa', cor: '#EF4444' }, { key: 'receita', label: 'Receita', cor: '#10B981' }].map(t => (
@@ -828,13 +924,49 @@ export default function MovimentosPage() {
 
       {/* ── MOBILE ── */}
       <div className="lg:hidden" style={{ backgroundColor: '#F8FAFC', minHeight: '100vh', paddingBottom: '100px' }}>
-        <div style={{ backgroundColor: '#0E3B2E', padding: '20px 20px 36px' }}>
+        <div style={{
+          backgroundColor: '#0E3B2E', padding: '20px 20px 36px',
+          border: contextoAtivo.tipo === 'empresa' ? '1.5px solid rgba(47,179,106,0.4)' : 'none',
+          borderTop: 'none', borderLeft: 'none', borderRight: 'none',
+        }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <h1 style={{ fontSize: '18px', fontWeight: 600, color: '#fff', margin: 0 }}>Fluxo Patrimonial</h1>
+            <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+              <button onClick={() => setContextoAbertoHeader(!contextoAbertoHeader)}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', padding: 0, maxWidth: '100%' }}>
+                <h1 style={{ fontSize: '18px', fontWeight: 600, color: '#fff', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {contextoAtivo.nome || 'Fluxo Patrimonial'}
+                </h1>
+                {contextoAtivo.tipo === 'empresa' && (
+                  <span style={{ fontSize: '9.5px', fontWeight: 700, color: '#0E3B2E', backgroundColor: '#58D68D', padding: '2px 6px', borderRadius: '999px', flexShrink: 0 }}>PJ</span>
+                )}
+                <ChevronDown size={14} color="rgba(255,255,255,0.6)" style={{ transform: contextoAbertoHeader ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }} />
+              </button>
               <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>{mesLabel}</p>
+
+              {contextoAbertoHeader && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '8px', width: '240px', backgroundColor: '#fff', borderRadius: '14px', border: '1px solid #E2E8F0', boxShadow: '0 12px 32px rgba(0,0,0,0.2)', zIndex: 20, overflow: 'hidden' }}>
+                  <button onClick={() => { trocarContexto({ tipo: 'pessoal', nome: familiaNome }); setContextoAbertoHeader(false) }}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                    <Users size={15} color="#64748B" strokeWidth={1.75} />
+                    <span style={{ flex: 1, fontSize: '13.5px', color: '#0F172A' }}>{familiaNome}</span>
+                    {contextoAtivo.tipo === 'pessoal' && <Check size={15} color="#145A45" strokeWidth={2.5} />}
+                  </button>
+                  {empresas.map((emp: any) => (
+                    <button key={emp.id} onClick={() => { trocarContexto({ tipo: 'empresa', empresaId: emp.id, nome: emp.nome }); setContextoAbertoHeader(false) }}
+                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', background: 'none', border: 'none', borderTop: '1px solid #F1F5F9', cursor: 'pointer', textAlign: 'left' }}>
+                      <Building2 size={15} color="#145A45" strokeWidth={1.75} />
+                      <span style={{ flex: 1, fontSize: '13.5px', color: '#0F172A' }}>{emp.nome}</span>
+                      {contextoAtivo.tipo === 'empresa' && contextoAtivo.empresaId === emp.id && <Check size={15} color="#145A45" strokeWidth={2.5} />}
+                    </button>
+                  ))}
+                  <a href="/dashboard/perfil"
+                    style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', borderTop: '1px solid #F1F5F9', textDecoration: 'none', color: '#145A45', fontSize: '13.5px', fontWeight: 600 }}>
+                    <Plus size={15} strokeWidth={2.5} /> Adicionar empresa (CNPJ)
+                  </a>
+                </div>
+              )}
             </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
               <button onClick={() => mudarMes(-1)} style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.1)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                 <ChevronLeft size={16} color="#fff" />
               </button>
@@ -973,9 +1105,42 @@ export default function MovimentosPage() {
       {/* ── DESKTOP ── */}
       <div className="hidden lg:block p-8 max-w-[1440px] mx-auto" style={{ backgroundColor: '#F8FAFC' }}>
         <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', letterSpacing: '-0.5px' }}>Fluxo Patrimonial</h1>
-            <p className="text-sm mt-1" style={{ color: '#64748B' }}>Acompanhe receitas e despesas{familiaNome ? ` da família ${familiaNome}` : ''}</p>
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => setContextoAbertoHeader(!contextoAbertoHeader)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 10px', marginLeft: '-10px', borderRadius: '10px',
+                backgroundColor: contextoAtivo.tipo === 'empresa' ? 'rgba(20,90,69,0.06)' : 'transparent',
+              }}>
+              <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', letterSpacing: '-0.5px' }}>{contextoAtivo.nome || 'Fluxo Patrimonial'}</h1>
+              {contextoAtivo.tipo === 'empresa' && (
+                <span style={{ fontSize: '11px', fontWeight: 700, color: '#145A45', backgroundColor: '#D1FAE5', padding: '3px 9px', borderRadius: '999px' }}>PJ</span>
+              )}
+              <ChevronDown size={18} color="#94A3B8" style={{ transform: contextoAbertoHeader ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+            </button>
+            <p className="text-sm mt-1" style={{ color: '#64748B' }}>Acompanhe receitas e despesas{contextoAtivo.tipo === 'pessoal' && familiaNome ? ` da família ${familiaNome}` : ''}</p>
+
+            {contextoAbertoHeader && (
+              <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '6px', width: '260px', backgroundColor: '#fff', borderRadius: '14px', border: '1px solid #E2E8F0', boxShadow: '0 12px 32px rgba(0,0,0,0.12)', zIndex: 20, overflow: 'hidden' }}>
+                <button onClick={() => { trocarContexto({ tipo: 'pessoal', nome: familiaNome }); setContextoAbertoHeader(false) }}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                  <Users size={15} color="#64748B" strokeWidth={1.75} />
+                  <span style={{ flex: 1, fontSize: '13.5px', color: '#0F172A' }}>{familiaNome}</span>
+                  {contextoAtivo.tipo === 'pessoal' && <Check size={15} color="#145A45" strokeWidth={2.5} />}
+                </button>
+                {empresas.map((emp: any) => (
+                  <button key={emp.id} onClick={() => { trocarContexto({ tipo: 'empresa', empresaId: emp.id, nome: emp.nome }); setContextoAbertoHeader(false) }}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', background: 'none', border: 'none', borderTop: '1px solid #F1F5F9', cursor: 'pointer', textAlign: 'left' }}>
+                    <Building2 size={15} color="#145A45" strokeWidth={1.75} />
+                    <span style={{ flex: 1, fontSize: '13.5px', color: '#0F172A' }}>{emp.nome}</span>
+                    {contextoAtivo.tipo === 'empresa' && contextoAtivo.empresaId === emp.id && <Check size={15} color="#145A45" strokeWidth={2.5} />}
+                  </button>
+                ))}
+                <a href="/dashboard/perfil"
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', borderTop: '1px solid #F1F5F9', textDecoration: 'none', color: '#145A45', fontSize: '13.5px', fontWeight: 600 }}>
+                  <Plus size={15} strokeWidth={2.5} /> Adicionar empresa (CNPJ)
+                </a>
+              </div>
+            )}
           </div>
           <button onClick={abrirModalNovo}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white hover:opacity-90"
