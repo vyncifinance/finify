@@ -9,9 +9,10 @@ import {
   ArrowDownLeft, ArrowUpRight, PiggyBank, Target,
   ArrowRight, ArrowUp, CheckCircle2, AlertCircle, Bell,
   Home, BookOpen, Shield, TrendingUp, Send, Heart, Star, Church,
-  ChevronRight, Wallet, Building2, Sparkles, UtensilsCrossed, Car,
+  ChevronRight, ChevronDown, Wallet, Building2, Sparkles, UtensilsCrossed, Car,
   Smile, ShoppingBag, CreditCard, MoreHorizontal, Briefcase,
-  Pill, Gift, GraduationCap, Smartphone, Shirt, Wrench, ClipboardList, PawPrint
+  Pill, Gift, GraduationCap, Smartphone, Shirt, Wrench, ClipboardList, PawPrint,
+  Users, Check, Plus
 } from 'lucide-react'
 
 const ICONES_CAT: Record<string, any> = {
@@ -69,6 +70,8 @@ function getSaudacao() {
 export default function DashboardPage() {
   const [nome, setNome]       = useState('')
   const [familia, setFamilia] = useState('')
+  const [familiaId, setFamiliaId] = useState('')
+  const [userId, setUserId]       = useState('')
   const [loading, setLoading] = useState(true)
   const [totalRec, setTotalRec] = useState(0)
   const [totalDes, setTotalDes] = useState(0)
@@ -84,6 +87,9 @@ export default function DashboardPage() {
   const [valorDizimo, setValorDizimo] = useState(0)
   const [dizimoPago, setDizimoPago]   = useState(0)
   const [atualizadoHa, setAtualizadoHa] = useState(0)
+  const [empresas, setEmpresas]         = useState<any[]>([])
+  const [contextoAtivo, setContextoAtivo] = useState<{ tipo: 'pessoal' | 'empresa'; empresaId?: string; nome: string }>({ tipo: 'pessoal', nome: '' })
+  const [contextoAberto, setContextoAberto] = useState(false)
 
   const ocultar  = useOcultarValores()
   const supabase = createClient()
@@ -103,21 +109,54 @@ export default function DashboardPage() {
       .from('profiles').select('nome, familia_id, familias(nome, dizimista)')
       .eq('id', session.user.id).single()
     if (profile) {
+      const fid = profile.familia_id
+      const nomeFam = (profile.familias as any)?.nome || ''
       setNome(profile.nome || '')
-      setFamilia((profile.familias as any)?.nome || '')
+      setFamilia(nomeFam)
+      setFamiliaId(fid)
+      setUserId(session.user.id)
       setDizimista((profile.familias as any)?.dizimista !== false)
-      await carregarDados(profile.familia_id, session.user.id)
+
+      const { data: empresasData } = await supabase.from('empresas')
+        .select('*').eq('familia_id', fid).order('created_at', { ascending: true })
+      const listaEmpresas = empresasData || []
+      setEmpresas(listaEmpresas)
+
+      let contexto: { tipo: 'pessoal' | 'empresa'; empresaId?: string; nome: string } = { tipo: 'pessoal', nome: nomeFam }
+      try {
+        const salvo = localStorage.getItem('finify_contexto')
+        if (salvo) {
+          const parsed = JSON.parse(salvo)
+          if (parsed.tipo === 'empresa' && parsed.empresaId) {
+            const emp = listaEmpresas.find((e: any) => e.id === parsed.empresaId)
+            if (emp) contexto = { tipo: 'empresa', empresaId: emp.id, nome: emp.nome }
+          }
+        }
+      } catch {}
+      setContextoAtivo(contexto)
+
+      await carregarDados(fid, session.user.id, contexto)
     }
     setLoading(false)
     setAtualizadoHa(0)
   }
 
-  async function carregarDados(fid: string, uid: string) {
+  function trocarContexto(novo: { tipo: 'pessoal' | 'empresa'; empresaId?: string; nome: string }) {
+    setContextoAtivo(novo)
+    setContextoAberto(false)
+    try { localStorage.setItem('finify_contexto', JSON.stringify(novo)) } catch {}
+    if (familiaId && userId) carregarDados(familiaId, userId, novo)
+  }
+
+  async function carregarDados(fid: string, uid: string, contexto?: { tipo: 'pessoal' | 'empresa'; empresaId?: string }) {
+    const ctx = contexto || contextoAtivo
+    const ehEmpresa = ctx.tipo === 'empresa' && !!ctx.empresaId
     const ini = new Date(agora.getFullYear(), agora.getMonth(), 1).toISOString().split('T')[0]
     const fim = new Date(agora.getFullYear(), agora.getMonth() + 1, 0).toISOString().split('T')[0]
-    const { data: lanc } = await supabase.from('lancamentos').select('*')
+    let queryLanc = supabase.from('lancamentos').select('*')
       .eq('familia_id', fid).gte('data', ini).lte('data', fim)
-      .order('data', { ascending: false })
+    queryLanc = ehEmpresa ? queryLanc.eq('empresa_id', ctx.empresaId) : queryLanc.is('empresa_id', null)
+    const { data: lanc } = await queryLanc.order('data', { ascending: false })
 
     if (lanc) {
       const r = lanc.filter((l: any) => l.tipo === 'receita').reduce((s: number, l: any) => s + Number(l.valor), 0)
@@ -125,9 +164,11 @@ export default function DashboardPage() {
       setTotalRec(r); setTotalDes(d); setTotalEco(r - d)
       setLancamentos(lanc.slice(0, 5))
 
-      const base = lanc.filter((l: any) => l.tipo === 'receita' && l.dizimar !== false).reduce((s: number, l: any) => s + Number(l.valor), 0)
-      const pago = lanc.filter((l: any) => l.tipo === 'despesa' && l.categoria === 'Dízimo').reduce((s: number, l: any) => s + Number(l.valor), 0)
-      setBaseDizimo(base); setValorDizimo(base * 0.1); setDizimoPago(pago)
+      if (!ehEmpresa) {
+        const base = lanc.filter((l: any) => l.tipo === 'receita' && l.dizimar !== false).reduce((s: number, l: any) => s + Number(l.valor), 0)
+        const pago = lanc.filter((l: any) => l.tipo === 'despesa' && l.categoria === 'Dízimo').reduce((s: number, l: any) => s + Number(l.valor), 0)
+        setBaseDizimo(base); setValorDizimo(base * 0.1); setDizimoPago(pago)
+      }
 
       const porCat: any = {}
       lanc.filter((l: any) => l.tipo === 'despesa').forEach((l: any) => {
@@ -146,8 +187,10 @@ export default function DashboardPage() {
       const d2 = new Date(agora.getFullYear(), agora.getMonth() - i, 1)
       const i2 = new Date(d2.getFullYear(), d2.getMonth(), 1).toISOString().split('T')[0]
       const f2 = new Date(d2.getFullYear(), d2.getMonth() + 1, 0).toISOString().split('T')[0]
-      const { data: mes } = await supabase.from('lancamentos').select('tipo, valor')
+      let queryMes = supabase.from('lancamentos').select('tipo, valor')
         .eq('familia_id', fid).gte('data', i2).lte('data', f2)
+      queryMes = ehEmpresa ? queryMes.eq('empresa_id', ctx.empresaId) : queryMes.is('empresa_id', null)
+      const { data: mes } = await queryMes
       const r2 = (mes || []).filter((l: any) => l.tipo === 'receita').reduce((s: number, l: any) => s + Number(l.valor), 0)
       const d3 = (mes || []).filter((l: any) => l.tipo === 'despesa').reduce((s: number, l: any) => s + Number(l.valor), 0)
       evo.push({ mes: MESES[d2.getMonth()].substring(0, 3), valor: r2 - d3 })
@@ -155,55 +198,64 @@ export default function DashboardPage() {
     }
     setEvolucao(evo)
 
-    // Média de despesas dos últimos 6 meses que de fato têm lançamento (evita distorcer com meses "vazios" de antes de você começar a usar o app)
-    const despesasComDados = despesasPorMes.filter(d => d > 0)
-    const ultimos3ComDados = despesasComDados.slice(-3)
-    const media3MesesDespesas = ultimos3ComDados.length > 0 ? ultimos3ComDados.reduce((s, d) => s + d, 0) / ultimos3ComDados.length : 0
-    const metaReservaEmergencia = media3MesesDespesas * 6 // amostra de 3 meses, alvo de 6 meses de despesas guardados
-    setMesesReservaConsiderados(ultimos3ComDados.length)
+    // Reserva de Emergência e Metas da Família — conceitos só do contexto pessoal
+    if (!ehEmpresa) {
+      // Média de despesas dos últimos 6 meses que de fato têm lançamento (evita distorcer com meses "vazios" de antes de você começar a usar o app)
+      const despesasComDados = despesasPorMes.filter(d => d > 0)
+      const ultimos3ComDados = despesasComDados.slice(-3)
+      const media3MesesDespesas = ultimos3ComDados.length > 0 ? ultimos3ComDados.reduce((s, d) => s + d, 0) / ultimos3ComDados.length : 0
+      const metaReservaEmergencia = media3MesesDespesas * 6 // amostra de 3 meses, alvo de 6 meses de despesas guardados
+      setMesesReservaConsiderados(ultimos3ComDados.length)
 
-    // Caixa cadastrado em Patrimônio — valor atual da reserva de emergência
-    const { data: bensCaixaData } = await supabase.from('bens').select('valor, eh_divida')
-      .eq('familia_id', fid).eq('tipo', 'caixa')
-    const caixaTotal = (bensCaixaData || []).filter((b: any) => !b.eh_divida).reduce((s: number, b: any) => s + Number(b.valor), 0)
+      // Caixa cadastrado em Patrimônio — valor atual da reserva de emergência
+      const { data: bensCaixaData } = await supabase.from('bens').select('valor, eh_divida')
+        .eq('familia_id', fid).eq('tipo', 'caixa')
+      const caixaTotal = (bensCaixaData || []).filter((b: any) => !b.eh_divida).reduce((s: number, b: any) => s + Number(b.valor), 0)
 
-    // Meta automática "Reserva de Emergência" — criada pelo sistema, alvo = 6x a média mensal de despesa (6 meses de reserva)
-    if (metaReservaEmergencia > 0) {
-      const { data: reservaExistente } = await supabase.from('metas').select('id')
-        .eq('familia_id', fid).eq('automatica', true).order('created_at', { ascending: true }).limit(1).maybeSingle()
-      if (!reservaExistente) {
-        const { error: erroInsertReserva } = await supabase.from('metas').insert({
-          familia_id: fid, user_id: uid, nome: 'Reserva de Emergência',
-          valor_alvo: metaReservaEmergencia, valor_atual: caixaTotal,
-          icone: 'shield', cor: '#0B3B2E', automatica: true,
-        })
-        if (erroInsertReserva) {
-          // Provável corrida entre abas/carregamentos simultâneos: alguém já criou nesse meio-tempo.
-          // Graças ao índice único no banco, o insert falha em vez de duplicar — só busca a que já existe e atualiza.
-          const { data: jaCriada } = await supabase.from('metas').select('id')
-            .eq('familia_id', fid).eq('automatica', true).order('created_at', { ascending: true }).limit(1).maybeSingle()
-          if (jaCriada) {
-            await supabase.from('metas').update({ valor_alvo: metaReservaEmergencia, valor_atual: caixaTotal }).eq('id', jaCriada.id)
+      // Meta automática "Reserva de Emergência" — criada pelo sistema, alvo = 6x a média mensal de despesa (6 meses de reserva)
+      if (metaReservaEmergencia > 0) {
+        const { data: reservaExistente } = await supabase.from('metas').select('id')
+          .eq('familia_id', fid).eq('automatica', true).order('created_at', { ascending: true }).limit(1).maybeSingle()
+        if (!reservaExistente) {
+          const { error: erroInsertReserva } = await supabase.from('metas').insert({
+            familia_id: fid, user_id: uid, nome: 'Reserva de Emergência',
+            valor_alvo: metaReservaEmergencia, valor_atual: caixaTotal,
+            icone: 'shield', cor: '#0B3B2E', automatica: true,
+          })
+          if (erroInsertReserva) {
+            // Provável corrida entre abas/carregamentos simultâneos: alguém já criou nesse meio-tempo.
+            // Graças ao índice único no banco, o insert falha em vez de duplicar — só busca a que já existe e atualiza.
+            const { data: jaCriada } = await supabase.from('metas').select('id')
+              .eq('familia_id', fid).eq('automatica', true).order('created_at', { ascending: true }).limit(1).maybeSingle()
+            if (jaCriada) {
+              await supabase.from('metas').update({ valor_alvo: metaReservaEmergencia, valor_atual: caixaTotal }).eq('id', jaCriada.id)
+            }
           }
+        } else {
+          await supabase.from('metas').update({
+            valor_alvo: metaReservaEmergencia, valor_atual: caixaTotal,
+          }).eq('id', reservaExistente.id)
         }
-      } else {
-        await supabase.from('metas').update({
-          valor_alvo: metaReservaEmergencia, valor_atual: caixaTotal,
-        }).eq('id', reservaExistente.id)
       }
+
+      const { data: metasData } = await supabase.from('metas').select('*')
+        .eq('familia_id', fid).order('automatica', { ascending: false }).order('created_at', { ascending: false }).limit(3)
+      if (metasData) setMetas(metasData)
+    } else {
+      setMetas([])
     }
 
-    const { data: metasData } = await supabase.from('metas').select('*')
-      .eq('familia_id', fid).order('automatica', { ascending: false }).order('created_at', { ascending: false }).limit(3)
-    if (metasData) setMetas(metasData)
-
-    // Despesas fixas do mês — todas, pagas e pendentes, com pendentes/atrasadas priorizadas no topo
-    const { data: fixasData } = await supabase.from('despesas_fixas').select('*')
-      .eq('familia_id', fid).eq('ativo', true).order('dia_vencimento', { ascending: true })
+    // Despesas fixas do mês — filtradas pelo contexto ativo, pagas e pendentes, com pendentes/atrasadas priorizadas no topo
+    let queryFixas = supabase.from('despesas_fixas').select('*')
+      .eq('familia_id', fid).eq('ativo', true)
+    queryFixas = ehEmpresa ? queryFixas.eq('empresa_id', ctx.empresaId) : queryFixas.is('empresa_id', null)
+    const { data: fixasData } = await queryFixas.order('dia_vencimento', { ascending: true })
     if (fixasData) {
       const fixasDespesa = fixasData.filter((f: any) => f.tipo !== 'receita')
-      const { data: lancFixos } = await supabase.from('lancamentos').select('despesa_fixa_id')
+      let queryLancFixos = supabase.from('lancamentos').select('despesa_fixa_id')
         .eq('familia_id', fid).not('despesa_fixa_id', 'is', null).gte('data', ini).lte('data', fim)
+      queryLancFixos = ehEmpresa ? queryLancFixos.eq('empresa_id', ctx.empresaId) : queryLancFixos.is('empresa_id', null)
+      const { data: lancFixos } = await queryLancFixos
       const pagosIds = new Set((lancFixos || []).map((l: any) => l.despesa_fixa_id))
       const hojeDia = agora.getDate()
       const todas = fixasDespesa
@@ -216,8 +268,11 @@ export default function DashboardPage() {
           return a.diasAte - b.diasAte
         })
       setDespesasFixas(todas.slice(0, 5))
+    } else {
+      setDespesasFixas([])
     }
   }
+
 
   const mesAtual     = `${MESES[agora.getMonth()]} ${agora.getFullYear()}`
   const pctGasto     = totalRec > 0 ? Math.round((totalDes / totalRec) * 100) : 0
@@ -230,7 +285,7 @@ export default function DashboardPage() {
   const mesAnteriorVal   = evolucao.length > 1 ? evolucao[evolucao.length - 2].valor : totalEco
   const crescimentoValor = totalEco - mesAnteriorVal
   const crescimentoPct   = mesAnteriorVal !== 0 ? (crescimentoValor / Math.abs(mesAnteriorVal)) * 100 : 0
-  const dizimoAtivo    = dizimista === true
+  const dizimoAtivo    = dizimista === true && contextoAtivo.tipo === 'pessoal'
   const dizimoRestante = Math.max(valorDizimo - dizimoPago, 0)
   const dizimoPctPago  = valorDizimo > 0 ? Math.min(Math.round((dizimoPago / valorDizimo) * 100), 100) : 0
   const dizimoQuitado  = dizimoPago >= valorDizimo && valorDizimo > 0
@@ -253,7 +308,7 @@ export default function DashboardPage() {
   const kpis = [
     { label: 'Receitas', val: totalRec, cor: '#2F8F68', bg: '#ECFDF5', borderTint: 'rgba(47,143,104,0.15)', Icon: ArrowDownLeft },
     { label: 'Despesas', val: totalDes, cor: '#DC2626', bg: '#FEF2F2', borderTint: 'rgba(220,38,38,0.12)', Icon: ArrowUpRight  },
-    { label: 'Economia', val: totalEco, cor: '#B7791F', bg: '#FFFBEB', borderTint: 'rgba(183,121,31,0.15)', Icon: PiggyBank     },
+    { label: contextoAtivo.tipo === 'empresa' ? 'Resultado' : 'Economia', val: totalEco, cor: '#B7791F', bg: '#FFFBEB', borderTint: 'rgba(183,121,31,0.15)', Icon: PiggyBank     },
   ]
 
   return (
@@ -262,14 +317,47 @@ export default function DashboardPage() {
       <div className="lg:hidden min-h-screen" style={{ backgroundColor: '#F8FAFC', paddingBottom: '32px' }}>
         <div style={{ background: 'linear-gradient(135deg, #05281F 0%, #0C342A 55%, #0E3B2F 100%)', padding: '24px 20px 48px' }}>
           <div className="flex items-center justify-between mb-6">
-            <div>
+            <div style={{ position: 'relative', flex: 1 }}>
               <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'rgba(255,255,255,0.5)' }}>
                 {getSaudacao()}, {primeiroNome || 'Família'}
               </p>
+              <button onClick={() => setContextoAberto(!contextoAberto)}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: '2px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '140px' }}>
+                  {contextoAtivo.nome || familia}
+                </span>
+                {contextoAtivo.tipo === 'empresa' && (
+                  <span style={{ fontSize: '9px', fontWeight: 700, color: '#0E3B2E', backgroundColor: '#58D68D', padding: '1px 6px', borderRadius: '999px' }}>PJ</span>
+                )}
+                <ChevronDown size={12} color="rgba(255,255,255,0.5)" style={{ transform: contextoAberto ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+              </button>
               <p className="text-2xl font-bold text-white" style={{ letterSpacing: '-1px' }}>
                 {loading ? '...' : fmtShortOculto(resultadoExibir, ocultar)}
               </p>
               <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.5)' }}>Resultado do mês · {mesAtual}</p>
+
+              {contextoAberto && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '8px', width: '230px', backgroundColor: '#fff', borderRadius: '14px', border: '1px solid #E2E8F0', boxShadow: '0 12px 32px rgba(0,0,0,0.25)', zIndex: 30, overflow: 'hidden' }}>
+                  <button onClick={() => trocarContexto({ tipo: 'pessoal', nome: familia })}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                    <Users size={15} color="#64748B" strokeWidth={1.75} />
+                    <span style={{ flex: 1, fontSize: '13.5px', color: '#0F172A' }}>{familia}</span>
+                    {contextoAtivo.tipo === 'pessoal' && <Check size={15} color="#145A45" strokeWidth={2.5} />}
+                  </button>
+                  {empresas.map((emp: any) => (
+                    <button key={emp.id} onClick={() => trocarContexto({ tipo: 'empresa', empresaId: emp.id, nome: emp.nome })}
+                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', background: 'none', border: 'none', borderTop: '1px solid #F1F5F9', cursor: 'pointer', textAlign: 'left' }}>
+                      <Building2 size={15} color="#145A45" strokeWidth={1.75} />
+                      <span style={{ flex: 1, fontSize: '13.5px', color: '#0F172A' }}>{emp.nome}</span>
+                      {contextoAtivo.tipo === 'empresa' && contextoAtivo.empresaId === emp.id && <Check size={15} color="#145A45" strokeWidth={2.5} />}
+                    </button>
+                  ))}
+                  <a href="/dashboard/perfil"
+                    style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', borderTop: '1px solid #F1F5F9', textDecoration: 'none', color: '#145A45', fontSize: '13.5px', fontWeight: 600 }}>
+                    <Plus size={15} strokeWidth={2.5} /> Adicionar empresa (CNPJ)
+                  </a>
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2">
               {!semDados && (
@@ -334,65 +422,104 @@ export default function DashboardPage() {
             </div>
           )}
 
-          <div className="rounded-2xl p-4 border" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0' }}>
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>Saúde Financeira</p>
-              <span className="text-2xl font-bold" style={{ color: scoreCor }}>
-                {score}<span className="text-xs font-normal text-gray-400">/100</span>
-              </span>
-            </div>
-            <div className="h-2 rounded-full overflow-hidden mb-3" style={{ backgroundColor: '#F1F5F9' }}>
-              <div className="h-full rounded-full transition-all" style={{ width: `${score}%`, backgroundColor: scoreCor }} />
-            </div>
-            <div className="flex flex-col gap-2">
-              {saude.map((s, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  {s.ok
-                    ? <CheckCircle2 size={14} color="#10B981" strokeWidth={1.75} className="flex-shrink-0" />
-                    : <AlertCircle  size={14} color="#EF4444" strokeWidth={1.75} className="flex-shrink-0" />
-                  }
-                  <p className="text-xs" style={{ color: '#64748B' }}>{s.label}</p>
+          {contextoAtivo.tipo === 'pessoal' && (
+            <>
+              <div className="rounded-2xl p-4 border" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0' }}>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>Saúde Financeira</p>
+                  <span className="text-2xl font-bold" style={{ color: scoreCor }}>
+                    {score}<span className="text-xs font-normal text-gray-400">/100</span>
+                  </span>
                 </div>
-              ))}
-            </div>
-          </div>
+                <div className="h-2 rounded-full overflow-hidden mb-3" style={{ backgroundColor: '#F1F5F9' }}>
+                  <div className="h-full rounded-full transition-all" style={{ width: `${score}%`, backgroundColor: scoreCor }} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  {saude.map((s, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      {s.ok
+                        ? <CheckCircle2 size={14} color="#10B981" strokeWidth={1.75} className="flex-shrink-0" />
+                        : <AlertCircle  size={14} color="#EF4444" strokeWidth={1.75} className="flex-shrink-0" />
+                      }
+                      <p className="text-xs" style={{ color: '#64748B' }}>{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
+              <div className="rounded-2xl border" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0' }}>
+                <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: '#F1F5F9' }}>
+                  <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>Metas da Família</p>
+                  <a href="/dashboard/metas" className="flex items-center gap-1 text-xs font-semibold" style={{ color: '#145A45' }}>
+                    Ver todas <ChevronRight size={13} strokeWidth={2} />
+                  </a>
+                </div>
+                {metas.length === 0 ? (
+                  <div className="p-6 text-center">
+                    <p className="text-sm" style={{ color: '#94A3B8' }}>Nenhuma meta criada.</p>
+                    <a href="/dashboard/metas" className="text-xs font-semibold mt-2 block" style={{ color: '#145A45' }}>Criar meta →</a>
+                  </div>
+                ) : metas.map((m: any) => {
+                  const pct  = Math.min(Math.round((Number(m.valor_atual) / Number(m.valor_alvo)) * 100), 100)
+                  const Icon = ICONES_META[m.icone] || Target
+                  const cor  = m.cor || '#145A45'
+                  return (
+                    <div key={m.id} className="p-4 border-t" style={{ borderColor: '#F1F5F9' }}>
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: cor + '18' }}>
+                          <Icon size={14} color={cor} strokeWidth={1.75} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate" style={{ color: '#0F172A' }}>{m.nome}</p>
+                          <p className="text-xs" style={{ color: '#94A3B8' }}>{fmtOculto(Number(m.valor_atual), ocultar)} de {fmtOculto(Number(m.valor_alvo), ocultar)}</p>
+                        </div>
+                        <span className="text-sm font-bold" style={{ color: cor }}>{pct}%</span>
+                      </div>
+                      <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: '#F1F5F9' }}>
+                        <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: cor }} />
+                      </div>
+                      {m.automatica && mesesReservaConsiderados < 3 && (
+                        <p style={{ fontSize: '10.5px', color: '#94A3B8', marginTop: '5px' }}>
+                          Baseado em {mesesReservaConsiderados} {mesesReservaConsiderados === 1 ? 'mês' : 'meses'} de dados — fica mais precisa com o tempo
+                        </p>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
+
+          {/* Despesas Fixas do Mês — mobile (sempre visível, respeita o contexto) */}
           <div className="rounded-2xl border" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0' }}>
             <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: '#F1F5F9' }}>
-              <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>Metas da Família</p>
-              <a href="/dashboard/metas" className="flex items-center gap-1 text-xs font-semibold" style={{ color: '#145A45' }}>
+              <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>Despesas Fixas</p>
+              <a href="/dashboard/movimentos" className="flex items-center gap-1 text-xs font-semibold" style={{ color: '#145A45' }}>
                 Ver todas <ChevronRight size={13} strokeWidth={2} />
               </a>
             </div>
-            {metas.length === 0 ? (
+            {despesasFixas.length === 0 ? (
               <div className="p-6 text-center">
-                <p className="text-sm" style={{ color: '#94A3B8' }}>Nenhuma meta criada.</p>
-                <a href="/dashboard/metas" className="text-xs font-semibold mt-2 block" style={{ color: '#145A45' }}>Criar meta →</a>
+                <p className="text-sm" style={{ color: '#94A3B8' }}>Nenhuma despesa fixa cadastrada.</p>
               </div>
-            ) : metas.map((m: any) => {
-              const pct  = Math.min(Math.round((Number(m.valor_atual) / Number(m.valor_alvo)) * 100), 100)
-              const Icon = ICONES_META[m.icone] || Target
-              const cor  = m.cor || '#145A45'
+            ) : despesasFixas.map((df: any) => {
+              const Icon = ICONES_CAT[df.categoria] || MoreHorizontal
               return (
-                <div key={m.id} className="p-4 border-t" style={{ borderColor: '#F1F5F9' }}>
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: cor + '18' }}>
-                      <Icon size={14} color={cor} strokeWidth={1.75} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate" style={{ color: '#0F172A' }}>{m.nome}</p>
-                      <p className="text-xs" style={{ color: '#94A3B8' }}>{fmtOculto(Number(m.valor_atual), ocultar)} de {fmtOculto(Number(m.valor_alvo), ocultar)}</p>
-                    </div>
-                    <span className="text-sm font-bold" style={{ color: cor }}>{pct}%</span>
+                <div key={df.id} className="flex items-center gap-3 px-4 py-3 border-t" style={{ borderColor: '#F1F5F9', opacity: df.pago ? 0.55 : 1 }}>
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'rgba(20,90,69,0.08)' }}>
+                    <Icon size={14} color="#145A45" strokeWidth={1.75} />
                   </div>
-                  <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: '#F1F5F9' }}>
-                    <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: cor }} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate" style={{ color: '#0F172A' }}>{df.nome}</p>
+                    <p className="text-xs" style={{ color: '#94A3B8' }}>Vence dia {df.dia_vencimento} · {fmtShort(Number(df.valor))}</p>
                   </div>
-                  {m.automatica && mesesReservaConsiderados < 3 && (
-                    <p style={{ fontSize: '10.5px', color: '#94A3B8', marginTop: '5px' }}>
-                      Baseado em {mesesReservaConsiderados} {mesesReservaConsiderados === 1 ? 'mês' : 'meses'} de dados — fica mais precisa com o tempo
-                    </p>
-                  )}
+                  <span style={{
+                    fontSize: '10px', fontWeight: 700, padding: '3px 9px', borderRadius: '999px', flexShrink: 0,
+                    backgroundColor: df.pago ? 'rgba(47,143,104,0.10)' : df.atrasada ? 'rgba(239,68,68,0.10)' : '#F7F8FA',
+                    color: df.pago ? '#2F8F68' : df.atrasada ? '#EF4444' : '#64748B',
+                  }}>
+                    {df.pago ? 'Pago' : df.atrasada ? 'Atrasada' : 'A pagar'}
+                  </span>
                 </div>
               )
             })}
@@ -458,19 +585,47 @@ export default function DashboardPage() {
 
           {/* Header premium */}
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '10px' }}>
-            <div>
+            <div style={{ position: 'relative' }}>
               <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.5px', marginBottom: '4px' }}>
                 {getSaudacao()}, {primeiroNome || 'Família'}
               </h1>
-              <p style={{ fontSize: '12px', color: '#64748B', marginBottom: '4px' }}>
-                Veja como seu patrimônio evoluiu hoje.
-              </p>
+              <button onClick={() => setContextoAberto(!contextoAberto)}
+                style={{ display: 'flex', alignItems: 'center', gap: '7px', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: '6px' }}>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A' }}>{contextoAtivo.nome || familia}</span>
+                {contextoAtivo.tipo === 'empresa' && (
+                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#145A45', backgroundColor: '#D1FAE5', padding: '2px 8px', borderRadius: '999px' }}>PJ</span>
+                )}
+                <ChevronDown size={14} color="#94A3B8" style={{ transform: contextoAberto ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+              </button>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#2F8F68' }} />
                 <span style={{ fontSize: '12.5px', color: '#94A3B8' }}>
                   Atualizado {atualizadoHa === 0 ? 'agora' : `há ${atualizadoHa} min`}
                 </span>
               </div>
+
+              {contextoAberto && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '6px', width: '260px', backgroundColor: '#fff', borderRadius: '14px', border: '1px solid #E2E8F0', boxShadow: '0 12px 32px rgba(0,0,0,0.12)', zIndex: 30, overflow: 'hidden' }}>
+                  <button onClick={() => trocarContexto({ tipo: 'pessoal', nome: familia })}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                    <Users size={15} color="#64748B" strokeWidth={1.75} />
+                    <span style={{ flex: 1, fontSize: '13.5px', color: '#0F172A' }}>{familia}</span>
+                    {contextoAtivo.tipo === 'pessoal' && <Check size={15} color="#145A45" strokeWidth={2.5} />}
+                  </button>
+                  {empresas.map((emp: any) => (
+                    <button key={emp.id} onClick={() => trocarContexto({ tipo: 'empresa', empresaId: emp.id, nome: emp.nome })}
+                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', background: 'none', border: 'none', borderTop: '1px solid #F1F5F9', cursor: 'pointer', textAlign: 'left' }}>
+                      <Building2 size={15} color="#145A45" strokeWidth={1.75} />
+                      <span style={{ flex: 1, fontSize: '13.5px', color: '#0F172A' }}>{emp.nome}</span>
+                      {contextoAtivo.tipo === 'empresa' && contextoAtivo.empresaId === emp.id && <Check size={15} color="#145A45" strokeWidth={2.5} />}
+                    </button>
+                  ))}
+                  <a href="/dashboard/perfil"
+                    style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', borderTop: '1px solid #F1F5F9', textDecoration: 'none', color: '#145A45', fontSize: '13.5px', fontWeight: 600 }}>
+                    <Plus size={15} strokeWidth={2.5} /> Adicionar empresa (CNPJ)
+                  </a>
+                </div>
+              )}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{
@@ -651,7 +806,8 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Metas + Saúde Financeira */}
+          {/* Metas + Saúde Financeira (pessoal) OU Despesas Fixas + Resultado Mensal (empresa) */}
+          {contextoAtivo.tipo === 'pessoal' ? (
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px', marginBottom: '10px', alignItems: 'start' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div style={{
@@ -813,8 +969,83 @@ export default function DashboardPage() {
               </a>
             </div>
           </div>
+          ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+            {/* Despesas Fixas do Mês (empresa) */}
+            <div style={{
+              borderRadius: '20px', padding: '24px', backgroundColor: '#fff',
+              border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: despesasFixas.length === 0 ? '0' : '14px' }}>
+                <div>
+                  <h2 style={{ fontSize: '14px', fontWeight: 600, color: '#0B1F18', marginBottom: '2px', letterSpacing: '-0.2px' }}>Despesas Fixas do Mês</h2>
+                  <p style={{ fontSize: '12px', color: '#64748B' }}>Pagas e pendentes</p>
+                </div>
+                <a href="/dashboard/movimentos" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px', fontWeight: 600, color: '#145A45', textDecoration: 'none', flexShrink: 0 }}>
+                  Ver todas <ArrowRight size={13} strokeWidth={2} />
+                </a>
+              </div>
+              {despesasFixas.length === 0 ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingTop: '18px', marginTop: '18px', borderTop: '1px solid #F1F5F9' }}>
+                  <CheckCircle2 size={18} color="#2F8F68" strokeWidth={1.5} />
+                  <p style={{ fontSize: '12.5px', color: '#94A3B8', flex: 1 }}>Nenhuma despesa fixa cadastrada.</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {despesasFixas.map((df: any) => {
+                    const Icon = ICONES_CAT[df.categoria] || MoreHorizontal
+                    return (
+                      <div key={df.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', borderRadius: '12px', padding: '10px', border: '1px solid rgba(15,23,42,0.05)', opacity: df.pago ? 0.55 : 1 }}>
+                        <div style={{ width: '36px', height: '36px', borderRadius: '10px', flexShrink: 0, backgroundColor: 'rgba(20,90,69,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Icon size={16} color="#145A45" strokeWidth={1.75} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: '13.5px', fontWeight: 600, color: '#0B1F18', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{df.nome}</p>
+                          <p style={{ fontSize: '12px', color: '#94A3B8', margin: 0 }}>Vence dia {df.dia_vencimento} · {fmtOculto(Number(df.valor), ocultar)}</p>
+                        </div>
+                        <span style={{
+                          display: 'flex', alignItems: 'center', gap: '4px',
+                          fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '999px', flexShrink: 0,
+                          backgroundColor: df.pago ? 'rgba(47,143,104,0.10)' : df.atrasada ? 'rgba(239,68,68,0.10)' : '#F7F8FA',
+                          border: df.pago ? '1px solid rgba(47,143,104,0.25)' : df.atrasada ? '1px solid rgba(239,68,68,0.25)' : '1px solid #E5E7EB',
+                          color: df.pago ? '#2F8F68' : df.atrasada ? '#EF4444' : '#64748B',
+                        }}>
+                          {df.pago && <CheckCircle2 size={11} strokeWidth={2} />}
+                          {df.pago ? 'Pago' : df.atrasada ? 'Atrasada' : 'A pagar'}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
 
-          {/* Categorias + Lançamentos */}
+            {/* Resultado Mensal (empresa) */}
+            <div style={{
+              borderRadius: '20px', padding: '24px', backgroundColor: '#fff',
+              border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
+            }}>
+              <h2 style={{ fontSize: '14px', fontWeight: 600, color: '#0B1F18', marginBottom: '2px', letterSpacing: '-0.2px' }}>Resultado Mensal</h2>
+              <p style={{ fontSize: '12px', color: '#64748B', marginBottom: '14px' }}>Receitas − despesas · últimos 6 meses</p>
+              <ResponsiveContainer width="100%" height={200}>
+                <AreaChart data={evolucao}>
+                  <defs>
+                    <linearGradient id="evoGradEmpresa" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#145A45" stopOpacity={0.18} />
+                      <stop offset="100%" stopColor="#145A45" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
+                  <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} tickFormatter={v => `${(v/1000).toFixed(0)}k`} />
+                  <Tooltip formatter={(v: any) => fmt(v)} contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', fontSize: '12px' }} />
+                  <Area type="monotone" dataKey="valor" stroke="#145A45" strokeWidth={2} fill="url(#evoGradEmpresa)"
+                    dot={{ fill: '#fff', stroke: '#145A45', strokeWidth: 2, r: 3 }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             <div style={{
               borderRadius: '20px', padding: '28px', backgroundColor: '#fff',
