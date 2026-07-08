@@ -118,9 +118,9 @@ export default function CadastroPage() {
   )
 
   const inputStyle = {
-    width: '100%', height: '37px', padding: '0 12px',
-    borderRadius: '10px', border: '1.5px solid #E8EAED',
-    fontSize: '12.5px', color: '#111827', outline: 'none',
+    width: '100%', height: '34px', padding: '0 11px',
+    borderRadius: '9px', border: '1.5px solid #E8EAED',
+    fontSize: '12px', color: '#111827', outline: 'none',
     backgroundColor: C.mist, boxSizing: 'border-box' as const,
     transition: 'border-color 0.15s, box-shadow 0.15s',
   }
@@ -192,11 +192,11 @@ export default function CadastroPage() {
               </span>
             </div>
 
-            <h1 style={{ fontSize: '38px', fontWeight: 800, lineHeight: 1.1, letterSpacing: '-1.5px', marginBottom: '18px', color: '#fff' }}>
+            <h1 style={{ fontSize: '32px', fontWeight: 800, lineHeight: 1.1, letterSpacing: '-1.2px', marginBottom: '14px', color: '#fff' }}>
               Comece sua jornada<br />financeira <span style={{ color: C.primary }}>juntos.</span>
             </h1>
 
-            <p style={{ fontSize: '14.5px', color: 'rgba(255,255,255,0.5)', lineHeight: 1.7, marginBottom: '32px', maxWidth: '380px' }}>
+            <p style={{ fontSize: '14.5px', color: 'rgba(255,255,255,0.5)', lineHeight: 1.7, marginBottom: '24px', maxWidth: '360px' }}>
               Crie um espaço onde toda a família poderá acompanhar patrimônio, investimentos e evolução financeira em um único lugar.
             </p>
 
@@ -206,7 +206,7 @@ export default function CadastroPage() {
                 <div key={p.titulo} style={{ display: 'flex', gap: '18px', position: 'relative' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
                     <div style={{
-                      width: '28px', height: '28px', borderRadius: '50%', flexShrink: 0,
+                      width: '26px', height: '26px', borderRadius: '50%', flexShrink: 0,
                       backgroundColor: 'rgba(50,195,108,0.1)', border: `1.5px solid rgba(50,195,108,0.35)`,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>
@@ -216,7 +216,7 @@ export default function CadastroPage() {
                       <div style={{ width: '1px', flex: 1, minHeight: '34px', background: 'linear-gradient(180deg, rgba(50,195,108,0.35) 0%, rgba(50,195,108,0.08) 100%)', margin: '2px 0' }} />
                     )}
                   </div>
-                  <div style={{ paddingBottom: i < passos.length - 1 ? '20px' : '0' }}>
+                  <div style={{ paddingBottom: i < passos.length - 1 ? '16px' : '0' }}>
                     <p style={{ fontSize: '14px', fontWeight: 600, color: '#fff', marginBottom: '3px', paddingTop: '6px' }}>{p.titulo}</p>
                     <p style={{ fontSize: '12.5px', color: 'rgba(255,255,255,0.45)', lineHeight: 1.5, maxWidth: '280px' }}>{p.texto}</p>
                   </div>
@@ -228,24 +228,24 @@ export default function CadastroPage() {
           {/* ── CARD DE CADASTRO ── */}
           <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
             <div style={{
-              width: '100%', maxWidth: '400px',
-              backgroundColor: '#fff', borderRadius: '20px',
-              padding: '24px 28px 20px',
+              width: '100%', maxWidth: '380px',
+              backgroundColor: '#fff', borderRadius: '18px',
+              padding: '18px 24px 16px',
               boxShadow: '0 30px 70px rgba(0,0,0,0.35)',
             }}>
               <div className="lg:hidden" style={{ marginBottom: '18px' }}>
                 <span style={{ fontSize: '17px', fontWeight: 700, color: C.darkest }}>Finify</span>
               </div>
 
-              <h2 style={{ fontSize: '18px', fontWeight: 700, color: C.darkest, letterSpacing: '-0.4px', marginBottom: '3px' }}>
+              <h2 style={{ fontSize: '16px', fontWeight: 700, color: C.darkest, letterSpacing: '-0.3px', marginBottom: '2px' }}>
                 Criar conta
               </h2>
-              <p style={{ fontSize: '11.5px', color: '#8A93A0', marginBottom: '14px' }}>
+              <p style={{ fontSize: '11px', color: '#8A93A0', marginBottom: '10px' }}>
                 Preencha seus dados para começar
               </p>
 
               {/* Segmented control premium — indicador deslizante */}
-              <div style={{ position: 'relative', display: 'flex', borderRadius: '11px', padding: '3px', marginBottom: '14px', backgroundColor: C.mist }}>
+              <div style={{ position: 'relative', display: 'flex', borderRadius: '10px', padding: '3px', marginBottom: '10px', backgroundColor: C.mist }}>
                 <div style={{
                   position: 'absolute', top: '4px', bottom: '4px', left: '4px',
                   width: 'calc(50% - 4px)', borderRadius: '9px',
@@ -256,7 +256,7 @@ export default function CadastroPage() {
                 {([['criar', 'Criar nova família'], ['entrar', 'Entrar por convite']] as const).map(([val, label]) => (
                   <button key={val} type="button" onClick={() => { setModo(val); setErro('') }}
                     style={{
-                      flex: 1, padding: '7px 4px', borderRadius: '8px', fontSize: '11px', fontWeight: 600,
+                      flex: 1, padding: '6px 4px', borderRadius: '7px', fontSize: '10.5px', fontWeight: 600,
                       backgroundColor: 'transparent', position: 'relative', zIndex: 1,
                       color: modo === val ? C.darkest : '#9AA2AD',
                       border: 'none', cursor: 'pointer', transition: 'color 0.2s',
@@ -266,25 +266,25 @@ export default function CadastroPage() {
                 ))}
               </div>
 
-              <form onSubmit={handleCadastro} style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+              <form onSubmit={handleCadastro} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#5B6472', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: '3px' }}>Seu nome</label>
+                  <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#5B6472', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '2px' }}>Seu nome</label>
                   <input type="text" value={nome} onChange={e => setNome(e.target.value)} placeholder="Como você se chama?" required
                     style={inputStyle} onFocus={onFocusInput} onBlur={onBlurInput} />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#5B6472', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: '3px' }}>E-mail</label>
+                  <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#5B6472', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '2px' }}>E-mail</label>
                   <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="seu@email.com" required
                     style={inputStyle} onFocus={onFocusInput} onBlur={onBlurInput} />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#5B6472', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: '3px' }}>Senha</label>
+                  <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#5B6472', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '2px' }}>Senha</label>
                   <div style={{ position: 'relative' }}>
                     <input type={showSenha ? 'text' : 'password'} value={senha} onChange={e => setSenha(e.target.value)}
                       placeholder="Mínimo 6 caracteres" required
-                      style={{ ...inputStyle, paddingRight: '38px' }} onFocus={onFocusInput} onBlur={onBlurInput} />
+                      style={{ ...inputStyle, paddingRight: '34px' }} onFocus={onFocusInput} onBlur={onBlurInput} />
                     <button type="button" onClick={() => setShowSenha(!showSenha)} style={{
                       position: 'absolute', right: '13px', top: '50%', transform: 'translateY(-50%)',
                       background: 'none', border: 'none', cursor: 'pointer', color: '#9AA2AD', display: 'flex',
@@ -298,11 +298,11 @@ export default function CadastroPage() {
                 {modo === 'criar' ? (
                   <>
                     <div>
-                      <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#5B6472', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: '3px' }}>Confirmar senha</label>
+                      <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#5B6472', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '2px' }}>Confirmar senha</label>
                       <div style={{ position: 'relative' }}>
                         <input type={showConfirmar ? 'text' : 'password'} value={confirmar} onChange={e => setConfirmar(e.target.value)}
                           placeholder="Repita a senha" required
-                          style={{ ...inputStyle, paddingRight: '38px' }} onFocus={onFocusInput} onBlur={onBlurInput} />
+                          style={{ ...inputStyle, paddingRight: '34px' }} onFocus={onFocusInput} onBlur={onBlurInput} />
                         <button type="button" onClick={() => setShowConfirmar(!showConfirmar)} style={{
                           position: 'absolute', right: '13px', top: '50%', transform: 'translateY(-50%)',
                           background: 'none', border: 'none', cursor: 'pointer', color: '#9AA2AD', display: 'flex',
@@ -312,23 +312,23 @@ export default function CadastroPage() {
                       </div>
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#5B6472', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: '3px' }}>Nome da família</label>
+                      <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#5B6472', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '2px' }}>Nome da família</label>
                       <input type="text" value={nomeFamilia} onChange={e => setNomeFamilia(e.target.value)}
                         placeholder="Ex: Família Aguiar" required
                         style={inputStyle} onFocus={onFocusInput} onBlur={onBlurInput} />
-                      <p style={{ fontSize: '9.5px', color: '#9CA3AF', marginTop: '2px' }}>
+                      <p style={{ fontSize: '9px', color: '#9CA3AF', marginTop: '2px' }}>
                         Um código de convite será gerado para você compartilhar.
                       </p>
                     </div>
                   </>
                 ) : (
                   <div>
-                    <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#5B6472', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: '3px' }}>Código da família</label>
+                    <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#5B6472', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '2px' }}>Código da família</label>
                     <input type="text" value={codigoConvite} onChange={e => setCodigoConvite(e.target.value)}
                       placeholder="Ex: AGU-4821" required
-                      style={{ ...inputStyle, textAlign: 'center', fontWeight: 700, fontSize: '13px', letterSpacing: '2px' }}
+                      style={{ ...inputStyle, textAlign: 'center', fontWeight: 700, fontSize: '12.5px', letterSpacing: '1.8px' }}
                       onFocus={onFocusInput} onBlur={onBlurInput} />
-                    <p style={{ fontSize: '9.5px', color: '#9CA3AF', marginTop: '2px' }}>
+                    <p style={{ fontSize: '9px', color: '#9CA3AF', marginTop: '2px' }}>
                       Peça o código para quem criou a família no Finify.
                     </p>
                   </div>
@@ -341,9 +341,9 @@ export default function CadastroPage() {
                 )}
 
                 <button type="submit" disabled={loading} style={{
-                  width: '100%', height: '40px', borderRadius: '11px', border: 'none',
+                  width: '100%', height: '37px', borderRadius: '10px', border: 'none',
                   background: loading ? '#9CA3AF' : `linear-gradient(135deg, ${C.darkest} 0%, ${C.dark} 100%)`,
-                  color: '#fff', fontSize: '13px', fontWeight: 600,
+                  color: '#fff', fontSize: '12.5px', fontWeight: 600,
                   cursor: loading ? 'not-allowed' : 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                   boxShadow: loading ? 'none' : `0 4px 16px rgba(5,40,31,0.3)`,
@@ -357,18 +357,18 @@ export default function CadastroPage() {
                 </button>
               </form>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '10px 0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '7px 0' }}>
                 <div style={{ flex: 1, height: '1px', backgroundColor: '#EEF0F3' }} />
                 <span style={{ fontSize: '11.5px', color: '#9AA2AD', fontWeight: 500 }}>ou</span>
                 <div style={{ flex: 1, height: '1px', backgroundColor: '#EEF0F3' }} />
               </div>
 
-              <p style={{ textAlign: 'center', fontSize: '12.5px', color: '#6B7280' }}>
+              <p style={{ textAlign: 'center', fontSize: '11.5px', color: '#6B7280' }}>
                 Já tem uma conta?{' '}
                 <a href="/" style={{ fontWeight: 600, color: C.dark, textDecoration: 'none' }}>Fazer login</a>
               </p>
 
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginTop: '12px', paddingTop: '10px', borderTop: `1px solid ${C.mist}` }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginTop: '9px', paddingTop: '8px', borderTop: `1px solid ${C.mist}` }}>
                 <Shield size={11} color="#B0B6BF" strokeWidth={1.75} />
                 <span style={{ fontSize: '10.5px', color: '#B0B6BF', fontWeight: 500 }}>
                   Criptografia bancária <span style={{ margin: '0 4px' }}>•</span> LGPD <span style={{ margin: '0 4px' }}>•</span> Dados protegidos
