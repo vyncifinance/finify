@@ -172,9 +172,8 @@ export default function LoginPage() {
             <div style={{
               position: 'absolute', top: '50%', left: '0', transform: 'translateY(-50%)',
               width: '460px', borderRadius: '22px', padding: '32px',
-              backgroundColor: 'rgba(255,255,255,0.045)',
-              border: '1px solid rgba(255,255,255,0.09)',
-              backdropFilter: 'blur(20px)',
+              backgroundColor: 'rgba(255,255,255,0.065)',
+              border: '1px solid rgba(255,255,255,0.1)',
               zIndex: 1,
               boxShadow: '0 40px 80px rgba(0,0,0,0.25)',
             }}>
