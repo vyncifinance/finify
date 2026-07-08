@@ -104,7 +104,7 @@ export default function LoginPage() {
         width: '55%',
         background: 'linear-gradient(180deg, #06261F 0%, #0A342A 50%, #0D3F31 100%)',
         flexDirection: 'column',
-        padding: '28px 44px 32px',
+        padding: '22px 36px 26px',
         position: 'relative', overflow: 'hidden',
       }}>
         {/* Radial glow */}
@@ -112,8 +112,8 @@ export default function LoginPage() {
         <div style={{ position: 'absolute', bottom: '-80px', left: '-60px', width: '400px', height: '400px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(21,90,69,0.15) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
         {/* Logo */}
-        <div style={{ position: 'relative', zIndex: 2, marginBottom: '32px' }}>
-          <Logo size={34} textSize={19} />
+        <div style={{ position: 'relative', zIndex: 2, marginBottom: '24px' }}>
+          <Logo size={30} textSize={17} />
         </div>
 
         {/* Hero */}
@@ -121,37 +121,37 @@ export default function LoginPage() {
           {/* Badge */}
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: '7px',
-            padding: '5px 14px', borderRadius: '999px', marginBottom: '20px',
+            padding: '4px 12px', borderRadius: '999px', marginBottom: '16px',
             backgroundColor: 'rgba(47,179,106,0.12)',
             border: '1px solid rgba(47,179,106,0.25)',
           }}>
-            <Users size={12} color="#58D68D" strokeWidth={2} />
-            <span style={{ fontSize: '11.5px', fontWeight: 600, color: '#58D68D', letterSpacing: '0.03em' }}>
+            <Users size={11} color="#58D68D" strokeWidth={2} />
+            <span style={{ fontSize: '11px', fontWeight: 600, color: '#58D68D', letterSpacing: '0.03em' }}>
               Gestão Patrimonial Familiar
             </span>
           </div>
 
           {/* Título + dashboard grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '28px', alignItems: 'start', marginBottom: '28px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '22px', alignItems: 'start', marginBottom: '22px' }}>
 
             {/* Texto esquerdo */}
             <div>
               <h1 style={{
-                fontSize: '40px', fontWeight: 800, lineHeight: 1.05,
-                letterSpacing: '-1.5px', marginBottom: '14px',
+                fontSize: '34px', fontWeight: 800, lineHeight: 1.05,
+                letterSpacing: '-1.2px', marginBottom: '10px',
               }}>
                 <span style={{ color: '#fff', display: 'block' }}>Prosperidade</span>
                 <span style={{ color: '#2FB36A', display: 'block' }}>para famílias.</span>
               </h1>
-              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.48)', lineHeight: 1.6, marginBottom: '22px', maxWidth: '250px' }}>
+              <p style={{ fontSize: '12.5px', color: 'rgba(255,255,255,0.48)', lineHeight: 1.55, marginBottom: '16px', maxWidth: '240px' }}>
                 Organize seu patrimônio, acompanhe seus objetivos e construa um futuro financeiro sólido.
               </p>
 
-              <div style={{ display: 'flex', gap: '10px', marginBottom: '22px' }}>
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
                 <a href="/cadastro" style={{
-                  padding: '11px 20px', borderRadius: '11px',
+                  padding: '9px 18px', borderRadius: '10px',
                   backgroundColor: '#2FB36A', color: '#07271F',
-                  fontSize: '13.5px', fontWeight: 600, textDecoration: 'none',
+                  fontSize: '13px', fontWeight: 600, textDecoration: 'none',
                   transition: 'all 0.15s',
                 }}
                   onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(-1px)' }}
@@ -161,39 +161,39 @@ export default function LoginPage() {
                 </a>
                 <a href="#" style={{
                   display: 'flex', alignItems: 'center', gap: '8px',
-                  padding: '11px 20px', borderRadius: '11px',
+                  padding: '9px 18px', borderRadius: '10px',
                   backgroundColor: 'transparent', color: '#fff',
                   border: '1px solid rgba(255,255,255,0.2)',
-                  fontSize: '13.5px', fontWeight: 600, textDecoration: 'none',
+                  fontSize: '13px', fontWeight: 600, textDecoration: 'none',
                   transition: 'all 0.15s',
                 }}
                   onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = 'rgba(255,255,255,0.4)' }}
                   onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = 'rgba(255,255,255,0.2)' }}
                 >
-                  <Play size={13} fill="currentColor" strokeWidth={0} />
+                  <Play size={12} fill="currentColor" strokeWidth={0} />
                   Ver demonstração
                 </a>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{ display: 'flex' }}>
                   {['#D97757', '#5B8DEF', '#9B7FE0', '#E0B860'].map((cor, i) => (
                     <div key={cor} style={{
-                      width: '24px', height: '24px', borderRadius: '50%',
+                      width: '22px', height: '22px', borderRadius: '50%',
                       backgroundColor: cor, border: '2px solid #0A342A',
                       marginLeft: i === 0 ? 0 : '-7px',
                     }} />
                   ))}
                 </div>
-                <span style={{ fontSize: '12.5px', color: 'rgba(255,255,255,0.6)' }}>
+                <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>
                   Mais de <strong style={{ color: '#fff' }}>1.200 famílias</strong> confiam na Finify
                 </span>
               </div>
             </div>
 
             {/* Dashboard mockup */}
-            <div style={{ height: '236px', overflow: 'visible' }}>
-            <div style={{ position: 'relative', height: '320px', width: '133.33%', transform: 'scale(0.75)', transformOrigin: 'top left' }}>
+            <div style={{ height: '208px', overflow: 'visible' }}>
+            <div style={{ position: 'relative', height: '320px', width: '153.8%', transform: 'scale(0.65)', transformOrigin: 'top left' }}>
               {/* Linhas pontilhadas */}
               <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 0 }} viewBox="0 0 280 320">
                 <line x1="240" y1="20" x2="180" y2="100" stroke="rgba(47,179,106,0.2)" strokeWidth="1" strokeDasharray="3 4"/>
@@ -317,7 +317,7 @@ export default function LoginPage() {
         {/* Nav */}
         <div className="hidden lg:flex" style={{
           alignItems: 'center', justifyContent: 'space-between',
-          padding: '16px 40px',
+          padding: '12px 36px',
         }}>
           <div className="lg:hidden">
             <LogoDark />
@@ -341,51 +341,51 @@ export default function LoginPage() {
         </div>
 
         {/* Form */}
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
           <div style={{
-            width: '100%', maxWidth: '420px',
+            width: '100%', maxWidth: '400px',
             backgroundColor: '#fff',
-            borderRadius: '24px',
-            padding: '32px 36px 28px',
+            borderRadius: '20px',
+            padding: '26px 30px 22px',
             boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 12px 40px rgba(0,0,0,0.07)',
             border: '1px solid #ECEFF3',
           }}>
             {/* Logo mobile */}
-            <div className="lg:hidden" style={{ marginBottom: '20px' }}>
+            <div className="lg:hidden" style={{ marginBottom: '16px' }}>
               <LogoDark />
             </div>
 
             {/* Ícone cadeado */}
-            <div style={{ marginBottom: '16px' }}>
+            <div style={{ marginBottom: '12px' }}>
               <div style={{
-                width: '46px', height: '46px', borderRadius: '50%',
+                width: '40px', height: '40px', borderRadius: '50%',
                 backgroundColor: '#F0FDF4', border: '1.5px solid #D1FAE5',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                <Lock size={19} color="#0F4737" strokeWidth={1.75} />
+                <Lock size={17} color="#0F4737" strokeWidth={1.75} />
               </div>
             </div>
 
-            <h2 style={{ fontSize: '23px', fontWeight: 700, color: '#0B3B2E', letterSpacing: '-0.6px', marginBottom: '4px' }}>
+            <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#0B3B2E', letterSpacing: '-0.5px', marginBottom: '3px' }}>
               Acesse sua conta
             </h2>
-            <p style={{ fontSize: '13.5px', color: '#6B7280', marginBottom: '22px', lineHeight: 1.5 }}>
+            <p style={{ fontSize: '13px', color: '#6B7280', marginBottom: '16px', lineHeight: 1.45 }}>
               Patrimônio e planejamento ao alcance da família
             </p>
 
-            <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {/* Email */}
               <div>
-                <label style={{ display: 'block', fontSize: '10.5px', fontWeight: 700, color: '#374151', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: '5px' }}>
+                <label style={{ display: 'block', fontSize: '10.5px', fontWeight: 700, color: '#374151', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: '4px' }}>
                   E-mail
                 </label>
                 <input
                   type="email" value={email} onChange={e => setEmail(e.target.value)}
                   placeholder="seu@email.com" required
                   style={{
-                    width: '100%', height: '46px', padding: '0 16px',
-                    borderRadius: '12px', border: '1.5px solid #E5E7EB',
-                    fontSize: '14px', color: '#111827', outline: 'none',
+                    width: '100%', height: '42px', padding: '0 14px',
+                    borderRadius: '11px', border: '1.5px solid #E5E7EB',
+                    fontSize: '13.5px', color: '#111827', outline: 'none',
                     backgroundColor: '#FAFAFA', boxSizing: 'border-box',
                     transition: 'border-color 0.15s, box-shadow 0.15s',
                   }}
@@ -404,7 +404,7 @@ export default function LoginPage() {
 
               {/* Senha */}
               <div>
-                <label style={{ display: 'block', fontSize: '10.5px', fontWeight: 700, color: '#374151', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: '5px' }}>
+                <label style={{ display: 'block', fontSize: '10.5px', fontWeight: 700, color: '#374151', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: '4px' }}>
                   Senha
                 </label>
                 <div style={{ position: 'relative' }}>
@@ -412,9 +412,9 @@ export default function LoginPage() {
                     type={showSenha ? 'text' : 'password'} value={senha} onChange={e => setSenha(e.target.value)}
                     placeholder="Sua senha" required
                     style={{
-                      width: '100%', height: '46px', padding: '0 48px 0 16px',
-                      borderRadius: '12px', border: '1.5px solid #E5E7EB',
-                      fontSize: '14px', color: '#111827', outline: 'none',
+                      width: '100%', height: '42px', padding: '0 44px 0 14px',
+                      borderRadius: '11px', border: '1.5px solid #E5E7EB',
+                      fontSize: '13.5px', color: '#111827', outline: 'none',
                       backgroundColor: '#FAFAFA', boxSizing: 'border-box',
                       transition: 'border-color 0.15s, box-shadow 0.15s',
                     }}
@@ -464,7 +464,7 @@ export default function LoginPage() {
               <button
                 type="submit" disabled={loading}
                 style={{
-                  width: '100%', height: '48px', borderRadius: '13px', border: 'none',
+                  width: '100%', height: '44px', borderRadius: '12px', border: 'none',
                   background: loading ? '#6B7280' : 'linear-gradient(135deg, #07271F 0%, #145A45 100%)',
                   color: '#fff', fontSize: '15px', fontWeight: 600,
                   cursor: loading ? 'not-allowed' : 'pointer',
@@ -492,7 +492,7 @@ export default function LoginPage() {
                 href="/cadastro"
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                  height: '46px', borderRadius: '12px',
+                  height: '42px', borderRadius: '11px',
                   border: '1.5px solid #E5E7EB',
                   backgroundColor: '#fff', color: '#0B3B2E',
                   fontSize: '14.5px', fontWeight: 600, textDecoration: 'none',
@@ -513,7 +513,7 @@ export default function LoginPage() {
             </form>
 
             {/* Trust badges */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px', marginTop: '18px', paddingTop: '16px', borderTop: '1px solid #F7F8FA' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px', marginTop: '14px', paddingTop: '12px', borderTop: '1px solid #F7F8FA' }}>
               {[
                 { Icon: Shield,     label: 'Dados protegidos',      sub: 'Criptografia bancária' },
                 { Icon: RefreshCw,  label: 'Sincronização',          sub: 'Automática' },
