@@ -22,18 +22,10 @@ export default function LoginPage() {
   const [erro, setErro]           = useState('')
   const [showSenha, setShowSenha] = useState(false)
   const [mounted, setMounted]     = useState(false)
-  const [isDesktop, setIsDesktop] = useState(false)
   const router   = useRouter()
   const supabase = createClient()
 
   useEffect(() => { setMounted(true) }, [])
-
-  useEffect(() => {
-    function check() { setIsDesktop(window.innerWidth >= 1024) }
-    check()
-    window.addEventListener('resize', check)
-    return () => window.removeEventListener('resize', check)
-  }, [])
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -174,8 +166,7 @@ export default function LoginPage() {
           </div>
 
           {/* ── MOCKUP + CARD (profundidade) ── */}
-          {isDesktop && (
-          <div style={{ flex: 1, position: 'relative', height: '480px' }}>
+          <div className="hidden lg:block" style={{ flex: 1, position: 'relative', height: '480px' }}>
 
             {/* Dashboard mockup — atrás do card */}
             <div style={{
@@ -339,11 +330,9 @@ export default function LoginPage() {
               </div>
             </div>
           </div>
-          )}
 
           {/* ── CARD MOBILE (sem mockup) ── */}
-          {!isDesktop && (
-          <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+          <div className="flex lg:hidden" style={{ width: '100%', justifyContent: 'center' }}>
             <div style={{
               width: '100%', maxWidth: '400px',
               backgroundColor: '#fff', borderRadius: '20px',
@@ -386,7 +375,6 @@ export default function LoginPage() {
               </form>
             </div>
           </div>
-          )}
 
         </div>
       </div>
