@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import {
-  Eye, EyeOff, Lock, Shield, RefreshCw, Smartphone,
+  Eye, EyeOff, Lock, Shield,
   Users, Home, BarChart2, FileText,
   ArrowRight, Play
 } from 'lucide-react'
@@ -110,6 +110,10 @@ export default function LoginPage() {
         {/* Radial glow */}
         <div style={{ position: 'absolute', top: '-120px', right: '-80px', width: '600px', height: '600px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(47,179,106,0.1) 0%, transparent 65%)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', bottom: '-80px', left: '-60px', width: '400px', height: '400px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(21,90,69,0.15) 0%, transparent 70%)', pointerEvents: 'none' }} />
+        {/* Glow discreto atrás do mockup do dashboard */}
+        <div style={{ position: 'absolute', top: '38%', right: '6%', width: '340px', height: '340px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(88,214,141,0.14) 0%, transparent 68%)', pointerEvents: 'none' }} />
+        {/* Brilho verde suave vindo de baixo */}
+        <div style={{ position: 'absolute', bottom: '-140px', left: 0, right: 0, height: '320px', background: 'radial-gradient(ellipse at bottom, rgba(47,179,106,0.16) 0%, transparent 72%)', pointerEvents: 'none' }} />
 
         {/* Logo */}
         <div style={{ position: 'relative', zIndex: 2, marginBottom: '24px' }}>
@@ -313,11 +317,21 @@ export default function LoginPage() {
       <div style={{
         flex: 1, backgroundColor: '#fff',
         display: 'flex', flexDirection: 'column',
+        position: 'relative', overflow: 'hidden',
       }}>
+        {/* Leve efeito de luz atrás do card de login */}
+        <div style={{
+          position: 'absolute', top: '50%', left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: '560px', height: '560px', borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(47,179,106,0.07) 0%, transparent 70%)',
+          pointerEvents: 'none', zIndex: 0,
+        }} />
+
         {/* Nav */}
         <div className="hidden lg:flex" style={{
           alignItems: 'center', justifyContent: 'space-between',
-          padding: '12px 36px',
+          padding: '12px 36px', position: 'relative', zIndex: 1,
         }}>
           <div className="lg:hidden">
             <LogoDark />
@@ -341,7 +355,7 @@ export default function LoginPage() {
         </div>
 
         {/* Form */}
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', position: 'relative', zIndex: 1 }}>
           <div style={{
             width: '100%', maxWidth: '400px',
             backgroundColor: '#fff',
@@ -512,27 +526,15 @@ export default function LoginPage() {
               </a>
             </form>
 
-            {/* Trust badges */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px', marginTop: '14px', paddingTop: '12px', borderTop: '1px solid #F7F8FA' }}>
-              {[
-                { Icon: Shield,     label: 'Dados protegidos',      sub: 'Criptografia bancária' },
-                { Icon: RefreshCw,  label: 'Sincronização',          sub: 'Automática' },
-                { Icon: Smartphone, label: 'Acesso em',              sub: 'qualquer lugar' },
-              ].map(({ Icon, label, sub }) => (
-                <div key={label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', textAlign: 'center' }}>
-                  <div style={{
-                    width: '32px', height: '32px', borderRadius: '9px',
-                    backgroundColor: '#F0FDF4', border: '1px solid #D1FAE5',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <Icon size={14} color="#0F4737" strokeWidth={1.75} />
-                  </div>
-                  <div>
-                    <p style={{ fontSize: '10.5px', fontWeight: 600, color: '#374151', lineHeight: 1.2 }}>{label}</p>
-                    <p style={{ fontSize: '9.5px', color: '#9CA3AF', lineHeight: 1.3, marginTop: '1px' }}>{sub}</p>
-                  </div>
-                </div>
-              ))}
+            {/* Selo de confiança */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+              marginTop: '14px', paddingTop: '12px', borderTop: '1px solid #F7F8FA',
+            }}>
+              <Shield size={12} color="#9CA3AF" strokeWidth={1.75} />
+              <span style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: 500, letterSpacing: '0.01em' }}>
+                Criptografia bancária <span style={{ margin: '0 5px', color: '#D1D5DB' }}>•</span> LGPD <span style={{ margin: '0 5px', color: '#D1D5DB' }}>•</span> Dados protegidos
+              </span>
             </div>
           </div>
         </div>

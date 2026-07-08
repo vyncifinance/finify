@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import {
-  Eye, EyeOff, UserPlus, Shield, RefreshCw, Smartphone,
+  Eye, EyeOff, UserPlus, Shield,
   Users, BarChart2, Target, Home, FileText, TrendingUp,
   ArrowRight
 } from 'lucide-react'
@@ -169,6 +169,10 @@ export default function CadastroPage() {
       }}>
         <div style={{ position: 'absolute', top: '-120px', right: '-80px', width: '600px', height: '600px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(47,179,106,0.1) 0%, transparent 65%)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', bottom: '-80px', left: '-60px', width: '400px', height: '400px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(21,90,69,0.15) 0%, transparent 70%)', pointerEvents: 'none' }} />
+        {/* Glow discreto atrás do card "como funciona o convite" */}
+        <div style={{ position: 'absolute', top: '30%', right: '8%', width: '300px', height: '300px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(88,214,141,0.13) 0%, transparent 68%)', pointerEvents: 'none' }} />
+        {/* Brilho verde suave vindo de baixo */}
+        <div style={{ position: 'absolute', bottom: '-140px', left: 0, right: 0, height: '300px', background: 'radial-gradient(ellipse at bottom, rgba(47,179,106,0.15) 0%, transparent 72%)', pointerEvents: 'none' }} />
 
         <div style={{ position: 'relative', zIndex: 2, marginBottom: '14px' }}>
           <Logo size={26} textSize={15} />
@@ -257,8 +261,17 @@ export default function CadastroPage() {
       </div>
 
       {/* ── LADO DIREITO ── */}
-      <div style={{ flex: 1, backgroundColor: '#fff', display: 'flex', flexDirection: 'column' }}>
-        <div className="hidden lg:flex" style={{ alignItems: 'center', justifyContent: 'flex-end', padding: '8px 36px', gap: '24px' }}>
+      <div style={{ flex: 1, backgroundColor: '#fff', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
+        {/* Leve efeito de luz atrás do card */}
+        <div style={{
+          position: 'absolute', top: '50%', left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: '520px', height: '520px', borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(47,179,106,0.07) 0%, transparent 70%)',
+          pointerEvents: 'none', zIndex: 0,
+        }} />
+
+        <div className="hidden lg:flex" style={{ alignItems: 'center', justifyContent: 'flex-end', padding: '8px 36px', gap: '24px', position: 'relative', zIndex: 1 }}>
           {['Sobre o Finify', 'Recursos', 'Preços'].map(item => (
             <a key={item} href="#" style={{ fontSize: '14px', fontWeight: 500, color: '#374151', textDecoration: 'none' }}>{item}</a>
           ))}
@@ -271,7 +284,7 @@ export default function CadastroPage() {
           </a>
         </div>
 
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px', position: 'relative', zIndex: 1 }}>
           <div style={{
             width: '100%', maxWidth: '400px',
             backgroundColor: '#fff', borderRadius: '16px',
@@ -420,23 +433,14 @@ export default function CadastroPage() {
               <a href="/" style={{ fontWeight: 600, color: '#0F4737', textDecoration: 'none' }}>Fazer login</a>
             </p>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '10px', marginTop: '10px', paddingTop: '8px', borderTop: '1px solid #F7F8FA' }}>
-              {[
-                { Icon: Shield,     label: 'Dados protegidos' },
-                { Icon: RefreshCw,  label: 'Sincronização automática' },
-                { Icon: Smartphone, label: 'Acesso em qualquer lugar' },
-              ].map(({ Icon, label }) => (
-                <div key={label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', textAlign: 'center' }}>
-                  <div style={{
-                    width: '24px', height: '24px', borderRadius: '8px',
-                    backgroundColor: '#F0FDF4', border: '1px solid #D1FAE5',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <Icon size={11} color="#0F4737" strokeWidth={1.75} />
-                  </div>
-                  <p style={{ fontSize: '9px', fontWeight: 600, color: '#9CA3AF', lineHeight: 1.3 }}>{label}</p>
-                </div>
-              ))}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+              marginTop: '10px', paddingTop: '8px', borderTop: '1px solid #F7F8FA',
+            }}>
+              <Shield size={11} color="#9CA3AF" strokeWidth={1.75} />
+              <span style={{ fontSize: '10px', color: '#9CA3AF', fontWeight: 500, letterSpacing: '0.01em' }}>
+                Criptografia bancária <span style={{ margin: '0 4px', color: '#D1D5DB' }}>•</span> LGPD <span style={{ margin: '0 4px', color: '#D1D5DB' }}>•</span> Dados protegidos
+              </span>
             </div>
           </div>
         </div>
