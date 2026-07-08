@@ -260,7 +260,7 @@ export default function DashboardPage() {
     <>
       {/* ── MOBILE (mantido) ── */}
       <div className="lg:hidden min-h-screen" style={{ backgroundColor: '#F8FAFC', paddingBottom: '32px' }}>
-        <div style={{ background: 'linear-gradient(135deg, #07271F 0%, #145A45 100%)', padding: '24px 20px 48px' }}>
+        <div style={{ background: 'linear-gradient(135deg, #05281F 0%, #0C342A 55%, #0E3B2F 100%)', padding: '24px 20px 48px' }}>
           <div className="flex items-center justify-between mb-6">
             <div>
               <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'rgba(255,255,255,0.5)' }}>
@@ -506,7 +506,7 @@ export default function DashboardPage() {
           {/* Hero — Resumo Executivo */}
           <div style={{
             borderRadius: '16px', padding: '16px', marginBottom: '10px', position: 'relative', overflow: 'hidden',
-            background: 'linear-gradient(135deg, #06261F 0%, #0B3B2E 45%, #0D3F31 100%)',
+            background: 'linear-gradient(135deg, #05281F 0%, #0C342A 55%, #0E3B2F 100%)',
             boxShadow: '0 20px 60px -16px rgba(6,38,31,0.45)',
           }}>
             <div style={{ position: 'absolute', top: '-100px', right: '-60px', width: '360px', height: '360px', borderRadius: '50%', background: 'rgba(110,231,183,0.08)', filter: 'blur(50px)' }} />

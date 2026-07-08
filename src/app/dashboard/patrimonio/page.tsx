@@ -194,7 +194,7 @@ export default function PatrimonioPage() {
           style={{
             width: '100%', height: '56px', borderRadius: '16px', border: 'none', fontSize: '15px', fontWeight: 700, color: '#fff',
             cursor: salvando || !nome.trim() || !valor ? 'not-allowed' : 'pointer',
-            background: 'linear-gradient(135deg, #07271F 0%, #145A45 100%)',
+            background: 'linear-gradient(135deg, #05281F 0%, #0C342A 55%, #0E3B2F 100%)',
             boxShadow: '0 4px 16px rgba(11,59,46,0.3)',
             opacity: salvando || !nome.trim() || !valor ? 0.6 : 1,
           }}>
@@ -208,7 +208,7 @@ export default function PatrimonioPage() {
     <>
       {/* ── MOBILE ── */}
       <div className="lg:hidden" style={{ backgroundColor: '#F8FAFC', minHeight: '100vh', paddingBottom: '100px' }}>
-        <div style={{ background: 'linear-gradient(135deg, #07271F 0%, #145A45 100%)', padding: '20px 20px 40px' }}>
+        <div style={{ background: 'linear-gradient(135deg, #05281F 0%, #0C342A 55%, #0E3B2F 100%)', padding: '20px 20px 40px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <h1 style={{ fontSize: '18px', fontWeight: 600, color: '#fff', margin: 0 }}>Patrimônio</h1>
@@ -308,7 +308,7 @@ export default function PatrimonioPage() {
           </div>
           <button onClick={abrirNovo}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white"
-            style={{ background: 'linear-gradient(135deg, #07271F 0%, #145A45 100%)', boxShadow: '0 4px 16px rgba(11,59,46,0.3)', border: 'none', cursor: 'pointer' }}>
+            style={{ background: 'linear-gradient(135deg, #05281F 0%, #0C342A 55%, #0E3B2F 100%)', boxShadow: '0 4px 16px rgba(11,59,46,0.3)', border: 'none', cursor: 'pointer' }}>
             <Plus size={16} strokeWidth={2.5} /> Novo bem
           </button>
         </div>

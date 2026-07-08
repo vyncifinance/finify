@@ -202,7 +202,7 @@ export default function MetasPage() {
     <>
       {/* ── MOBILE ── */}
       <div className="lg:hidden min-h-screen" style={{ backgroundColor: '#F8FAFC', paddingBottom: '100px' }}>
-        <div style={{ background: 'linear-gradient(135deg, #07271F 0%, #145A45 100%)', padding: '24px 20px 48px' }}>
+        <div style={{ background: 'linear-gradient(135deg, #05281F 0%, #0C342A 55%, #0E3B2F 100%)', padding: '24px 20px 48px' }}>
           <div className="flex items-center justify-between mb-2">
             <div>
               <h1 className="text-lg font-semibold text-white">Metas da Família</h1>
