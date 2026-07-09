@@ -299,10 +299,14 @@ export default function DashboardPage() {
   const scoreLabel = score >= 80 ? 'Excelente' : score >= 60 ? 'Bom' : score >= 35 ? 'Atenção' : 'Crítico'
   const scoreCor   = score >= 80 ? '#2F8F68' : score >= 60 ? '#F59E0B' : score >= 35 ? '#F97316' : '#EF4444'
 
+  const reservaMeta = metas.find((m: any) => m.automatica)
+  const reservaPct  = reservaMeta ? Math.min(Math.round((Number(reservaMeta.valor_atual) / Number(reservaMeta.valor_alvo)) * 100), 100) : 0
+
   const saude = [
     { label: 'Orçamento Controlado',    ok: pctGasto < 80,    desc: pctGasto < 80 ? `${pctGasto}% comprometido` : 'Gastos elevados' },
     { label: 'Metas em Andamento',      ok: metas.length > 0, desc: metas.length > 0 ? `${metas.length} meta(s) ativa(s)` : 'Nenhuma meta criada' },
     { label: 'Crescimento Patrimonial', ok: totalEco > 0,     desc: totalEco > 0 ? `+${fmtOculto(totalEco, ocultar)} este mês` : 'Sem crescimento' },
+    ...(reservaMeta ? [{ label: 'Reserva de Emergência', ok: reservaPct >= 100, desc: `${reservaPct}% completa` }] : []),
   ]
 
   const kpis = [
@@ -1071,21 +1075,32 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 28px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                   {cats.map((c: any) => {
                     const Icon = ICONES_CAT[c.nome] || MoreHorizontal
                     return (
-                      <div key={c.nome}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
-                          <div style={{ width: '24px', height: '24px', borderRadius: '6px', backgroundColor: c.cor + '18', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            <Icon size={12} color={c.cor} strokeWidth={1.75} />
-                          </div>
-                          <span style={{ fontSize: '12.5px', fontWeight: 500, color: '#0B1F18', flex: 1 }}>{c.nome}</span>
-                          <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#0B1F18' }}>{fmtOculto(c.val, ocultar)}</span>
-                          <span style={{ fontSize: '10.5px', color: '#94A3B8', minWidth: '28px', textAlign: 'right' }}>{c.pct}%</span>
+                      <div key={c.nome} style={{
+                        display: 'flex', alignItems: 'center', gap: '12px',
+                        borderRadius: '12px', padding: '10px', border: '1px solid rgba(15,23,42,0.05)',
+                        transition: 'all 0.2s',
+                      }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 24px rgba(15,23,42,0.06)'; (e.currentTarget as HTMLElement).style.borderColor = c.cor + '30' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(15,23,42,0.05)' }}
+                      >
+                        <div style={{ width: '36px', height: '36px', borderRadius: '11px', backgroundColor: c.cor + '15', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <Icon size={16} color={c.cor} strokeWidth={1.75} />
                         </div>
-                        <div style={{ marginLeft: '32px', height: '3px', borderRadius: '2px', backgroundColor: '#F1F5F9', overflow: 'hidden' }}>
-                          <div style={{ height: '100%', width: `${c.pct}%`, backgroundColor: c.cor, borderRadius: '2px' }} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: '#0B1F18', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.nome}</span>
+                            <span style={{ fontSize: '13px', fontWeight: 700, color: c.cor, flexShrink: 0, marginLeft: '8px' }}>{c.pct}%</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <div style={{ flex: 1, height: '5px', borderRadius: '4px', overflow: 'hidden', backgroundColor: '#F1F5F9', marginRight: '10px' }}>
+                              <div style={{ height: '100%', width: `${c.pct}%`, backgroundColor: c.cor, borderRadius: '4px', transition: 'width 0.4s ease' }} />
+                            </div>
+                            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', flexShrink: 0 }}>{fmtOculto(c.val, ocultar)}</span>
+                          </div>
                         </div>
                       </div>
                     )
