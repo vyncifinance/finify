@@ -533,6 +533,71 @@ export default function DashboardPage() {
             })}
           </div>
 
+          <div className="rounded-2xl border p-4" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0' }}>
+            <p className="text-sm font-semibold mb-1" style={{ color: '#0F172A' }}>Despesas por Categoria</p>
+            <p className="text-xs mb-4" style={{ color: '#94A3B8' }}>Distribuição do mês</p>
+            {cats.length === 0 ? (
+              <p className="text-sm text-center py-8" style={{ color: '#94A3B8' }}>Sem despesas ainda.</p>
+            ) : (
+              <>
+                <div className="flex justify-center mb-5">
+                  <div style={{ position: 'relative', width: '200px', height: '200px', flexShrink: 0 }}>
+                    <PieChart width={200} height={200}>
+                      <Pie data={cats} cx={100} cy={100} innerRadius={66} outerRadius={94} dataKey="val" strokeWidth={2} stroke="#fff" paddingAngle={2}>
+                        {cats.map((c: any, i: number) => <Cell key={i} fill={c.cor} />)}
+                      </Pie>
+                      <Tooltip formatter={(v: any) => fmt(Number(v))}
+                        contentStyle={{ borderRadius: '12px', border: '1px solid rgba(15,23,42,0.06)', backgroundColor: '#fff', padding: '8px 12px', boxShadow: '0 8px 24px rgba(15,23,42,0.12)' }}
+                        itemStyle={{ color: '#0B1F18', fontSize: '13px', fontWeight: 600 }}
+                        wrapperStyle={{ zIndex: 20, outline: 'none' }}
+                      />
+                    </PieChart>
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                      <span style={{ fontSize: '11px', color: '#94A3B8' }}>Total</span>
+                      <span style={{ fontSize: '17px', fontWeight: 700, color: '#0B1F18' }}>{ocultar ? '••••' : `R$${(totalDes/1000).toFixed(1)}k`}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  {cats.map((c: any) => {
+                    const Icon = ICONES_CAT[c.nome] || MoreHorizontal
+                    return (
+                      <div key={c.nome} style={{
+                        display: 'flex', alignItems: 'center', gap: '12px',
+                        borderRadius: '12px', padding: '10px', border: '1px solid rgba(15,23,42,0.05)',
+                      }}>
+                        <div style={{ width: '32px', height: '32px', borderRadius: '10px', backgroundColor: c.cor + '15', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <Icon size={15} color={c.cor} strokeWidth={1.75} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: '#0B1F18', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.nome}</span>
+                            <span style={{ fontSize: '13px', fontWeight: 700, color: c.cor, flexShrink: 0, marginLeft: '8px' }}>{c.pct}%</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <div style={{ flex: 1, height: '5px', borderRadius: '4px', overflow: 'hidden', backgroundColor: '#F1F5F9', marginRight: '10px' }}>
+                              <div style={{ height: '100%', width: `${c.pct}%`, backgroundColor: c.cor, borderRadius: '4px' }} />
+                            </div>
+                            <span style={{ fontSize: '11.5px', fontWeight: 600, color: '#64748B', flexShrink: 0 }}>{fmtShort(Number(c.val))}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                {cats.length > 0 && (
+                  <div style={{ marginTop: '14px', padding: '9px 12px', borderRadius: '10px', backgroundColor: cats[0].cor + '10', border: `1px solid ${cats[0].cor}25`, display: 'flex', alignItems: 'center', gap: '7px' }}>
+                    <ArrowUp size={12} color={cats[0].cor} strokeWidth={2.5} />
+                    <p style={{ fontSize: '11.5px', color: '#64748B', margin: 0 }}>
+                      <strong style={{ color: '#0B1F18' }}>{cats[0].nome}</strong> representa {cats[0].pct}% do total.
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
           <div className="rounded-2xl border" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0' }}>
             <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: '#F1F5F9' }}>
               <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>Últimos Lançamentos</p>
