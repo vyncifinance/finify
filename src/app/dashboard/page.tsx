@@ -34,6 +34,7 @@ const ICONES_CAT: Record<string, any> = {
   'Consertos': Wrench,
   'Serviços': ClipboardList,
   'Pet': PawPrint,
+  'Investimentos': TrendingUp,
   'Outros': MoreHorizontal,
   'Salário': Briefcase,
   'Investimento': TrendingUp,
