@@ -1046,104 +1046,105 @@ export default function DashboardPage() {
             </div>
           </div>
           )}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-            <div style={{
-              borderRadius: '20px', padding: '28px', backgroundColor: '#fff',
-              border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
-            }}>
-              <h2 style={{ fontSize: '14px', fontWeight: 600, color: '#0B1F18', marginBottom: '2px', letterSpacing: '-0.2px' }}>Despesas por Categoria</h2>
-              <p style={{ fontSize: '12px', color: '#64748B', marginBottom: '14px' }}>Distribuição do mês</p>
-              {cats.length === 0 ? (
-                <p style={{ fontSize: '13.5px', textAlign: 'center', padding: '48px 0', color: '#94A3B8' }}>Sem despesas ainda.</p>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
-                  <div style={{ position: 'relative', width: '160px', height: '160px', flexShrink: 0 }}>
-                    <PieChart width={160} height={160}>
-                      <Pie data={cats} cx={80} cy={80} innerRadius={52} outerRadius={75} dataKey="val" strokeWidth={2} stroke="#fff" paddingAngle={2}>
+          <div style={{
+            borderRadius: '20px', padding: '28px', backgroundColor: '#fff', marginBottom: '10px',
+            border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
+          }}>
+            <h2 style={{ fontSize: '14px', fontWeight: 600, color: '#0B1F18', marginBottom: '2px', letterSpacing: '-0.2px' }}>Despesas por Categoria</h2>
+            <p style={{ fontSize: '12px', color: '#64748B', marginBottom: '20px' }}>Distribuição do mês</p>
+            {cats.length === 0 ? (
+              <p style={{ fontSize: '13.5px', textAlign: 'center', padding: '48px 0', color: '#94A3B8' }}>Sem despesas ainda.</p>
+            ) : (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
+                  <div style={{ position: 'relative', width: '170px', height: '170px', flexShrink: 0 }}>
+                    <PieChart width={170} height={170}>
+                      <Pie data={cats} cx={85} cy={85} innerRadius={56} outerRadius={80} dataKey="val" strokeWidth={2} stroke="#fff" paddingAngle={2}>
                         {cats.map((c: any, i: number) => <Cell key={i} fill={c.cor} />)}
                       </Pie>
                       <Tooltip formatter={(v: any) => fmt(Number(v))} contentStyle={{ borderRadius: '12px', border: '1px solid rgba(15,23,42,0.06)' }} />
                     </PieChart>
                     <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-                      <span style={{ fontSize: '10px', color: '#94A3B8' }}>Total</span>
-                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#0B1F18' }}>{ocultar ? '••••' : `R$${(totalDes/1000).toFixed(1)}k`}</span>
+                      <span style={{ fontSize: '11px', color: '#94A3B8' }}>Total</span>
+                      <span style={{ fontSize: '15px', fontWeight: 700, color: '#0B1F18' }}>{ocultar ? '••••' : `R$${(totalDes/1000).toFixed(1)}k`}</span>
                     </div>
                   </div>
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {cats.map((c: any) => {
-                      const Icon = ICONES_CAT[c.nome] || MoreHorizontal
-                      return (
-                        <div key={c.nome}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
-                            <div style={{ width: '24px', height: '24px', borderRadius: '6px', backgroundColor: c.cor + '18', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                              <Icon size={12} color={c.cor} strokeWidth={1.75} />
-                            </div>
-                            <span style={{ fontSize: '12px', fontWeight: 500, color: '#0B1F18', flex: 1 }}>{c.nome}</span>
-                            <span style={{ fontSize: '12px', fontWeight: 700, color: '#0B1F18' }}>{fmtOculto(c.val, ocultar)}</span>
-                            <span style={{ fontSize: '10px', color: '#94A3B8', minWidth: '26px', textAlign: 'right' }}>{c.pct}%</span>
-                          </div>
-                          <div style={{ marginLeft: '32px', height: '3px', borderRadius: '2px', backgroundColor: '#F1F5F9', overflow: 'hidden' }}>
-                            <div style={{ height: '100%', width: `${c.pct}%`, backgroundColor: c.cor, borderRadius: '2px' }} />
-                          </div>
-                        </div>
-                      )
-                    })}
-                    {cats.length > 0 && (
-                      <div style={{ marginTop: '4px', padding: '7px 10px', borderRadius: '9px', backgroundColor: cats[0].cor + '10', border: `1px solid ${cats[0].cor}25`, display: 'flex', alignItems: 'center', gap: '7px' }}>
-                        <ArrowUp size={11} color={cats[0].cor} strokeWidth={2.5} />
-                        <p style={{ fontSize: '10px', color: '#64748B', margin: 0 }}>
-                          <strong style={{ color: '#0B1F18' }}>{cats[0].nome}</strong> representa {cats[0].pct}% do total.
-                        </p>
-                      </div>
-                    )}
-                  </div>
                 </div>
-              )}
-            </div>
 
-            <div style={{
-              borderRadius: '20px', overflow: 'hidden', backgroundColor: '#fff',
-              border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px 10px' }}>
-                <div>
-                  <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#0B1F18', letterSpacing: '-0.3px' }}>Últimos Lançamentos</h2>
-                  <p style={{ fontSize: '12px', color: '#64748B', marginTop: '1px' }}>Atividade recente</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 28px' }}>
+                  {cats.map((c: any) => {
+                    const Icon = ICONES_CAT[c.nome] || MoreHorizontal
+                    return (
+                      <div key={c.nome}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
+                          <div style={{ width: '24px', height: '24px', borderRadius: '6px', backgroundColor: c.cor + '18', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <Icon size={12} color={c.cor} strokeWidth={1.75} />
+                          </div>
+                          <span style={{ fontSize: '12.5px', fontWeight: 500, color: '#0B1F18', flex: 1 }}>{c.nome}</span>
+                          <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#0B1F18' }}>{fmtOculto(c.val, ocultar)}</span>
+                          <span style={{ fontSize: '10.5px', color: '#94A3B8', minWidth: '28px', textAlign: 'right' }}>{c.pct}%</span>
+                        </div>
+                        <div style={{ marginLeft: '32px', height: '3px', borderRadius: '2px', backgroundColor: '#F1F5F9', overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${c.pct}%`, backgroundColor: c.cor, borderRadius: '2px' }} />
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
-                <a href="/dashboard/movimentos" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13.5px', fontWeight: 600, color: '#145A45', textDecoration: 'none' }}>
-                  Ver todos <ArrowRight size={13} strokeWidth={2} />
-                </a>
+                {cats.length > 0 && (
+                  <div style={{ marginTop: '16px', padding: '9px 12px', borderRadius: '10px', backgroundColor: cats[0].cor + '10', border: `1px solid ${cats[0].cor}25`, display: 'flex', alignItems: 'center', gap: '7px' }}>
+                    <ArrowUp size={12} color={cats[0].cor} strokeWidth={2.5} />
+                    <p style={{ fontSize: '12px', color: '#64748B', margin: 0 }}>
+                      <strong style={{ color: '#0B1F18' }}>{cats[0].nome}</strong> representa {cats[0].pct}% do total.
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          <div style={{
+            borderRadius: '20px', overflow: 'hidden', backgroundColor: '#fff',
+            border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px 10px' }}>
+              <div>
+                <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#0B1F18', letterSpacing: '-0.3px' }}>Últimos Lançamentos</h2>
+                <p style={{ fontSize: '12px', color: '#64748B', marginTop: '1px' }}>Atividade recente</p>
               </div>
-              {lancamentos.length === 0 ? (
-                <p style={{ fontSize: '13.5px', textAlign: 'center', padding: '48px 0', color: '#94A3B8' }}>Nenhum lançamento ainda.</p>
-              ) : lancamentos.map((l: any) => (
-                <div key={l.id} style={{
-                  display: 'flex', alignItems: 'center', gap: '14px', padding: '8px 16px',
-                  borderTop: '1px solid rgba(15,23,42,0.04)', transition: 'background 0.15s',
-                }}
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.backgroundColor = '#FAFBFC'}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'}
-                >
-                  <div style={{
-                    width: '34px', height: '34px', borderRadius: '50%', flexShrink: 0,
-                    backgroundColor: l.tipo === 'receita' ? '#ECFDF5' : '#FEF2F2',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    {l.tipo === 'receita'
-                      ? <ArrowDownLeft size={16} color="#2F8F68" strokeWidth={1.75} />
-                      : <ArrowUpRight  size={16} color="#DC2626" strokeWidth={1.75} />
-                    }
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: '14px', fontWeight: 500, color: '#0B1F18', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.categoria}</p>
-                    <p style={{ fontSize: '12.5px', color: '#94A3B8' }}>{l.membro} · {l.hora}</p>
-                  </div>
-                  <p style={{ fontSize: '14px', fontWeight: 600, flexShrink: 0, color: l.tipo === 'receita' ? '#2F8F68' : '#DC2626' }}>
-                    {l.tipo === 'receita' ? '+' : '-'} {fmtOculto(Number(l.valor), ocultar)}
-                  </p>
-                </div>
-              ))}
+              <a href="/dashboard/movimentos" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13.5px', fontWeight: 600, color: '#145A45', textDecoration: 'none' }}>
+                Ver todos <ArrowRight size={13} strokeWidth={2} />
+              </a>
             </div>
+            {lancamentos.length === 0 ? (
+              <p style={{ fontSize: '13.5px', textAlign: 'center', padding: '48px 0', color: '#94A3B8' }}>Nenhum lançamento ainda.</p>
+            ) : lancamentos.map((l: any) => (
+              <div key={l.id} style={{
+                display: 'flex', alignItems: 'center', gap: '14px', padding: '8px 16px',
+                borderTop: '1px solid rgba(15,23,42,0.04)', transition: 'background 0.15s',
+              }}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.backgroundColor = '#FAFBFC'}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'}
+              >
+                <div style={{
+                  width: '34px', height: '34px', borderRadius: '50%', flexShrink: 0,
+                  backgroundColor: l.tipo === 'receita' ? '#ECFDF5' : '#FEF2F2',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  {l.tipo === 'receita'
+                    ? <ArrowDownLeft size={16} color="#2F8F68" strokeWidth={1.75} />
+                    : <ArrowUpRight  size={16} color="#DC2626" strokeWidth={1.75} />
+                  }
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: '14px', fontWeight: 500, color: '#0B1F18', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.categoria}</p>
+                  <p style={{ fontSize: '12.5px', color: '#94A3B8' }}>{l.membro} · {l.hora}</p>
+                </div>
+                <p style={{ fontSize: '14px', fontWeight: 600, flexShrink: 0, color: l.tipo === 'receita' ? '#2F8F68' : '#DC2626' }}>
+                  {l.tipo === 'receita' ? '+' : '-'} {fmtOculto(Number(l.valor), ocultar)}
+                </p>
+              </div>
+            ))}
           </div>
         </div>
       </div>
