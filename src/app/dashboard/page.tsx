@@ -175,10 +175,13 @@ export default function DashboardPage() {
         porCat[l.categoria] = (porCat[l.categoria] || 0) + Number(l.valor)
       })
       const cores = ['#C0453D','#4A7FA5','#D68C4A','#3D8C7D','#6B4C7A','#E0A76B','#345E7A','#6BAF9C','#8B4A42','#2C6B60','#6FA3C4','#B56B3E']
-      setCats(Object.entries(porCat).map(([nome, val], i) => ({
-        nome, val: Number(val), cor: cores[i % cores.length],
-        pct: d > 0 ? Math.round((Number(val) / d) * 100) : 0
-      })))
+      const catsOrdenadas = Object.entries(porCat)
+        .sort((a: any, b: any) => Number(b[1]) - Number(a[1])) // maior valor primeiro
+        .map(([nome, val], i) => ({
+          nome, val: Number(val), cor: cores[i % cores.length],
+          pct: d > 0 ? Math.round((Number(val) / d) * 100) : 0
+        }))
+      setCats(catsOrdenadas)
     }
 
     const evo = []
