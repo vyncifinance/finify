@@ -174,7 +174,7 @@ export default function DashboardPage() {
       lanc.filter((l: any) => l.tipo === 'despesa').forEach((l: any) => {
         porCat[l.categoria] = (porCat[l.categoria] || 0) + Number(l.valor)
       })
-      const cores = ['#0B3B2E','#2FB36A','#B7791F','#145A45','#D4A24C','#64748B','#58D68D','#94A3B8','#0F4737','#E8C078']
+      const cores = ['#0B3B2E','#D9785F','#D9A441','#5B8C7B','#8B4F42','#2FB36A','#C9A97E','#4A3F4E','#B7791F','#94A3B8']
       setCats(Object.entries(porCat).map(([nome, val], i) => ({
         nome, val: Number(val), cor: cores[i % cores.length],
         pct: d > 0 ? Math.round((Number(val) / d) * 100) : 0
