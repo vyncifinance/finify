@@ -174,7 +174,7 @@ export default function DashboardPage() {
       lanc.filter((l: any) => l.tipo === 'despesa').forEach((l: any) => {
         porCat[l.categoria] = (porCat[l.categoria] || 0) + Number(l.valor)
       })
-      const cores = ['#0B3B2E','#D9785F','#D9A441','#5B8C7B','#8B4F42','#2FB36A','#C9A97E','#4A3F4E','#B7791F','#94A3B8']
+      const cores = ['#0B3B2E','#D9785F','#D9A441','#5B8C7B','#8B4F42','#2FB36A','#C9A97E','#4A3F4E','#B7791F','#94A3B8','#6B7A8F','#A85D5D','#7A9E7E','#C08552']
       setCats(Object.entries(porCat).map(([nome, val], i) => ({
         nome, val: Number(val), cor: cores[i % cores.length],
         pct: d > 0 ? Math.round((Number(val) / d) * 100) : 0
@@ -1066,7 +1066,11 @@ export default function DashboardPage() {
                       <Pie data={cats} cx={85} cy={85} innerRadius={56} outerRadius={80} dataKey="val" strokeWidth={2} stroke="#fff" paddingAngle={2}>
                         {cats.map((c: any, i: number) => <Cell key={i} fill={c.cor} />)}
                       </Pie>
-                      <Tooltip formatter={(v: any) => fmt(Number(v))} contentStyle={{ borderRadius: '12px', border: '1px solid rgba(15,23,42,0.06)' }} />
+                      <Tooltip formatter={(v: any) => fmt(Number(v))}
+                        contentStyle={{ borderRadius: '12px', border: '1px solid rgba(15,23,42,0.06)', backgroundColor: '#fff', padding: '8px 12px', boxShadow: '0 8px 24px rgba(15,23,42,0.12)' }}
+                        itemStyle={{ color: '#0B1F18', fontSize: '13px', fontWeight: 600 }}
+                        wrapperStyle={{ zIndex: 20, outline: 'none' }}
+                      />
                     </PieChart>
                     <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
                       <span style={{ fontSize: '11px', color: '#94A3B8' }}>Total</span>
