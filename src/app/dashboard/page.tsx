@@ -174,7 +174,7 @@ export default function DashboardPage() {
       lanc.filter((l: any) => l.tipo === 'despesa').forEach((l: any) => {
         porCat[l.categoria] = (porCat[l.categoria] || 0) + Number(l.valor)
       })
-      const cores = ['#C0453D','#D68C4A','#4A7FA5','#3D8C7D','#8B4A42','#E0A76B','#6FA3C4','#6BAF9C','#7A3530','#2C6B60','#345E7A','#B56B3E']
+      const cores = ['#C0453D','#4A7FA5','#D68C4A','#3D8C7D','#6B4C7A','#E0A76B','#345E7A','#6BAF9C','#8B4A42','#2C6B60','#6FA3C4','#B56B3E']
       setCats(Object.entries(porCat).map(([nome, val], i) => ({
         nome, val: Number(val), cor: cores[i % cores.length],
         pct: d > 0 ? Math.round((Number(val) / d) * 100) : 0
@@ -1061,9 +1061,9 @@ export default function DashboardPage() {
             ) : (
               <>
                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
-                  <div style={{ position: 'relative', width: '170px', height: '170px', flexShrink: 0 }}>
-                    <PieChart width={170} height={170}>
-                      <Pie data={cats} cx={85} cy={85} innerRadius={56} outerRadius={80} dataKey="val" strokeWidth={2} stroke="#fff" paddingAngle={2}>
+                  <div style={{ position: 'relative', width: '230px', height: '230px', flexShrink: 0 }}>
+                    <PieChart width={230} height={230}>
+                      <Pie data={cats} cx={115} cy={115} innerRadius={76} outerRadius={108} dataKey="val" strokeWidth={2} stroke="#fff" paddingAngle={2}>
                         {cats.map((c: any, i: number) => <Cell key={i} fill={c.cor} />)}
                       </Pie>
                       <Tooltip formatter={(v: any) => fmt(Number(v))}
@@ -1073,8 +1073,8 @@ export default function DashboardPage() {
                       />
                     </PieChart>
                     <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-                      <span style={{ fontSize: '11px', color: '#94A3B8' }}>Total</span>
-                      <span style={{ fontSize: '15px', fontWeight: 700, color: '#0B1F18' }}>{ocultar ? '••••' : `R$${(totalDes/1000).toFixed(1)}k`}</span>
+                      <span style={{ fontSize: '12.5px', color: '#94A3B8' }}>Total</span>
+                      <span style={{ fontSize: '19px', fontWeight: 700, color: '#0B1F18' }}>{ocultar ? '••••' : `R$${(totalDes/1000).toFixed(1)}k`}</span>
                     </div>
                   </div>
                 </div>
