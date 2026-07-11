@@ -70,7 +70,8 @@ export default function LinhaDoTempoPage() {
     const fimMes    = new Date(anoAtual, new Date().getMonth() + 1, 0).toISOString().split('T')[0]
 
     const { data: lanc } = await supabase.from('lancamentos').select('*')
-      .eq('familia_id', profile.familia_id).gte('data', inicioMes).lte('data', fimMes)
+      .eq('familia_id', profile.familia_id).is('empresa_id', null)
+      .gte('data', inicioMes).lte('data', fimMes)
 
     if (lanc) {
       const r = lanc.filter((l: any) => l.tipo === 'receita').reduce((s: number, l: any) => s + Number(l.valor), 0)
@@ -91,7 +92,8 @@ export default function LinhaDoTempoPage() {
       const ini = ref.toISOString().split('T')[0]
       const fim = new Date(ref.getFullYear(), ref.getMonth() + 1, 0).toISOString().split('T')[0]
       const { data: lm } = await supabase.from('lancamentos').select('tipo, valor')
-        .eq('familia_id', profile.familia_id).gte('data', ini).lte('data', fim)
+        .eq('familia_id', profile.familia_id).is('empresa_id', null)
+        .gte('data', ini).lte('data', fim)
       const saldoMes = (lm || []).reduce((s: number, l: any) => s + (l.tipo === 'receita' ? Number(l.valor) : -Number(l.valor)), 0)
       acumulado += saldoMes
       evo.push({ mes: MESES[ref.getMonth()].slice(0, 3), valor: Math.max(acumulado, 0) })
