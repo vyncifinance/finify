@@ -103,12 +103,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
 
       {/* ── DESKTOP ── */}
-      <div className="hidden lg:flex" style={{ backgroundColor: '#F8FAFC', zoom, height: `${100 / parseFloat(zoom)}vh`, overflow: 'hidden' }}>
+      <div className="hidden lg:flex" style={{ backgroundColor: '#F7F9FB', zoom, height: `${100 / parseFloat(zoom)}vh`, overflow: 'hidden' }}>
         <aside className="flex flex-col flex-shrink-0 transition-all duration-300"
           style={{
             width: collapsed ? '60px' : '185px',
-            background: 'linear-gradient(180deg, #06261F 0%, #0A342A 50%, #0D3F31 100%)',
-            borderRight: '1px solid rgba(255,255,255,0.06)',
+            background: '#F7F9FB',
+            borderRight: '1px solid rgba(15,23,42,0.06)',
           }}>
 
           {/* Logo */}
@@ -131,7 +131,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </svg>
             </div>
             {!collapsed && (
-              <span style={{ fontSize: '14px', fontWeight: 700, color: '#fff', letterSpacing: '-0.3px' }}>
+              <span style={{ fontSize: '14px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.3px' }}>
                 finify
               </span>
             )}
@@ -148,12 +148,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <button key={item.href} onClick={() => navegar(item.href)}
                   className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-all text-xs font-medium w-full"
                   style={{
-                    backgroundColor: active ? 'rgba(47,179,106,0.15)' : 'transparent',
-                    color: active ? '#58D68D' : 'rgba(255,255,255,0.45)',
-                    border: active ? '1px solid rgba(47,179,106,0.2)' : '1px solid transparent',
+                    backgroundColor: active ? '#D1FAE5' : 'transparent',
+                    color: active ? '#145A45' : '#64748B',
+                    fontWeight: active ? 600 : 500,
+                    border: '1px solid transparent',
                     cursor: 'pointer',
                   }}
-                  onMouseEnter={e => { if (!active) (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'rgba(255,255,255,0.05)' }}
+                  onMouseEnter={e => { if (!active) (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'rgba(15,23,42,0.04)' }}
                   onMouseLeave={e => { if (!active) (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent' }}
                 >
                   <Icon size={17} className="flex-shrink-0" strokeWidth={active ? 2 : 1.75} />
@@ -167,20 +168,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="p-2.5 flex-shrink-0">
             {!collapsed && (
               <div className="flex items-center gap-2 px-2.5 py-2 mb-1 rounded-lg"
-                style={{ backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                style={{ backgroundColor: '#fff', border: '1px solid rgba(15,23,42,0.06)' }}>
                 <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold"
-                  style={{ background: 'linear-gradient(135deg, #145A45 0%, #2FB36A 100%)', color: '#fff', minWidth: '32px' }}>
+                  style={{ background: 'linear-gradient(135deg, #145A45 0%, #2F8F68 100%)', color: '#fff', minWidth: '32px' }}>
                   {inicial}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-white truncate">{nome || 'Usuário'}</p>
+                  <p className="text-xs font-medium truncate" style={{ color: '#0B1F18' }}>{nome || 'Usuário'}</p>
                 </div>
               </div>
             )}
             <button onClick={toggleOcultar}
               className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-all text-xs font-medium mb-1"
-              style={{ color: ocultarValores ? '#58D68D' : 'rgba(255,255,255,0.45)', border: ocultarValores ? '1px solid rgba(47,179,106,0.2)' : '1px solid transparent', backgroundColor: ocultarValores ? 'rgba(47,179,106,0.15)' : 'transparent', cursor: 'pointer' }}
-              onMouseEnter={e => { if (!ocultarValores) (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'rgba(255,255,255,0.05)' }}
+              style={{ color: ocultarValores ? '#145A45' : '#64748B', border: '1px solid transparent', backgroundColor: ocultarValores ? '#D1FAE5' : 'transparent', cursor: 'pointer' }}
+              onMouseEnter={e => { if (!ocultarValores) (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'rgba(15,23,42,0.04)' }}
               onMouseLeave={e => { if (!ocultarValores) (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent' }}
             >
               {ocultarValores
@@ -191,8 +192,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </button>
             <button onClick={handleLogout}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all"
-              style={{ color: 'rgba(255,255,255,0.4)', border: 'none', cursor: 'pointer', background: 'none' }}
-              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'rgba(255,255,255,0.05)'}
+              style={{ color: '#94A3B8', border: 'none', cursor: 'pointer', background: 'none' }}
+              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'rgba(15,23,42,0.04)'}
               onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'}
             >
               <LogOut size={16} strokeWidth={1.75} className="flex-shrink-0" />
