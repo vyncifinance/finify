@@ -657,25 +657,21 @@ export default function DashboardPage() {
         <div style={{ maxWidth: '1080px', margin: '0 auto', padding: '16px 20px 24px' }}>
 
           {/* Header premium */}
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px', minHeight: '40px' }}>
             <div style={{ position: 'relative' }}>
               <button onClick={() => setContextoAberto(!contextoAberto)}
-                style={{ display: 'flex', alignItems: 'center', gap: '9px', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: '2px' }}>
-                <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.5px' }}>{contextoAtivo.nome || familia}</h1>
-                {contextoAtivo.tipo === 'empresa' && (
-                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#145A45', backgroundColor: '#D1FAE5', padding: '2px 8px', borderRadius: '999px' }}>PJ</span>
-                )}
-                <ChevronDown size={16} color="#94A3B8" style={{ transform: contextoAberto ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
-              </button>
-              <p style={{ fontSize: '12.5px', color: '#64748B', marginBottom: '6px' }}>
-                {getSaudacao()}, {primeiroNome || 'Família'}
-              </p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#2F8F68' }} />
-                <span style={{ fontSize: '12.5px', color: '#94A3B8' }}>
-                  Atualizado {atualizadoHa === 0 ? 'agora' : `há ${atualizadoHa} min`}
+                style={{ display: 'flex', alignItems: 'baseline', gap: '10px', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
+                  <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.5px', margin: 0 }}>{contextoAtivo.nome || familia}</h1>
+                  {contextoAtivo.tipo === 'empresa' && (
+                    <span style={{ fontSize: '10px', fontWeight: 700, color: '#145A45', backgroundColor: '#D1FAE5', padding: '2px 8px', borderRadius: '999px' }}>PJ</span>
+                  )}
+                  <ChevronDown size={16} color="#94A3B8" style={{ transform: contextoAberto ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
                 </span>
-              </div>
+                <span style={{ fontSize: '13px', color: '#64748B' }}>
+                  {getSaudacao()}, {primeiroNome || 'Família'}
+                </span>
+              </button>
 
               {contextoAberto && (
                 <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '6px', width: '260px', backgroundColor: '#fff', borderRadius: '14px', border: '1px solid #E2E8F0', boxShadow: '0 12px 32px rgba(0,0,0,0.12)', zIndex: 30, overflow: 'hidden' }}>
@@ -701,6 +697,12 @@ export default function DashboardPage() {
               )}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginRight: '2px' }}>
+                <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#2F8F68' }} />
+                <span style={{ fontSize: '12px', color: '#94A3B8' }}>
+                  Atualizado {atualizadoHa === 0 ? 'agora' : `há ${atualizadoHa} min`}
+                </span>
+              </div>
               <div style={{
                 padding: '10px 18px', borderRadius: '999px', fontSize: '13.5px', fontWeight: 500,
                 backgroundColor: '#fff', border: '1px solid rgba(15,23,42,0.06)', color: '#0F172A',
