@@ -176,12 +176,30 @@ export default function DashboardPage() {
         porCat[l.categoria] = (porCat[l.categoria] || 0) + Number(l.valor)
       })
       const cores = ['#C0453D','#4A7FA5','#D68C4A','#3D8C7D','#6B4C7A','#E0A76B','#345E7A','#6BAF9C','#8B4A42','#2C6B60','#6FA3C4','#B56B3E']
-      const catsOrdenadas = Object.entries(porCat)
+
+      const TOP_N = 10
+      const entradasSemOutros = Object.entries(porCat).filter(([nome]) => nome !== 'Outros')
+      const valorOutrosOriginal = Number(porCat['Outros'] || 0)
+
+      const ordenadasSemOutros = entradasSemOutros
         .sort((a: any, b: any) => Number(b[1]) - Number(a[1])) // maior valor primeiro
-        .map(([nome, val], i) => ({
-          nome, val: Number(val), cor: cores[i % cores.length],
-          pct: d > 0 ? Math.round((Number(val) / d) * 100) : 0
-        }))
+
+      let catsFinal: [string, number][]
+      if (ordenadasSemOutros.length <= (valorOutrosOriginal > 0 ? TOP_N - 1 : TOP_N)) {
+        catsFinal = [...ordenadasSemOutros, ...(valorOutrosOriginal > 0 ? [['Outros', valorOutrosOriginal]] : [])] as [string, number][]
+      } else {
+        const limiteTop = TOP_N - 1 // reserva 1 posição pro bucket "Outros"
+        const top = ordenadasSemOutros.slice(0, limiteTop)
+        const resto = ordenadasSemOutros.slice(limiteTop)
+        const somaResto = resto.reduce((s, [, val]) => s + Number(val), 0) + valorOutrosOriginal
+        catsFinal = [...top, ['Outros', somaResto]] as [string, number][]
+      }
+      catsFinal.sort((a, b) => Number(b[1]) - Number(a[1]))
+
+      const catsOrdenadas = catsFinal.map(([nome, val], i) => ({
+        nome, val: Number(val), cor: cores[i % cores.length],
+        pct: d > 0 ? Math.round((Number(val) / d) * 100) : 0
+      }))
       setCats(catsOrdenadas)
     }
 
