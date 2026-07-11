@@ -107,7 +107,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <aside className="flex flex-col flex-shrink-0 transition-all duration-300"
           style={{
             width: collapsed ? '60px' : '185px',
-            background: 'linear-gradient(180deg, #06261F 0%, #0A342A 60%, #0D3F31 100%)',
+            background: 'linear-gradient(180deg, #06261F 0%, #0A342A 50%, #0D3F31 100%)',
+            borderRight: '1px solid rgba(255,255,255,0.06)',
           }}>
 
           {/* Logo */}
