@@ -257,6 +257,37 @@ export default function MovimentosPage() {
     setParcelado(false)
   }
 
+  function ehCategoriaInvestimento(cat: string) {
+    return cat === 'Investimento' || cat === 'Investimentos'
+  }
+
+  // Sincroniza aportes/estornos de investimento com o saldo da carteira (tabela investimentos).
+  // Só atua no contexto pessoal — Investimentos, assim como Reserva de Emergência e Metas, não existe para empresas.
+  async function ajustarSaldoInvestimento(fid: string, dataStr: string, delta: number, empresaId: string | null) {
+    if (!fid || delta === 0 || empresaId) return
+    const mesRef = `${dataStr.slice(0, 7)}-01`
+
+    const { data: registroMes } = await supabase.from('investimentos')
+      .select('id, saldo').eq('familia_id', fid).eq('mes', mesRef).maybeSingle()
+
+    if (registroMes) {
+      const novoSaldo = Number(registroMes.saldo) + delta
+      await supabase.from('investimentos').update({ saldo: novoSaldo }).eq('id', registroMes.id)
+      return
+    }
+
+    if (delta > 0) {
+      const { data: anteriores } = await supabase.from('investimentos')
+        .select('saldo').eq('familia_id', fid).lt('mes', mesRef)
+        .order('mes', { ascending: false }).limit(1)
+      const base = anteriores && anteriores[0] ? Number(anteriores[0].saldo) : 0
+      await supabase.from('investimentos').insert({
+        familia_id: fid, user_id: userId, mes: mesRef, saldo: base + delta,
+        observacao: 'Aporte automático via Movimentos',
+      })
+    }
+  }
+
   async function handleSalvar() {
     if (!valor) return
     setSalvando(true)
@@ -268,11 +299,19 @@ export default function MovimentosPage() {
     const empresaId = contextoAtivo.tipo === 'empresa' ? contextoAtivo.empresaId : null
 
     if (editando) {
+      const eraInvestimento   = ehCategoriaInvestimento(editando.categoria) && editando.tipo === 'despesa'
+      const eInvestimentoNovo = ehCategoriaInvestimento(categoria) && tipo === 'despesa'
+
       const { error } = await supabase.from('lancamentos').update({
         tipo, valor: valorNum, categoria, membro: membroForm, data: dataLanc,
         dizimar: tipo === 'receita' ? dizimar : false,
         descricao: observacao || null,
       }).eq('id', editando.id)
+
+      if (!error) {
+        if (eraInvestimento) await ajustarSaldoInvestimento(fid, editando.data, -Number(editando.valor), editando.empresa_id || null)
+        if (eInvestimentoNovo) await ajustarSaldoInvestimento(fid, dataLanc, valorNum, empresaId)
+      }
       setSalvando(false)
       if (!error) { setModalOpen(false); await carregarLancamentos(fid) }
     } else if (parcelado && tipo === 'despesa') {
@@ -294,6 +333,9 @@ export default function MovimentosPage() {
         })
       }
       const { error } = await supabase.from('lancamentos').insert(inserts)
+      if (!error && ehCategoriaInvestimento(categoria)) {
+        for (const item of inserts) await ajustarSaldoInvestimento(fid, item.data, item.valor, empresaId)
+      }
       setSalvando(false)
       if (!error) { setModalOpen(false); await carregarLancamentos(fid) }
     } else {
@@ -304,6 +346,9 @@ export default function MovimentosPage() {
         empresa_id: empresaId,
         descricao: observacao || null,
       })
+      if (!error && tipo === 'despesa' && ehCategoriaInvestimento(categoria)) {
+        await ajustarSaldoInvestimento(fid, dataLanc, valorNum, empresaId)
+      }
       setSalvando(false)
       if (!error) { setModalOpen(false); await carregarLancamentos(fid) }
     }
@@ -314,6 +359,9 @@ export default function MovimentosPage() {
     if (!confirmDelete) { setConfirmDelete(true); return }
     setDeletando(true)
     const { error } = await supabase.from('lancamentos').delete().eq('id', editando.id)
+    if (!error && editando.tipo === 'despesa' && ehCategoriaInvestimento(editando.categoria)) {
+      await ajustarSaldoInvestimento(familiaIdRef.current, editando.data, -Number(editando.valor), editando.empresa_id || null)
+    }
     setDeletando(false)
     if (!error) {
       setLancamentos(prev => prev.filter((l: any) => l.id !== editando.id))
@@ -415,6 +463,9 @@ export default function MovimentosPage() {
       empresa_id: df.empresa_id || null,
     })
     if (!error) {
+      if (!ehReceita && ehCategoriaInvestimento(df.categoria)) {
+        await ajustarSaldoInvestimento(fid, dataStr, valor, df.empresa_id || null)
+      }
       // Para valores variáveis, o valor confirmado vira a nova referência do próximo mês
       if (df.valor_variavel && valor !== Number(df.valor)) {
         await supabase.from('despesas_fixas').update({ valor }).eq('id', df.id)
@@ -439,7 +490,12 @@ export default function MovimentosPage() {
   async function desfazerPagamento(df: any) {
     if (!df.lancamento) return
     const { error } = await supabase.from('lancamentos').delete().eq('id', df.lancamento.id)
-    if (!error) await carregarLancamentos(familiaIdRef.current)
+    if (!error) {
+      if (df.lancamento.tipo === 'despesa' && ehCategoriaInvestimento(df.lancamento.categoria)) {
+        await ajustarSaldoInvestimento(familiaIdRef.current, df.lancamento.data, -Number(df.lancamento.valor), df.lancamento.empresa_id || null)
+      }
+      await carregarLancamentos(familiaIdRef.current)
+    }
     else console.error('Erro ao desfazer pagamento:', error)
   }
 
