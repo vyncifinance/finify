@@ -38,6 +38,17 @@ function fmtMesLong(dateStr: string) {
   return `${MESES[d.getMonth()]} ${d.getFullYear()}`
 }
 
+// Taxa diária do CDI (Sistema Gerenciador de Séries Temporais do Bacen, série 12).
+// Usada só como estimativa em tempo real — não altera o saldo salvo no banco.
+async function buscarTaxaCDIDiaria(): Promise<number> {
+  try {
+    const res = await fetch('https://api.bcb.gov.br/dados/serie/bcdata.sgs.12/dados/ultimos/1?formato=json')
+    const json = await res.json()
+    if (json && json[0]?.valor) return Number(json[0].valor) / 100
+  } catch {}
+  return 0.00039 // fallback aproximado (~10% a.a.) se a API do Bacen estiver indisponível
+}
+
 export default function InvestimentosPage() {
   const [loading, setLoading]       = useState(true)
   const [familiaId, setFamiliaId]   = useState('')
@@ -55,9 +66,12 @@ export default function InvestimentosPage() {
   const [deletando, setDeletando]   = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [isMobile, setIsMobile]     = useState(true)
+  const [taxaCDIDiaria, setTaxaCDIDiaria] = useState(0)
 
   const ocultar  = useOcultarValores()
   const supabase = createClient()
+
+  useEffect(() => { buscarTaxaCDIDiaria().then(setTaxaCDIDiaria) }, [])
 
   useEffect(() => {
     setIsMobile(window.innerWidth < 1024)
@@ -163,6 +177,18 @@ export default function InvestimentosPage() {
     const var_ = prev ? ((Number(r.saldo) - Number(prev.saldo)) / Number(prev.saldo)) * 100 : 0
     return { mes: fmtMes(r.mes), saldo: Number(r.saldo), var: var_ }
   })
+
+  // Estimativa em tempo real (não persistida): aplica o CDI diário sobre o saldo do último
+  // mês registrado até hoje. É só uma noção de "quanto já deve ter rendido" — o valor oficial
+  // continua sendo o que você registra manualmente todo mês.
+  const dataBaseCDI = atual ? new Date(atual.mes + 'T12:00:00') : null
+  const diasDesdeRegistro = dataBaseCDI
+    ? Math.max(Math.floor((Date.now() - dataBaseCDI.getTime()) / 86400000), 0)
+    : 0
+  const saldoEstimadoHoje = dataBaseCDI
+    ? saldoAtual * Math.pow(1 + taxaCDIDiaria, diasDesdeRegistro)
+    : 0
+  const rendimentoEstimado = saldoEstimadoHoje - saldoAtual
 
   // Modal content
   const modalContent = (
@@ -281,6 +307,17 @@ export default function InvestimentosPage() {
             </div>
           ))}
         </div>
+
+        {/* Estimativa CDI mobile */}
+        {atual && (
+          <div style={{ margin: '0 16px 16px', backgroundColor: '#F0FDF4', border: '1px solid #D1FAE5', borderRadius: '16px', padding: '14px' }}>
+            <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#145A45', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Estimativa hoje · 100% do CDI</p>
+            <p style={{ fontSize: '18px', fontWeight: 700, color: '#0F172A', letterSpacing: '-0.3px' }}>{loading ? '...' : fmtOculto(saldoEstimadoHoje, ocultar)}</p>
+            <p style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>
+              {rendimentoEstimado > 0 ? `+${fmtShort(rendimentoEstimado)} desde ${fmtMesLong(atual.mes)}` : 'Sem rendimento estimado ainda'}
+            </p>
+          </div>
+        )}
 
         {/* Gráfico mobile */}
         {dadosGrafico.length > 1 && (
@@ -437,6 +474,24 @@ export default function InvestimentosPage() {
             </div>
           ))}
         </div>
+
+        {/* Estimativa CDI desktop */}
+        {atual && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F0FDF4', border: '1px solid #D1FAE5', borderRadius: '18px', padding: '18px 24px', marginBottom: '24px' }}>
+            <div>
+              <p style={{ fontSize: '11px', fontWeight: 700, color: '#145A45', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Estimativa de hoje · 100% do CDI</p>
+              <p style={{ fontSize: '13px', color: '#64748B' }}>
+                Projeção com base na taxa CDI diária do Bacen, aplicada sobre o saldo de {atual ? fmtMesLong(atual.mes) : '—'}. Não substitui o saldo oficial da corretora.
+              </p>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <p style={{ fontSize: '26px', fontWeight: 700, color: '#0F172A', letterSpacing: '-0.5px' }}>{loading ? '...' : fmtOculto(saldoEstimadoHoje, ocultar)}</p>
+              <p style={{ fontSize: '12px', color: '#10B981', fontWeight: 600 }}>
+                {rendimentoEstimado > 0 ? `+${fmt(rendimentoEstimado)} estimado` : 'Sem rendimento estimado ainda'}
+              </p>
+            </div>
+          </div>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
           {/* Gráfico */}

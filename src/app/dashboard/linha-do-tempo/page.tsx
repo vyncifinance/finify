@@ -30,6 +30,16 @@ function mesesEntre(hoje: Date, alvo: Date) {
   return diff > 0 ? diff : 0
 }
 
+// Taxa diária do CDI (Bacen, série 12) — mesma estimativa usada na tela Investimentos
+async function buscarTaxaCDIDiaria(): Promise<number> {
+  try {
+    const res = await fetch('https://api.bcb.gov.br/dados/serie/bcdata.sgs.12/dados/ultimos/1?formato=json')
+    const json = await res.json()
+    if (json && json[0]?.valor) return Number(json[0].valor) / 100
+  } catch {}
+  return 0.00039
+}
+
 export default function LinhaDoTempoPage() {
   const [loading, setLoading] = useState(true)
   const [familiaId, setFamiliaId] = useState('')
@@ -37,14 +47,18 @@ export default function LinhaDoTempoPage() {
   const [totalRec, setTotalRec] = useState(0)
   const [totalDes, setTotalDes] = useState(0)
   const [totalInv, setTotalInv] = useState(0)
+  const [mesInvestimento, setMesInvestimento] = useState<string | null>(null)
   const [metas, setMetas] = useState<any[]>([])
   const [evolucao, setEvolucao] = useState<{ mes: string; valor: number }[]>([])
   const [anoSelecionado, setAnoSelecionado] = useState(new Date().getFullYear())
   const [atualizadoHa, setAtualizadoHa] = useState(0)
+  const [taxaCDIDiaria, setTaxaCDIDiaria] = useState(0)
 
   const ocultar = useOcultarValores()
   const supabase = createClient()
   const trilhaRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => { buscarTaxaCDIDiaria().then(setTaxaCDIDiaria) }, [])
 
   const anoAtual = new Date().getFullYear()
   const anos = Array.from({ length: 12 }, (_, i) => anoAtual - 2 + i)
@@ -81,9 +95,14 @@ export default function LinhaDoTempoPage() {
 
     // Saldo real da carteira de investimentos (mesma fonte da tela Investimentos, não soma de lançamentos)
     const { data: invMaisRecente } = await supabase.from('investimentos')
-      .select('saldo').eq('familia_id', profile.familia_id)
+      .select('saldo, mes').eq('familia_id', profile.familia_id)
       .order('mes', { ascending: false }).limit(1).maybeSingle()
-    setTotalInv(invMaisRecente ? Number(invMaisRecente.saldo) : 0)
+    if (invMaisRecente) {
+      setTotalInv(Number(invMaisRecente.saldo))
+      setMesInvestimento(invMaisRecente.mes)
+    } else {
+      setTotalInv(0)
+    }
 
     const { data: metasData } = await supabase.from('metas')
       .select('*').eq('familia_id', profile.familia_id).order('prazo', { ascending: true })
@@ -133,11 +152,15 @@ export default function LinhaDoTempoPage() {
   }
   const anoAlvoProjecao = projecao.find(p => p.valor >= valorAlvoProjecao)?.ano || null
 
+  const dataBaseInv = mesInvestimento ? new Date(mesInvestimento + 'T12:00:00') : null
+  const diasInv = dataBaseInv ? Math.max(Math.floor((Date.now() - dataBaseInv.getTime()) / 86400000), 0) : 0
+  const totalInvEstimado = dataBaseInv ? totalInv * Math.pow(1 + taxaCDIDiaria, diasInv) : totalInv
+
   const resumo = [
     { label: 'Receitas',     val: totalRec, cor: '#378ADD', bg: '#EFF6FF', Icon: ArrowDownLeft },
     { label: 'Despesas',     val: totalDes, cor: '#DC2626', bg: '#FEF2F2', Icon: ArrowUpRight },
     { label: 'Economia',     val: totalRec - totalDes, cor: '#BA7517', bg: '#FAEEDA', Icon: PiggyBank },
-    { label: 'Carteira de investimentos', val: totalInv, cor: '#145A45', bg: '#D1FAE5', Icon: Wallet },
+    { label: 'Carteira de investimentos', val: totalInvEstimado, cor: '#145A45', bg: '#D1FAE5', Icon: Wallet },
   ]
 
   return (
