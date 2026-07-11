@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import {
-  LayoutDashboard, ArrowLeftRight, Target, User, LogOut, Menu, ChevronLeft, TrendingUp, Eye, EyeOff
+  LayoutDashboard, ArrowLeftRight, Target, User, LogOut, Menu, ChevronLeft, ChevronRight, TrendingUp, Eye, EyeOff
 } from 'lucide-react'
 
 const NAV = [
@@ -167,16 +167,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* Footer */}
           <div className="p-2.5 flex-shrink-0">
             {!collapsed && (
-              <div className="flex items-center gap-2 px-2.5 py-2 mb-1 rounded-lg"
-                style={{ backgroundColor: '#fff', border: '1px solid rgba(15,23,42,0.06)' }}>
-                <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold"
-                  style={{ background: 'linear-gradient(135deg, #145A45 0%, #2F8F68 100%)', color: '#fff', minWidth: '32px' }}>
+              <button onClick={() => navegar('/dashboard/perfil')}
+                className="w-full flex items-center gap-2 px-2.5 py-2 mb-1 rounded-lg transition-all"
+                style={{ backgroundColor: '#fff', border: '1px solid rgba(15,23,42,0.06)', cursor: 'pointer' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(15,23,42,0.12)' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(15,23,42,0.06)' }}
+              >
+                <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold"
+                  style={{ background: 'linear-gradient(135deg, #145A45 0%, #2F8F68 100%)', color: '#fff', minWidth: '28px' }}>
                   {inicial}
                 </div>
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0" style={{ textAlign: 'left' }}>
                   <p className="text-xs font-medium truncate" style={{ color: '#0B1F18' }}>{nome || 'Usuário'}</p>
+                  <p style={{ fontSize: '10.5px', color: '#94A3B8' }}>Ver perfil</p>
                 </div>
-              </div>
+                <ChevronRight size={14} color="#CBD5E1" strokeWidth={2} className="flex-shrink-0" />
+              </button>
             )}
             <button onClick={toggleOcultar}
               className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-all text-xs font-medium mb-1"
