@@ -76,9 +76,14 @@ export default function LinhaDoTempoPage() {
     if (lanc) {
       const r = lanc.filter((l: any) => l.tipo === 'receita').reduce((s: number, l: any) => s + Number(l.valor), 0)
       const d = lanc.filter((l: any) => l.tipo === 'despesa').reduce((s: number, l: any) => s + Number(l.valor), 0)
-      const inv = lanc.filter((l: any) => l.categoria === 'Investimento').reduce((s: number, l: any) => s + Number(l.valor), 0)
-      setTotalRec(r); setTotalDes(d); setTotalInv(inv)
+      setTotalRec(r); setTotalDes(d)
     }
+
+    // Saldo real da carteira de investimentos (mesma fonte da tela Investimentos, não soma de lançamentos)
+    const { data: invMaisRecente } = await supabase.from('investimentos')
+      .select('saldo').eq('familia_id', profile.familia_id)
+      .order('mes', { ascending: false }).limit(1).maybeSingle()
+    setTotalInv(invMaisRecente ? Number(invMaisRecente.saldo) : 0)
 
     const { data: metasData } = await supabase.from('metas')
       .select('*').eq('familia_id', profile.familia_id).order('prazo', { ascending: true })
@@ -132,7 +137,7 @@ export default function LinhaDoTempoPage() {
     { label: 'Receitas',     val: totalRec, cor: '#378ADD', bg: '#EFF6FF', Icon: ArrowDownLeft },
     { label: 'Despesas',     val: totalDes, cor: '#DC2626', bg: '#FEF2F2', Icon: ArrowUpRight },
     { label: 'Economia',     val: totalRec - totalDes, cor: '#BA7517', bg: '#FAEEDA', Icon: PiggyBank },
-    { label: 'Investimentos',val: totalInv, cor: '#145A45', bg: '#D1FAE5', Icon: Wallet },
+    { label: 'Carteira de investimentos', val: totalInv, cor: '#145A45', bg: '#D1FAE5', Icon: Wallet },
   ]
 
   return (
