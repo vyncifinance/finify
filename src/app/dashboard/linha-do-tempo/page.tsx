@@ -75,7 +75,7 @@ export default function LinhaDoTempoPage() {
     if (lanc) {
       const r = lanc.filter((l: any) => l.tipo === 'receita').reduce((s: number, l: any) => s + Number(l.valor), 0)
       const d = lanc.filter((l: any) => l.tipo === 'despesa').reduce((s: number, l: any) => s + Number(l.valor), 0)
-      const inv = lanc.filter((l: any) => l.categoria === 'Investimentos').reduce((s: number, l: any) => s + Number(l.valor), 0)
+      const inv = lanc.filter((l: any) => l.categoria === 'Investimento').reduce((s: number, l: any) => s + Number(l.valor), 0)
       setTotalRec(r); setTotalDes(d); setTotalInv(inv)
     }
 
@@ -110,16 +110,21 @@ export default function LinhaDoTempoPage() {
     : 500
   const patrimonioAtual = evolucao.length ? evolucao[evolucao.length - 1].valor : 0
 
+  const metasAbertas = metas.filter(m => Number(m.valor_atual) < Number(m.valor_alvo))
+  const hoje = new Date()
+
+  const maiorMeta = metasAbertas.length
+    ? metasAbertas.reduce((maior, m) => Number(m.valor_alvo) > Number(maior.valor_alvo) ? m : maior, metasAbertas[0])
+    : null
+  const valorAlvoProjecao = maiorMeta ? Number(maiorMeta.valor_alvo) : Math.max(patrimonioAtual * 2, 50000)
+
   const projecao: { ano: number; valor: number }[] = []
   let valorProj = patrimonioAtual
-  for (let i = 0; i <= 12; i++) {
+  for (let i = 0; i <= 20; i++) {
     projecao.push({ ano: anoAtual + i, valor: Math.round(valorProj) })
     valorProj = valorProj * 1.006 + economiaMediaMensal * 12 // crescimento anual composto simplificado
   }
-  const anoPrimeiroMilhao = projecao.find(p => p.valor >= 1000000)?.ano || (anoAtual + 12)
-
-  const metasAbertas = metas.filter(m => Number(m.valor_atual) < Number(m.valor_alvo))
-  const hoje = new Date()
+  const anoAlvoProjecao = projecao.find(p => p.valor >= valorAlvoProjecao)?.ano || null
 
   const resumo = [
     { label: 'Receitas',     val: totalRec, cor: '#378ADD', bg: '#EFF6FF', Icon: ArrowDownLeft },
@@ -236,15 +241,57 @@ export default function LinhaDoTempoPage() {
 
           <div style={{ backgroundColor: '#fff', border: '1px solid rgba(15,23,42,0.06)', borderRadius: '18px', padding: '18px' }}>
             <p style={{ fontSize: '12.5px', color: '#64748B', margin: '0 0 10px' }}>Evento do período</p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ width: '42px', height: '42px', borderRadius: '13px', backgroundColor: '#D1FAE5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Trophy size={19} color="#145A45" strokeWidth={1.75} />
-              </div>
-              <div>
-                <p style={{ fontSize: '13.5px', fontWeight: 600, color: '#0B1F18', margin: 0 }}>Reserva de emergência em dia</p>
-                <p style={{ fontSize: '12px', color: '#64748B', margin: '2px 0 0' }}>Você está avançando na sua jornada financeira.</p>
-              </div>
-            </div>
+            {(() => {
+              const metaConcluida = metas.find(m => Number(m.valor_atual) >= Number(m.valor_alvo))
+              const metaMaisProxima = metasAbertas.length
+                ? metasAbertas.reduce((maisProx, m) => {
+                    const pctM = Number(m.valor_atual) / Number(m.valor_alvo)
+                    const pctMaisProx = Number(maisProx.valor_atual) / Number(maisProx.valor_alvo)
+                    return pctM > pctMaisProx ? m : maisProx
+                  }, metasAbertas[0])
+                : null
+
+              if (metaConcluida) {
+                const Icon = ICONES_META[metaConcluida.icone] || Trophy
+                return (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ width: '42px', height: '42px', borderRadius: '13px', backgroundColor: '#D1FAE5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Icon size={19} color="#145A45" strokeWidth={1.75} />
+                    </div>
+                    <div>
+                      <p style={{ fontSize: '13.5px', fontWeight: 600, color: '#0B1F18', margin: 0 }}>{metaConcluida.nome} concluída</p>
+                      <p style={{ fontSize: '12px', color: '#64748B', margin: '2px 0 0' }}>Você bateu esse marco da sua jornada.</p>
+                    </div>
+                  </div>
+                )
+              }
+              if (metaMaisProxima) {
+                const Icon = ICONES_META[metaMaisProxima.icone] || Target
+                const pct = Math.min(Math.round((Number(metaMaisProxima.valor_atual) / Number(metaMaisProxima.valor_alvo)) * 100), 100)
+                return (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ width: '42px', height: '42px', borderRadius: '13px', backgroundColor: '#FAEEDA', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Icon size={19} color="#BA7517" strokeWidth={1.75} />
+                    </div>
+                    <div>
+                      <p style={{ fontSize: '13.5px', fontWeight: 600, color: '#0B1F18', margin: 0 }}>{metaMaisProxima.nome} em {pct}%</p>
+                      <p style={{ fontSize: '12px', color: '#64748B', margin: '2px 0 0' }}>Seu marco mais próximo de ser concluído.</p>
+                    </div>
+                  </div>
+                )
+              }
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ width: '42px', height: '42px', borderRadius: '13px', backgroundColor: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Target size={19} color="#94A3B8" strokeWidth={1.75} />
+                  </div>
+                  <div>
+                    <p style={{ fontSize: '13.5px', fontWeight: 600, color: '#0B1F18', margin: 0 }}>Nenhuma meta criada ainda</p>
+                    <p style={{ fontSize: '12px', color: '#64748B', margin: '2px 0 0' }}>Crie sua primeira meta para começar sua jornada.</p>
+                  </div>
+                </div>
+              )
+            })()}
           </div>
 
           <div style={{ backgroundColor: '#fff', border: '1px solid rgba(15,23,42,0.06)', borderRadius: '18px', padding: '18px' }}>
@@ -309,9 +356,13 @@ export default function LinhaDoTempoPage() {
           <div style={{ backgroundColor: '#fff', border: '1px solid rgba(15,23,42,0.06)', borderRadius: '18px', padding: '18px' }}>
             <p style={{ fontSize: '13.5px', fontWeight: 600, color: '#0B1F18', margin: '0 0 2px' }}>Projeção de patrimônio</p>
             <p style={{ fontSize: '22px', fontWeight: 700, color: '#0B1F18', margin: '2px 0 0', letterSpacing: '-0.4px' }}>
-              {fmtOculto(1000000, ocultar)}
+              {fmtOculto(valorAlvoProjecao, ocultar)}
             </p>
-            <p style={{ fontSize: '12px', color: '#94A3B8', margin: '2px 0 12px' }}>em {anoPrimeiroMilhao}, mantendo o ritmo atual</p>
+            <p style={{ fontSize: '12px', color: '#94A3B8', margin: '2px 0 12px' }}>
+              {maiorMeta
+                ? `${maiorMeta.nome}${anoAlvoProjecao ? `, previsto para ${anoAlvoProjecao}` : ''}`
+                : `Dobrando seu patrimônio atual, mantendo o ritmo de hoje`}
+            </p>
             <ResponsiveContainer width="100%" height={160}>
               <AreaChart data={projecao}>
                 <defs>
