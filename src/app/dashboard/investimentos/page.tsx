@@ -10,7 +10,7 @@ import {
   ArrowUpRight, ArrowDownRight, Minus, BarChart2, Calendar
 } from 'lucide-react'
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid,
+  AreaChart, Area, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer
 } from 'recharts'
 
@@ -94,14 +94,33 @@ export default function InvestimentosPage() {
   const [percentualCDI, setPercentualCDI]           = useState('100')
   const [dataAplicacao, setDataAplicacao]           = useState(() => new Date().toISOString().split('T')[0])
   const [valorAtualManual, setValorAtualManual]     = useState('')
+  const [ticker, setTicker]                         = useState('')
+  const [quantidade, setQuantidade]                 = useState('')
   const [salvandoPosicao, setSalvandoPosicao]       = useState(false)
   const [deletandoPosicao, setDeletandoPosicao]     = useState(false)
   const [confirmDeletePosicao, setConfirmDeletePosicao] = useState(false)
+
+  // Fase 2: cotações ao vivo (Ação/FII)
+  const [cotacoes, setCotacoes] = useState<Record<string, number>>({})
+  const [carregandoCotacoes, setCarregandoCotacoes] = useState(false)
+
+  // Fase 3: proventos/dividendos
+  const [proventoOpen, setProventoOpen]           = useState(false)
+  const [posicaoProvento, setPosicaoProvento]     = useState<any>(null)
+  const [valorProvento, setValorProvento]         = useState('')
+  const [salvandoProvento, setSalvandoProvento]   = useState(false)
 
   const ocultar  = useOcultarValores()
   const supabase = createClient()
 
   useEffect(() => { buscarTaxaCDIDiaria().then(setTaxaCDIDiaria) }, [])
+
+  useEffect(() => {
+    const tickers = Array.from(new Set(
+      posicoes.filter(p => (p.tipo === 'acao' || p.tipo === 'fii') && p.ticker).map(p => p.ticker)
+    ))
+    if (tickers.length > 0) buscarCotacoes(tickers)
+  }, [posicoes])
 
   useEffect(() => {
     setIsMobile(window.innerWidth < 1024)
@@ -132,6 +151,19 @@ export default function InvestimentosPage() {
     const { data } = await supabase.from('posicoes_investimento').select('*')
       .eq('familia_id', fid).order('created_at', { ascending: false })
     if (data) setPosicoes(data)
+  }
+
+  async function buscarCotacoes(tickers: string[]) {
+    if (tickers.length === 0) return
+    setCarregandoCotacoes(true)
+    try {
+      const res = await fetch(`/api/cotacoes?tickers=${encodeURIComponent(tickers.join(','))}`)
+      const data = await res.json()
+      if (data.cotacoes) setCotacoes(prev => ({ ...prev, ...data.cotacoes }))
+    } catch {
+      // Falha silenciosa — as posições caem no fallback de valor manual
+    }
+    setCarregandoCotacoes(false)
   }
 
   async function carregar(fid: string) {
@@ -202,6 +234,8 @@ export default function InvestimentosPage() {
     setPercentualCDI('100')
     setDataAplicacao(new Date().toISOString().split('T')[0])
     setValorAtualManual('')
+    setTicker('')
+    setQuantidade('')
     setConfirmDeletePosicao(false)
     setModalPosicaoOpen(true)
   }
@@ -214,6 +248,8 @@ export default function InvestimentosPage() {
     setPercentualCDI(p.percentual_cdi != null ? String(p.percentual_cdi) : '100')
     setDataAplicacao(p.data_aplicacao)
     setValorAtualManual(p.valor_atual != null ? Number(p.valor_atual).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '')
+    setTicker(p.ticker || '')
+    setQuantidade(p.quantidade != null ? String(p.quantidade) : '')
     setConfirmDeletePosicao(false)
     setModalPosicaoOpen(true)
   }
@@ -223,6 +259,7 @@ export default function InvestimentosPage() {
     setSalvandoPosicao(true)
     const valorInvestidoNum = parseFloat(valorInvestido.replace(/\./g, '').replace(',', '.'))
     const ehCDI = tipoPosicao === 'renda_fixa_cdi'
+    const ehVar = ehVariavel(tipoPosicao)
     const payload = {
       familia_id: familiaId, user_id: userId,
       nome: nomePosicao.trim(), tipo: tipoPosicao,
@@ -230,6 +267,8 @@ export default function InvestimentosPage() {
       data_aplicacao: dataAplicacao,
       percentual_cdi: ehCDI ? parseFloat((percentualCDI || '100').replace(',', '.')) : null,
       valor_atual: ehCDI ? null : (valorAtualManual ? parseFloat(valorAtualManual.replace(/\./g, '').replace(',', '.')) : valorInvestidoNum),
+      ticker: ehVar && ticker.trim() ? ticker.trim().toUpperCase() : null,
+      quantidade: ehVar && quantidade ? parseFloat(quantidade.replace(',', '.')) : null,
     }
 
     if (editandoPosicao) {
@@ -254,10 +293,30 @@ export default function InvestimentosPage() {
     }
   }
 
+  function abrirProvento(p: any) {
+    setPosicaoProvento(p)
+    setValorProvento('')
+    setProventoOpen(true)
+  }
+
+  async function handleSalvarProvento() {
+    if (!valorProvento || !posicaoProvento) return
+    setSalvandoProvento(true)
+    const valor = parseFloat(valorProvento.replace(/\./g, '').replace(',', '.'))
+    const novoTotal = Number(posicaoProvento.proventos_recebidos || 0) + valor
+    const { error } = await supabase.from('posicoes_investimento')
+      .update({ proventos_recebidos: novoTotal }).eq('id', posicaoProvento.id)
+    if (!error) {
+      setPosicoes(prev => prev.map(p => p.id === posicaoProvento.id ? { ...p, proventos_recebidos: novoTotal } : p))
+      setProventoOpen(false)
+    }
+    setSalvandoProvento(false)
+  }
+
   // Valor de uma posição numa data de referência (padrão: hoje). CDI é calculado com juros
-  // compostos a X% do CDI em dias úteis; renda variável e Tesouro (Fase 1, sem API de mercado
-  // ainda) usam o último valor informado, aplicado igual em qualquer data — é uma simplificação
-  // conhecida até a Fase 2 trazer cotação histórica real.
+  // compostos a X% do CDI em dias úteis; Ação/FII com ticker+quantidade usam a cotação ao vivo
+  // (Fase 2, via brapi.dev) só pra "hoje" — pra datas passadas (gráfico histórico) ainda cai no
+  // valor manual, já que não buscamos série histórica de preço.
   function valorPosicaoEm(p: any, dataRef: Date = new Date()): number {
     const dataAp = new Date(p.data_aplicacao + 'T12:00:00')
     if (dataAp > dataRef) return 0 // posição ainda não existia nessa data
@@ -265,6 +324,10 @@ export default function InvestimentosPage() {
       const dias = diasUteisEntre(dataAp, dataRef)
       const taxaAjustada = taxaCDIDiaria * (Number(p.percentual_cdi || 100) / 100)
       return Number(p.valor_investido) * Math.pow(1 + taxaAjustada, dias)
+    }
+    const ehHoje = dataRef.toDateString() === new Date().toDateString()
+    if (ehHoje && (p.tipo === 'acao' || p.tipo === 'fii') && p.ticker && p.quantidade && cotacoes[p.ticker] != null) {
+      return cotacoes[p.ticker] * Number(p.quantidade)
     }
     return p.valor_atual != null ? Number(p.valor_atual) : Number(p.valor_investido)
   }
@@ -291,7 +354,9 @@ export default function InvestimentosPage() {
   const investidoVar = posicoesVar.reduce((s, p) => s + Number(p.valor_investido), 0)
   const investidoTotal = investidoRF + investidoVar
 
-  const rendimentoTotal = totalGeral - investidoTotal
+  const totalProventos = posicoes.reduce((s, p) => s + Number(p.proventos_recebidos || 0), 0)
+
+  const rendimentoTotal = (totalGeral - investidoTotal) + totalProventos
   const rendimentoTotalPct = investidoTotal > 0 ? (rendimentoTotal / investidoTotal) * 100 : 0
 
   const pctRF  = totalGeral > 0 ? (totalRF / totalGeral) * 100 : 0
@@ -299,13 +364,20 @@ export default function InvestimentosPage() {
 
   // Evolução mensal reconstruída a partir das posições (últimos 6 meses + hoje)
   const hojeRef = new Date()
-  const mesesEvolucao: { mes: string; total: number; rf: number; variavel: number; var: number }[] = []
+  const mesesEvolucao: { mes: string; total: number; rf: number; variavel: number; var: number; cdi100: number }[] = []
   for (let i = 5; i >= 0; i--) {
     const refDate = new Date(hojeRef.getFullYear(), hojeRef.getMonth() - i + 1, 0) // último dia do mês
     const dataCalc = refDate > hojeRef ? hojeRef : refDate
     const rf  = posicoesRF.reduce((s, p) => s + valorPosicaoEm(p, dataCalc), 0)
     const vr  = posicoesVar.reduce((s, p) => s + valorPosicaoEm(p, dataCalc), 0)
-    mesesEvolucao.push({ mes: `${MESES[dataCalc.getMonth()].substring(0, 3)} ${dataCalc.getFullYear()}`, total: rf + vr, rf, variavel: vr, var: 0 })
+    // Benchmark: quanto valeriam os mesmos aportes se tivessem ido 100% pro CDI, em vez da alocação real
+    const cdi100 = posicoes.reduce((s, p) => {
+      const dataAp = new Date(p.data_aplicacao + 'T12:00:00')
+      if (dataAp > dataCalc) return s
+      const dias = diasUteisEntre(dataAp, dataCalc)
+      return s + Number(p.valor_investido) * Math.pow(1 + taxaCDIDiaria, dias)
+    }, 0)
+    mesesEvolucao.push({ mes: `${MESES[dataCalc.getMonth()].substring(0, 3)} ${dataCalc.getFullYear()}`, total: rf + vr, rf, variavel: vr, var: 0, cdi100 })
   }
   for (let i = 1; i < mesesEvolucao.length; i++) {
     const prev = mesesEvolucao[i - 1].total
@@ -313,6 +385,7 @@ export default function InvestimentosPage() {
   }
   const varMesAtualR   = mesesEvolucao.length > 1 ? mesesEvolucao[5].total - mesesEvolucao[4].total : 0
   const varMesAtualPct = mesesEvolucao.length > 1 && mesesEvolucao[4].total > 0 ? (varMesAtualR / mesesEvolucao[4].total) * 100 : 0
+  const vsCDI = mesesEvolucao.length ? totalGeral - mesesEvolucao[mesesEvolucao.length - 1].cdi100 : 0
 
   // Modal content
   const modalContent = (
@@ -401,18 +474,9 @@ export default function InvestimentosPage() {
   function renderPosicoesList(lista: any[], titulo: string, subtitulo: string, vazio: string) {
     return (
       <div style={{ backgroundColor: '#fff', borderRadius: '20px', border: '1px solid #ECEFF3', overflow: 'hidden' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px', borderBottom: lista.length ? '1px solid #F1F5F9' : 'none' }}>
-          <div>
-            <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A', margin: 0, letterSpacing: '-0.2px' }}>{titulo}</h2>
-            <p style={{ fontSize: '12px', color: '#94A3B8', margin: '2px 0 0' }}>{subtitulo}</p>
-          </div>
-          <button onClick={abrirNovaPosicao} style={{
-            display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '10px',
-            background: 'linear-gradient(135deg, #07271F 0%, #145A45 100%)', color: '#fff',
-            border: 'none', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer',
-          }}>
-            <Plus size={14} /> Nova posição
-          </button>
+        <div style={{ padding: '18px 20px', borderBottom: lista.length ? '1px solid #F1F5F9' : 'none' }}>
+          <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A', margin: 0, letterSpacing: '-0.2px' }}>{titulo}</h2>
+          <p style={{ fontSize: '12px', color: '#94A3B8', margin: '2px 0 0' }}>{subtitulo}</p>
         </div>
 
         {lista.length === 0 ? (
@@ -422,33 +486,49 @@ export default function InvestimentosPage() {
         ) : (
           lista.map((p, i) => {
             const valorAtual = valorAtualPosicao(p)
-            const rendimento = valorAtual - Number(p.valor_investido)
+            const proventos = Number(p.proventos_recebidos || 0)
+            const rendimento = (valorAtual - Number(p.valor_investido)) + proventos
             const rendPct = Number(p.valor_investido) > 0 ? (rendimento / Number(p.valor_investido)) * 100 : 0
             const Icon = TIPO_ICON[p.tipo] || BarChart2
+            const temCotacao = (p.tipo === 'acao' || p.tipo === 'fii') && p.ticker && cotacoes[p.ticker] != null
             return (
-              <button key={p.id} onClick={() => abrirEditarPosicao(p)} style={{
-                width: '100%', display: 'flex', alignItems: 'center', gap: '12px',
+              <div key={p.id} style={{
+                display: 'flex', alignItems: 'center', gap: '12px',
                 padding: '14px 20px', borderTop: i > 0 ? '1px solid #F1F5F9' : 'none',
-                background: 'none', border: i > 0 ? '1px solid #F1F5F9' : 'none',
-                borderLeft: 'none', borderRight: 'none', borderBottom: 'none',
-                cursor: 'pointer', textAlign: 'left',
               }}>
-                <div style={{ width: '34px', height: '34px', borderRadius: '10px', flexShrink: 0, backgroundColor: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon size={15} color="#145A45" strokeWidth={1.75} />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: '13.5px', fontWeight: 600, color: '#0F172A', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.nome}</p>
-                  <p style={{ fontSize: '11px', color: '#94A3B8', margin: '1px 0 0' }}>
-                    {TIPO_LABEL[p.tipo]}{p.tipo === 'renda_fixa_cdi' ? ` · ${p.percentual_cdi}% do CDI` : ''}
-                  </p>
-                </div>
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <p style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A', margin: 0 }}>{fmtOculto(valorAtual, ocultar)}</p>
-                  <p style={{ fontSize: '11px', fontWeight: 600, color: rendimento >= 0 ? '#10B981' : '#EF4444', margin: 0 }}>
-                    {fmtPct(rendPct)}
-                  </p>
-                </div>
-              </button>
+                <button onClick={() => abrirEditarPosicao(p)} style={{
+                  flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '12px',
+                  background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0,
+                }}>
+                  <div style={{ width: '34px', height: '34px', borderRadius: '10px', flexShrink: 0, backgroundColor: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon size={15} color="#145A45" strokeWidth={1.75} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: '13.5px', fontWeight: 600, color: '#0F172A', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.nome}</p>
+                    <p style={{ fontSize: '11px', color: '#94A3B8', margin: '1px 0 0' }}>
+                      {TIPO_LABEL[p.tipo]}
+                      {p.tipo === 'renda_fixa_cdi' ? ` · ${p.percentual_cdi}% do CDI` : ''}
+                      {p.ticker ? ` · ${p.ticker}${temCotacao ? ` · ${fmt(cotacoes[p.ticker])}` : ''}` : ''}
+                      {proventos > 0 ? ` · ${fmtShort(proventos)} em proventos` : ''}
+                    </p>
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <p style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A', margin: 0 }}>{fmtOculto(valorAtual, ocultar)}</p>
+                    <p style={{ fontSize: '11px', fontWeight: 600, color: rendimento >= 0 ? '#10B981' : '#EF4444', margin: 0 }}>
+                      {fmtPct(rendPct)}
+                    </p>
+                  </div>
+                </button>
+                {ehVariavel(p.tipo) && (
+                  <button onClick={() => abrirProvento(p)} title="Registrar provento/dividendo" style={{
+                    width: '28px', height: '28px', borderRadius: '8px', flexShrink: 0,
+                    backgroundColor: '#FAEEDA', border: 'none', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <Plus size={13} color="#BA7517" strokeWidth={2} />
+                  </button>
+                )}
+              </div>
             )
           })
         )}
@@ -567,6 +647,45 @@ export default function InvestimentosPage() {
               O valor atual é calculado automaticamente, com juros compostos por dia útil, a partir do CDI real do Bacen. Estimativa bruta — não considera IR.
             </p>
           </>
+        ) : (tipoPosicao === 'acao' || tipoPosicao === 'fii') ? (
+          <>
+            <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Ticker (código na bolsa)</p>
+            <input type="text" value={ticker} onChange={e => setTicker(e.target.value.toUpperCase())}
+              placeholder="Ex: PETR4, HGLG11"
+              style={{ width: '100%', height: '46px', padding: '0 14px', borderRadius: '12px', border: '1.5px solid #E5E7EB', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box', marginBottom: '16px', backgroundColor: '#FAFAFA', textTransform: 'uppercase' }}
+            />
+
+            <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Quantidade (ações/cotas)</p>
+            <input type="text" inputMode="decimal" value={quantidade} onChange={e => setQuantidade(e.target.value.replace(/[^\d,]/g, ''))}
+              placeholder="Ex: 100"
+              style={{ width: '100%', height: '46px', padding: '0 14px', borderRadius: '12px', border: '1.5px solid #E5E7EB', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box', marginBottom: '8px', backgroundColor: '#FAFAFA' }}
+            />
+
+            {ticker.trim() && cotacoes[ticker.trim().toUpperCase()] != null ? (
+              <p style={{ fontSize: '11.5px', color: '#10B981', marginBottom: '4px' }}>
+                Cotação encontrada: {fmt(cotacoes[ticker.trim().toUpperCase()])} — o valor atual é calculado automaticamente, não precisa digitar.
+              </p>
+            ) : (
+              <>
+                {ticker.trim() && !carregandoCotacoes && (
+                  <p style={{ fontSize: '11.5px', color: '#94A3B8', marginBottom: '8px' }}>
+                    Cotação ainda não encontrada pra "{ticker.trim().toUpperCase()}" — salve a posição pra buscar, ou confirme se o ticker está certo.
+                  </p>
+                )}
+                <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Valor atual (R$) — usado enquanto não há cotação</p>
+                <input
+                  type="text" inputMode="numeric" value={valorAtualManual}
+                  onChange={e => {
+                    const digits = e.target.value.replace(/\D/g, '')
+                    const num = parseInt(digits || '0', 10)
+                    setValorAtualManual(digits === '' ? '' : (num / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
+                  }}
+                  placeholder="0,00"
+                  style={{ width: '100%', height: '46px', padding: '0 14px', borderRadius: '12px', border: '1.5px solid #E5E7EB', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box', marginBottom: '16px', backgroundColor: '#FAFAFA' }}
+                />
+              </>
+            )}
+          </>
         ) : (
           <>
             <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Valor atual (R$)</p>
@@ -581,7 +700,7 @@ export default function InvestimentosPage() {
               style={{ width: '100%', height: '46px', padding: '0 14px', borderRadius: '12px', border: '1.5px solid #E5E7EB', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box', marginBottom: '8px', backgroundColor: '#FAFAFA' }}
             />
             <p style={{ fontSize: '11.5px', color: '#94A3B8', marginBottom: '16px' }}>
-              Cotação automática de ações e FIIs ainda não está disponível — atualize aqui manualmente por enquanto.
+              Cotação automática do Tesouro Direto ainda não está disponível — atualize aqui manualmente por enquanto.
             </p>
           </>
         )}
@@ -818,8 +937,15 @@ export default function InvestimentosPage() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
           {/* Gráfico */}
           <div style={{ backgroundColor: '#fff', borderRadius: '20px', padding: '24px', border: '1px solid #ECEFF3', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
-            <h2 style={{ fontSize: '16px', fontWeight: 600, color: '#0F172A', marginBottom: '4px', letterSpacing: '-0.3px' }}>Evolução da carteira</h2>
-            <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '20px' }}>Reconstruída a partir das posições — renda variável usa o último valor informado, sem histórico real de cotação</p>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '4px' }}>
+              <h2 style={{ fontSize: '16px', fontWeight: 600, color: '#0F172A', margin: 0, letterSpacing: '-0.3px' }}>Evolução da carteira</h2>
+              {posicoes.length > 0 && (
+                <span style={{ fontSize: '11.5px', fontWeight: 600, color: vsCDI >= 0 ? '#10B981' : '#EF4444' }}>
+                  {vsCDI >= 0 ? '+' : ''}{fmtShort(vsCDI)} vs. 100% CDI
+                </span>
+              )}
+            </div>
+            <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '20px' }}>Linha tracejada: quanto valeria se tudo fosse 100% CDI, pra comparar</p>
             {posicoes.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
                 <AreaChart data={mesesEvolucao}>
@@ -833,7 +959,8 @@ export default function InvestimentosPage() {
                   <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
                   <Tooltip formatter={(v: any) => fmt(Number(v))} labelStyle={{ color: '#0F172A', fontWeight: 600 }} contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }} />
-                  <Area type="monotone" dataKey="total" stroke="#2FB36A" strokeWidth={2.5} fill="url(#invGrad)" dot={{ fill: '#fff', stroke: '#2FB36A', strokeWidth: 2, r: 4 }} activeDot={{ fill: '#2FB36A', r: 6, strokeWidth: 0 }} />
+                  <Area type="monotone" dataKey="total" name="Carteira real" stroke="#2FB36A" strokeWidth={2.5} fill="url(#invGrad)" dot={{ fill: '#fff', stroke: '#2FB36A', strokeWidth: 2, r: 4 }} activeDot={{ fill: '#2FB36A', r: 6, strokeWidth: 0 }} />
+                  <Line type="monotone" dataKey="cdi100" name="100% do CDI" stroke="#94A3B8" strokeWidth={1.5} strokeDasharray="4 4" dot={false} />
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
@@ -988,6 +1115,43 @@ export default function InvestimentosPage() {
           style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
           <div style={{ width: '480px', backgroundColor: '#fff', borderRadius: '24px', display: 'flex', flexDirection: 'column', maxHeight: '90vh', margin: 'auto' }}>
             {modalPosicaoContent}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Provento (Fase 3) */}
+      {proventoOpen && posicaoProvento && (
+        <div onClick={e => { if (e.target === e.currentTarget) setProventoOpen(false) }}
+          style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
+          <div style={{ width: isMobile ? '100%' : '380px', backgroundColor: '#fff', borderRadius: isMobile ? '28px 28px 0 0' : '20px', padding: '24px' }}>
+            {isMobile && <div style={{ width: '40px', height: '4px', borderRadius: '2px', backgroundColor: '#E2E8F0', margin: '-8px auto 16px' }} />}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+              <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', margin: 0 }}>Registrar provento</h2>
+              <button onClick={() => setProventoOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}>
+                <X size={20} strokeWidth={2} />
+              </button>
+            </div>
+            <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '16px' }}>{posicaoProvento.nome}</p>
+            <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Valor recebido (R$)</p>
+            <input type="text" inputMode="numeric" value={valorProvento} autoFocus
+              onChange={e => {
+                const digits = e.target.value.replace(/\D/g, '')
+                const num = parseInt(digits || '0', 10)
+                setValorProvento(digits === '' ? '' : (num / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
+              }}
+              placeholder="0,00"
+              style={{ width: '100%', height: '46px', padding: '0 14px', borderRadius: '12px', border: '1.5px solid #E5E7EB', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box', marginBottom: '8px', backgroundColor: '#FAFAFA' }}
+            />
+            <p style={{ fontSize: '11.5px', color: '#94A3B8', marginBottom: '18px' }}>
+              Soma ao total de proventos já recebidos nessa posição ({fmtShort(Number(posicaoProvento.proventos_recebidos || 0))} até agora). Não gera lançamento em Movimentos.
+            </p>
+            <button onClick={handleSalvarProvento} disabled={salvandoProvento || !valorProvento} style={{
+              width: '100%', height: '48px', borderRadius: '13px', border: 'none',
+              background: salvandoProvento || !valorProvento ? '#94A3B8' : 'linear-gradient(135deg, #07271F 0%, #145A45 100%)',
+              color: '#fff', fontSize: '14px', fontWeight: 600, cursor: salvandoProvento || !valorProvento ? 'not-allowed' : 'pointer',
+            }}>
+              {salvandoProvento ? 'Salvando...' : 'Registrar provento'}
+            </button>
           </div>
         </div>
       )}
