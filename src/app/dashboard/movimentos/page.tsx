@@ -42,11 +42,20 @@ function fmt(val: number) {
   return `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
+// toISOString() converte pra UTC — no Brasil (UTC-3), lançar à noite fazia a data
+// "pular" pro dia seguinte. Isso usa os componentes de data locais, sem conversão.
+function dataLocalISO(d: Date): string {
+  const ano = d.getFullYear()
+  const mes = String(d.getMonth() + 1).padStart(2, '0')
+  const dia = String(d.getDate()).padStart(2, '0')
+  return `${ano}-${mes}-${dia}`
+}
+
 function formatDiaLabel(dataStr: string) {
   const hoje  = new Date()
   const ontem = new Date(); ontem.setDate(hoje.getDate() - 1)
   const data  = new Date(dataStr + 'T12:00:00')
-  const f = (d: Date) => d.toISOString().split('T')[0]
+  const f = (d: Date) => dataLocalISO(d)
   if (f(data) === f(hoje))  return 'Hoje'
   if (f(data) === f(ontem)) return 'Ontem'
   const dias = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado']
@@ -101,7 +110,7 @@ export default function MovimentosPage() {
   const [valor, setValor]                 = useState('')
   const [categoria, setCategoria]         = useState('Alimentação')
   const [membroForm, setMembroForm]       = useState('')
-  const [dataLanc, setDataLanc]           = useState(new Date().toISOString().split('T')[0])
+  const [dataLanc, setDataLanc]           = useState(dataLocalISO(new Date()))
   const [dizimar, setDizimar]             = useState(true)
   const [observacao, setObservacao]       = useState('')
   const [parcelado, setParcelado]         = useState(false)
@@ -200,8 +209,8 @@ export default function MovimentosPage() {
   async function carregarLancamentos(fid: string, nomeUsuario?: string, nomeFamilia?: string, contexto?: { tipo: 'pessoal' | 'empresa'; empresaId?: string }) {
     if (!fid) return
     const ctx = contexto || contextoAtivo
-    const ini = new Date(mesRef.getFullYear(), mesRef.getMonth(), 1).toISOString().split('T')[0]
-    const fim = new Date(mesRef.getFullYear(), mesRef.getMonth() + 1, 0).toISOString().split('T')[0]
+    const ini = dataLocalISO(new Date(mesRef.getFullYear(), mesRef.getMonth(), 1))
+    const fim = dataLocalISO(new Date(mesRef.getFullYear(), mesRef.getMonth() + 1, 0))
     let query = supabase.from('lancamentos').select('*')
       .eq('familia_id', fid).gte('data', ini).lte('data', fim)
     query = ctx.tipo === 'empresa' && ctx.empresaId
@@ -227,7 +236,7 @@ export default function MovimentosPage() {
     setEditando(null)
     setTipo('despesa'); setValor('')
     setCategoria(contextoAtivo.tipo === 'empresa' ? CATEGORIAS_EMPRESA_DESPESA[0] : 'Alimentação')
-    setDataLanc(new Date().toISOString().split('T')[0])
+    setDataLanc(dataLocalISO(new Date()))
     setMembroForm(membroAtual); setDizimar(false)
     setObservacao(''); setParcelado(false); setNumParcelas('2'); setDiaParcela('1')
     setConfirmDelete(false)
@@ -332,7 +341,7 @@ export default function MovimentosPage() {
       const inserts = []
       for (let i = 0; i < n; i++) {
         const d = new Date(dataBase.getFullYear(), dataBase.getMonth() + i, dia)
-        const dataStr = d.toISOString().split('T')[0]
+        const dataStr = dataLocalISO(d)
         inserts.push({
           familia_id: fid, user_id: userId, tipo: 'despesa',
           valor: Math.round(valorParcela * 100) / 100,
