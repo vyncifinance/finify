@@ -84,6 +84,20 @@ export default function InvestimentosPage() {
   const [isMobile, setIsMobile]     = useState(true)
   const [taxaCDIDiaria, setTaxaCDIDiaria] = useState(0)
 
+  // Posições individuais (Fase 1: Ação, FII, Renda Fixa CDI com % customizável, Tesouro)
+  const [posicoes, setPosicoes]                     = useState<any[]>([])
+  const [modalPosicaoOpen, setModalPosicaoOpen]     = useState(false)
+  const [editandoPosicao, setEditandoPosicao]       = useState<any>(null)
+  const [nomePosicao, setNomePosicao]               = useState('')
+  const [tipoPosicao, setTipoPosicao]               = useState<'acao' | 'fii' | 'renda_fixa_cdi' | 'tesouro'>('renda_fixa_cdi')
+  const [valorInvestido, setValorInvestido]         = useState('')
+  const [percentualCDI, setPercentualCDI]           = useState('100')
+  const [dataAplicacao, setDataAplicacao]           = useState(() => new Date().toISOString().split('T')[0])
+  const [valorAtualManual, setValorAtualManual]     = useState('')
+  const [salvandoPosicao, setSalvandoPosicao]       = useState(false)
+  const [deletandoPosicao, setDeletandoPosicao]     = useState(false)
+  const [confirmDeletePosicao, setConfirmDeletePosicao] = useState(false)
+
   const ocultar  = useOcultarValores()
   const supabase = createClient()
 
@@ -109,8 +123,15 @@ export default function InvestimentosPage() {
     if (profile) {
       setFamiliaId(profile.familia_id)
       await carregar(profile.familia_id)
+      await carregarPosicoes(profile.familia_id)
     }
     setLoading(false)
+  }
+
+  async function carregarPosicoes(fid: string) {
+    const { data } = await supabase.from('posicoes_investimento').select('*')
+      .eq('familia_id', fid).order('created_at', { ascending: false })
+    if (data) setPosicoes(data)
   }
 
   async function carregar(fid: string) {
@@ -173,6 +194,82 @@ export default function InvestimentosPage() {
     }
   }
 
+  function abrirNovaPosicao() {
+    setEditandoPosicao(null)
+    setNomePosicao('')
+    setTipoPosicao('renda_fixa_cdi')
+    setValorInvestido('')
+    setPercentualCDI('100')
+    setDataAplicacao(new Date().toISOString().split('T')[0])
+    setValorAtualManual('')
+    setConfirmDeletePosicao(false)
+    setModalPosicaoOpen(true)
+  }
+
+  function abrirEditarPosicao(p: any) {
+    setEditandoPosicao(p)
+    setNomePosicao(p.nome)
+    setTipoPosicao(p.tipo)
+    setValorInvestido(Number(p.valor_investido).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
+    setPercentualCDI(p.percentual_cdi != null ? String(p.percentual_cdi) : '100')
+    setDataAplicacao(p.data_aplicacao)
+    setValorAtualManual(p.valor_atual != null ? Number(p.valor_atual).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '')
+    setConfirmDeletePosicao(false)
+    setModalPosicaoOpen(true)
+  }
+
+  async function handleSalvarPosicao() {
+    if (!nomePosicao.trim() || !valorInvestido) return
+    setSalvandoPosicao(true)
+    const valorInvestidoNum = parseFloat(valorInvestido.replace(/\./g, '').replace(',', '.'))
+    const ehCDI = tipoPosicao === 'renda_fixa_cdi'
+    const payload = {
+      familia_id: familiaId, user_id: userId,
+      nome: nomePosicao.trim(), tipo: tipoPosicao,
+      valor_investido: valorInvestidoNum,
+      data_aplicacao: dataAplicacao,
+      percentual_cdi: ehCDI ? parseFloat((percentualCDI || '100').replace(',', '.')) : null,
+      valor_atual: ehCDI ? null : (valorAtualManual ? parseFloat(valorAtualManual.replace(/\./g, '').replace(',', '.')) : valorInvestidoNum),
+    }
+
+    if (editandoPosicao) {
+      const { error } = await supabase.from('posicoes_investimento').update(payload).eq('id', editandoPosicao.id)
+      if (!error) { setModalPosicaoOpen(false); await carregarPosicoes(familiaId) }
+    } else {
+      const { error } = await supabase.from('posicoes_investimento').insert(payload)
+      if (!error) { setModalPosicaoOpen(false); await carregarPosicoes(familiaId) }
+    }
+    setSalvandoPosicao(false)
+  }
+
+  async function handleDeletarPosicao() {
+    if (!editandoPosicao) return
+    if (!confirmDeletePosicao) { setConfirmDeletePosicao(true); return }
+    setDeletandoPosicao(true)
+    const { error } = await supabase.from('posicoes_investimento').delete().eq('id', editandoPosicao.id)
+    setDeletandoPosicao(false)
+    if (!error) {
+      setPosicoes(prev => prev.filter(p => p.id !== editandoPosicao.id))
+      setModalPosicaoOpen(false)
+    }
+  }
+
+  // Valor atual de uma posição: CDI é calculado (principal + juros compostos a X% do CDI, dias úteis);
+  // os demais tipos ainda usam valor informado manualmente — cotação automática fica pra Fase 2 (API de mercado).
+  function valorAtualPosicao(p: any): number {
+    if (p.tipo === 'renda_fixa_cdi') {
+      const dataAp = new Date(p.data_aplicacao + 'T12:00:00')
+      const dias = diasUteisEntre(dataAp, new Date())
+      const taxaAjustada = taxaCDIDiaria * (Number(p.percentual_cdi || 100) / 100)
+      return Number(p.valor_investido) * Math.pow(1 + taxaAjustada, dias)
+    }
+    return p.valor_atual != null ? Number(p.valor_atual) : Number(p.valor_investido)
+  }
+
+  const TIPO_LABEL: Record<string, string> = {
+    acao: 'Ação', fii: 'FII', renda_fixa_cdi: 'Renda Fixa (CDI)', tesouro: 'Tesouro Direto',
+  }
+
   // Cálculos
   const ordenados = [...registros].sort((a, b) => a.mes.localeCompare(b.mes))
   const atual     = ordenados[ordenados.length - 1]
@@ -205,6 +302,10 @@ export default function InvestimentosPage() {
     ? saldoAtual * Math.pow(1 + taxaCDIDiaria, diasDesdeRegistro)
     : 0
   const rendimentoEstimado = saldoEstimadoHoje - saldoAtual
+
+  const totalPosicoes = posicoes.reduce((s, p) => s + valorAtualPosicao(p), 0)
+  const totalInvestidoPosicoes = posicoes.reduce((s, p) => s + Number(p.valor_investido), 0)
+  const rendimentoPosicoes = totalPosicoes - totalInvestidoPosicoes
 
   // Modal content
   const modalContent = (
@@ -287,6 +388,188 @@ export default function InvestimentosPage() {
     </>
   )
 
+  const TIPO_ICON: Record<string, any> = { acao: TrendingUp, fii: BarChart2, renda_fixa_cdi: Calendar, tesouro: BarChart2 }
+
+  // Seção "Minhas posições" — compartilhada entre mobile e desktop
+  const posicoesSection = (
+    <div style={{ backgroundColor: '#fff', borderRadius: '20px', border: '1px solid #ECEFF3', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px', borderBottom: posicoes.length ? '1px solid #F1F5F9' : 'none' }}>
+        <div>
+          <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A', margin: 0, letterSpacing: '-0.2px' }}>Minhas posições</h2>
+          <p style={{ fontSize: '12px', color: '#94A3B8', margin: '2px 0 0' }}>
+            {posicoes.length === 0 ? 'Ações, FIIs, renda fixa e Tesouro' : `Total: ${fmtOculto(totalPosicoes, ocultar)}`}
+          </p>
+        </div>
+        <button onClick={abrirNovaPosicao} style={{
+          display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '10px',
+          background: 'linear-gradient(135deg, #07271F 0%, #145A45 100%)', color: '#fff',
+          border: 'none', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer',
+        }}>
+          <Plus size={14} /> Nova posição
+        </button>
+      </div>
+
+      {posicoes.length === 0 ? (
+        <div style={{ padding: '32px 20px', textAlign: 'center' }}>
+          <p style={{ fontSize: '13px', color: '#94A3B8' }}>Nenhuma posição cadastrada ainda.</p>
+        </div>
+      ) : (
+        posicoes.map((p, i) => {
+          const valorAtual = valorAtualPosicao(p)
+          const rendimento = valorAtual - Number(p.valor_investido)
+          const rendPct = Number(p.valor_investido) > 0 ? (rendimento / Number(p.valor_investido)) * 100 : 0
+          const Icon = TIPO_ICON[p.tipo] || BarChart2
+          return (
+            <button key={p.id} onClick={() => abrirEditarPosicao(p)} style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: '12px',
+              padding: '14px 20px', borderTop: i > 0 ? '1px solid #F1F5F9' : 'none',
+              background: 'none', border: i > 0 ? '1px solid #F1F5F9' : 'none',
+              borderLeft: 'none', borderRight: 'none', borderBottom: 'none',
+              cursor: 'pointer', textAlign: 'left',
+            }}>
+              <div style={{ width: '34px', height: '34px', borderRadius: '10px', flexShrink: 0, backgroundColor: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon size={15} color="#145A45" strokeWidth={1.75} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: '13.5px', fontWeight: 600, color: '#0F172A', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.nome}</p>
+                <p style={{ fontSize: '11px', color: '#94A3B8', margin: '1px 0 0' }}>
+                  {TIPO_LABEL[p.tipo]}{p.tipo === 'renda_fixa_cdi' ? ` · ${p.percentual_cdi}% do CDI` : ''}
+                </p>
+              </div>
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <p style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A', margin: 0 }}>{fmtOculto(valorAtual, ocultar)}</p>
+                <p style={{ fontSize: '11px', fontWeight: 600, color: rendimento >= 0 ? '#10B981' : '#EF4444', margin: 0 }}>
+                  {rendimento >= 0 ? '+' : ''}{fmtPct(rendPct)}
+                </p>
+              </div>
+            </button>
+          )
+        })
+      )}
+    </div>
+  )
+
+  // Modal de posição — compartilhado entre mobile e desktop
+  const modalPosicaoContent = (
+    <>
+      {isMobile && <div style={{ width: '40px', height: '4px', borderRadius: '2px', backgroundColor: '#E2E8F0', margin: '12px auto 4px', flexShrink: 0 }} />}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 24px', borderBottom: '1px solid #F1F5F9', flexShrink: 0 }}>
+        <h2 style={{ fontSize: '17px', fontWeight: 700, color: '#0F172A', margin: 0, letterSpacing: '-0.3px' }}>
+          {editandoPosicao ? 'Editar posição' : 'Nova posição'}
+        </h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {editandoPosicao && (
+            <button onClick={handleDeletarPosicao} disabled={deletandoPosicao} style={{
+              display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px',
+              borderRadius: '8px', fontSize: '12px', fontWeight: 600, border: 'none', cursor: 'pointer',
+              backgroundColor: confirmDeletePosicao ? '#EF4444' : '#FEF2F2',
+              color: confirmDeletePosicao ? '#fff' : '#DC2626',
+            }}>
+              <Trash2 size={12} strokeWidth={2} />
+              {deletandoPosicao ? 'Deletando...' : confirmDeletePosicao ? 'Confirmar' : 'Deletar'}
+            </button>
+          )}
+          <button onClick={() => setModalPosicaoOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}>
+            <X size={20} strokeWidth={2} />
+          </button>
+        </div>
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px 8px' }}>
+        <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Nome</p>
+        <input type="text" value={nomePosicao} onChange={e => setNomePosicao(e.target.value)}
+          placeholder="Ex: CDB Banco X, PETR4, HGLG11..."
+          style={{ width: '100%', height: '46px', padding: '0 14px', borderRadius: '12px', border: '1.5px solid #E5E7EB', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box', marginBottom: '16px', backgroundColor: '#FAFAFA' }}
+        />
+
+        <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Tipo</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '8px', marginBottom: '16px' }}>
+          {(['renda_fixa_cdi', 'acao', 'fii', 'tesouro'] as const).map(t => (
+            <button key={t} type="button" onClick={() => setTipoPosicao(t)}
+              style={{
+                padding: '10px', borderRadius: '12px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer',
+                border: `1.5px solid ${tipoPosicao === t ? '#145A45' : '#E5E7EB'}`,
+                backgroundColor: tipoPosicao === t ? '#F0FDF4' : '#fff',
+                color: tipoPosicao === t ? '#145A45' : '#64748B',
+              }}>
+              {TIPO_LABEL[t]}
+            </button>
+          ))}
+        </div>
+
+        <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>
+          {tipoPosicao === 'renda_fixa_cdi' ? 'Valor investido (R$)' : 'Valor investido / de compra (R$)'}
+        </p>
+        <input
+          type="text" inputMode="numeric" value={valorInvestido}
+          onChange={e => {
+            const digits = e.target.value.replace(/\D/g, '')
+            const num = parseInt(digits || '0', 10)
+            setValorInvestido(digits === '' ? '' : (num / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
+          }}
+          placeholder="0,00"
+          style={{ width: '100%', height: '46px', padding: '0 14px', borderRadius: '12px', border: '1.5px solid #E5E7EB', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box', marginBottom: '16px', backgroundColor: '#FAFAFA' }}
+        />
+
+        <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Data de aplicação / compra</p>
+        <input type="date" value={dataAplicacao} onChange={e => setDataAplicacao(e.target.value)}
+          style={{ width: '100%', height: '46px', padding: '0 14px', borderRadius: '12px', border: '1.5px solid #E5E7EB', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box', marginBottom: '16px', backgroundColor: '#FAFAFA' }}
+        />
+
+        {tipoPosicao === 'renda_fixa_cdi' ? (
+          <>
+            <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Percentual do CDI</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+              <input type="text" inputMode="numeric" value={percentualCDI}
+                onChange={e => setPercentualCDI(e.target.value.replace(/\D/g, ''))}
+                style={{ width: '90px', height: '46px', textAlign: 'center', borderRadius: '12px', border: '1.5px solid #E5E7EB', fontSize: '16px', fontWeight: 700, color: '#145A45', outline: 'none', backgroundColor: '#FAFAFA' }}
+              />
+              <span style={{ fontSize: '13px', color: '#64748B' }}>% do CDI (ex: 130 para 130% do CDI)</span>
+            </div>
+            <p style={{ fontSize: '11.5px', color: '#94A3B8', marginBottom: '16px' }}>
+              O valor atual é calculado automaticamente, com juros compostos por dia útil, a partir do CDI real do Bacen. Estimativa bruta — não considera IR.
+            </p>
+          </>
+        ) : (
+          <>
+            <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Valor atual (R$)</p>
+            <input
+              type="text" inputMode="numeric" value={valorAtualManual}
+              onChange={e => {
+                const digits = e.target.value.replace(/\D/g, '')
+                const num = parseInt(digits || '0', 10)
+                setValorAtualManual(digits === '' ? '' : (num / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
+              }}
+              placeholder="0,00"
+              style={{ width: '100%', height: '46px', padding: '0 14px', borderRadius: '12px', border: '1.5px solid #E5E7EB', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box', marginBottom: '8px', backgroundColor: '#FAFAFA' }}
+            />
+            <p style={{ fontSize: '11.5px', color: '#94A3B8', marginBottom: '16px' }}>
+              Cotação automática de ações e FIIs ainda não está disponível — atualize aqui manualmente por enquanto.
+            </p>
+          </>
+        )}
+
+        {confirmDeletePosicao && (
+          <p style={{ fontSize: '12px', color: '#EF4444', textAlign: 'center', marginTop: '4px' }}>
+            Toque em "Confirmar" para deletar permanentemente.
+          </p>
+        )}
+      </div>
+
+      <div style={{ padding: '12px 24px 20px', borderTop: '1px solid #F1F5F9', backgroundColor: '#fff', flexShrink: 0 }}>
+        <button onClick={handleSalvarPosicao} disabled={salvandoPosicao || !nomePosicao.trim() || !valorInvestido} style={{
+          width: '100%', height: '50px', borderRadius: '13px', border: 'none',
+          background: salvandoPosicao || !nomePosicao.trim() || !valorInvestido ? '#94A3B8' : 'linear-gradient(135deg, #07271F 0%, #145A45 100%)',
+          color: '#fff', fontSize: '15px', fontWeight: 600,
+          cursor: salvandoPosicao || !nomePosicao.trim() || !valorInvestido ? 'not-allowed' : 'pointer',
+          boxShadow: salvandoPosicao || !nomePosicao.trim() || !valorInvestido ? 'none' : '0 4px 14px rgba(11,59,46,0.3)',
+        }}>
+          {salvandoPosicao ? 'Salvando...' : editandoPosicao ? 'Salvar alterações' : 'Adicionar posição'}
+        </button>
+      </div>
+    </>
+  )
+
   return (
     <>
       {/* ── MOBILE ── */}
@@ -334,6 +617,11 @@ export default function InvestimentosPage() {
             </p>
           </div>
         )}
+
+        {/* Posições mobile */}
+        <div style={{ margin: '0 16px 16px' }}>
+          {posicoesSection}
+        </div>
 
         {/* Gráfico mobile */}
         {dadosGrafico.length > 1 && (
@@ -509,6 +797,10 @@ export default function InvestimentosPage() {
           </div>
         )}
 
+        <div style={{ marginBottom: '24px' }}>
+          {posicoesSection}
+        </div>
+
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
           {/* Gráfico */}
           <div style={{ backgroundColor: '#fff', borderRadius: '20px', padding: '24px', border: '1px solid #ECEFF3', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
@@ -660,6 +952,26 @@ export default function InvestimentosPage() {
           style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
           <div style={{ width: '480px', backgroundColor: '#fff', borderRadius: '24px', display: 'flex', flexDirection: 'column', maxHeight: '90vh', margin: 'auto' }}>
             {modalContent}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Posição Mobile */}
+      {modalPosicaoOpen && isMobile && (
+        <div onClick={e => { if (e.target === e.currentTarget) setModalPosicaoOpen(false) }}
+          style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
+          <div style={{ width: '100%', backgroundColor: '#fff', borderRadius: '28px 28px 0 0', display: 'flex', flexDirection: 'column', maxHeight: 'calc(85vh - 65px)', marginBottom: '65px' }}>
+            {modalPosicaoContent}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Posição Desktop */}
+      {modalPosicaoOpen && !isMobile && (
+        <div onClick={e => { if (e.target === e.currentTarget) setModalPosicaoOpen(false) }}
+          style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
+          <div style={{ width: '480px', backgroundColor: '#fff', borderRadius: '24px', display: 'flex', flexDirection: 'column', maxHeight: '90vh', margin: 'auto' }}>
+            {modalPosicaoContent}
           </div>
         </div>
       )}
