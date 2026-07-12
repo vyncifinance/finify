@@ -53,6 +53,16 @@ function calcMesesRestantes(prazo: string | null) {
   const diff = (fim.getFullYear() - hoje.getFullYear()) * 12 + (fim.getMonth() - hoje.getMonth())
   return diff > 0 ? diff : 0
 }
+// Máscara de valor em real: digita só números, vírgula/ponto de milhar entram sozinhos.
+// Mesmo padrão já usado certo na tela de Movimentos.
+function maskValor(raw: string, setter: (v: string) => void) {
+  const digits = raw.replace(/\D/g, '')
+  const num = parseInt(digits || '0', 10)
+  setter(digits === '' ? '' : (num / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
+}
+function parseValorMasked(v: string) {
+  return parseFloat(v.replace(/\./g, '').replace(',', '.'))
+}
 
 export default function MetasPage() {
   const [loading, setLoading]         = useState(true)
@@ -127,7 +137,7 @@ export default function MetasPage() {
     if (m.automatica) return
     setEditandoMeta(m)
     setNome(m.nome)
-    setValorAlvo(String(m.valor_alvo))
+    setValorAlvo(Number(m.valor_alvo).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
     setPrazo(m.prazo ? m.prazo.substring(0, 7) : '')
     setIcone(m.icone || 'target')
     setCor(m.cor || '#145A45')
@@ -141,7 +151,7 @@ export default function MetasPage() {
     if (editandoMeta) {
       const { error } = await supabase.from('metas').update({
         nome: nome.trim(),
-        valor_alvo: parseFloat(valorAlvo.replace(',', '.')),
+        valor_alvo: parseValorMasked(valorAlvo),
         prazo: prazo ? `${prazo}-01` : null,
         icone, cor,
       }).eq('id', editandoMeta.id)
@@ -151,7 +161,7 @@ export default function MetasPage() {
       const { error } = await supabase.from('metas').insert({
         familia_id: familiaId, user_id: userId,
         nome: nome.trim(),
-        valor_alvo: parseFloat(valorAlvo.replace(',', '.')),
+        valor_alvo: parseValorMasked(valorAlvo),
         valor_atual: 0,
         prazo: prazo ? `${prazo}-01` : null,
         icone, cor,
@@ -180,7 +190,7 @@ export default function MetasPage() {
   async function handleAporte() {
     if (!valorAporte || !metaSelecionada) return
     setSalvandoAporte(true)
-    const valor = parseFloat(valorAporte.replace(',', '.'))
+    const valor = parseValorMasked(valorAporte)
 
     if (metaSelecionada.automatica) {
       // Meta automática: o aporte vira/soma um registro de Caixa em Patrimônio, não um lançamento de despesa
@@ -235,13 +245,13 @@ export default function MetasPage() {
 
   function iniciarEdicaoAporte(a: any) {
     setEditandoAporteId(a.id)
-    setValorEditAporte(String(a.valor).replace('.', ','))
+    setValorEditAporte(Number(a.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
     setConfirmDeleteAporteId(null)
   }
 
   async function salvarEdicaoAporte(a: any) {
     if (!valorEditAporte || !metaHistorico) return
-    const novoValor = parseFloat(valorEditAporte.replace(',', '.'))
+    const novoValor = parseValorMasked(valorEditAporte)
     if (isNaN(novoValor) || novoValor <= 0) return
     setSalvandoEdicaoAporte(true)
     const delta = novoValor - Number(a.valor)
@@ -595,9 +605,9 @@ export default function MetasPage() {
 
               <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Valor alvo (R$)</label>
               <input
-                type="text"
+                type="text" inputMode="numeric"
                 value={valorAlvo}
-                onChange={e => setValorAlvo(e.target.value)}
+                onChange={e => maskValor(e.target.value, setValorAlvo)}
                 placeholder="0,00"
                 className="w-full px-4 h-12 rounded-xl border text-sm mb-4 outline-none"
                 style={{ borderColor: '#E2E8F0', color: '#0F172A' }}
@@ -712,10 +722,10 @@ export default function MetasPage() {
             <div className="rounded-2xl p-4 mb-4 text-center" style={{ backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
               <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#94A3B8' }}>Valor (R$)</p>
               <input
-                type="number"
-                inputMode="decimal"
+                type="text"
+                inputMode="numeric"
                 value={valorAporte}
-                onChange={e => setValorAporte(e.target.value)}
+                onChange={e => maskValor(e.target.value, setValorAporte)}
                 placeholder="0,00"
                 autoFocus
                 className="w-full text-center text-4xl font-bold outline-none bg-transparent"
@@ -767,9 +777,9 @@ export default function MetasPage() {
                         <p className="text-xs" style={{ color: '#94A3B8' }}>{formatPrazo(a.data.slice(0, 7) + '-01')}</p>
                         {editandoAporteId === a.id ? (
                           <input
-                            type="text" inputMode="decimal" autoFocus
+                            type="text" inputMode="numeric" autoFocus
                             value={valorEditAporte}
-                            onChange={e => setValorEditAporte(e.target.value)}
+                            onChange={e => maskValor(e.target.value, setValorEditAporte)}
                             className="w-full mt-1 px-2 h-8 rounded-lg border text-sm outline-none"
                             style={{ borderColor: '#E2E8F0', color: '#0F172A' }}
                           />
