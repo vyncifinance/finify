@@ -78,6 +78,16 @@ export default function MetasPage() {
   const [valorAporte, setValorAporte]         = useState('')
   const [salvandoAporte, setSalvandoAporte]   = useState(false)
 
+  const [historicoOpen, setHistoricoOpen]     = useState(false)
+  const [metaHistorico, setMetaHistorico]     = useState<any>(null)
+  const [aportes, setAportes]                 = useState<any[]>([])
+  const [carregandoAportes, setCarregandoAportes] = useState(false)
+  const [editandoAporteId, setEditandoAporteId]   = useState<string | null>(null)
+  const [valorEditAporte, setValorEditAporte]     = useState('')
+  const [salvandoEdicaoAporte, setSalvandoEdicaoAporte] = useState(false)
+  const [confirmDeleteAporteId, setConfirmDeleteAporteId] = useState<string | null>(null)
+  const [deletandoAporteId, setDeletandoAporteId] = useState<string | null>(null)
+
   const ocultar  = useOcultarValores()
   const supabase = createClient()
 
@@ -204,10 +214,64 @@ export default function MetasPage() {
         categoria: 'Investimento', membro: membroAtual,
         data: agora.toISOString().split('T')[0], hora,
         descricao: `Aporte para meta: ${metaSelecionada.nome}`,
+        meta_id: metaSelecionada.id,
       })
       setAporteOpen(false); await carregarMetas(familiaId)
     }
     setSalvandoAporte(false)
+  }
+
+  async function abrirHistorico(m: any) {
+    setMetaHistorico(m)
+    setHistoricoOpen(true)
+    setCarregandoAportes(true)
+    setEditandoAporteId(null)
+    setConfirmDeleteAporteId(null)
+    const { data } = await supabase.from('lancamentos').select('*')
+      .eq('meta_id', m.id).order('data', { ascending: false }).order('hora', { ascending: false })
+    setAportes(data || [])
+    setCarregandoAportes(false)
+  }
+
+  function iniciarEdicaoAporte(a: any) {
+    setEditandoAporteId(a.id)
+    setValorEditAporte(String(a.valor).replace('.', ','))
+    setConfirmDeleteAporteId(null)
+  }
+
+  async function salvarEdicaoAporte(a: any) {
+    if (!valorEditAporte || !metaHistorico) return
+    const novoValor = parseFloat(valorEditAporte.replace(',', '.'))
+    if (isNaN(novoValor) || novoValor <= 0) return
+    setSalvandoEdicaoAporte(true)
+    const delta = novoValor - Number(a.valor)
+
+    const { error } = await supabase.from('lancamentos').update({ valor: novoValor }).eq('id', a.id)
+    if (!error) {
+      const novoValorAtual = Math.max(Number(metaHistorico.valor_atual) + delta, 0)
+      await supabase.from('metas').update({ valor_atual: novoValorAtual }).eq('id', metaHistorico.id)
+      setMetaHistorico({ ...metaHistorico, valor_atual: novoValorAtual })
+      setAportes(prev => prev.map(x => x.id === a.id ? { ...x, valor: novoValor } : x))
+      await carregarMetas(familiaId)
+    }
+    setEditandoAporteId(null)
+    setSalvandoEdicaoAporte(false)
+  }
+
+  async function deletarAporte(a: any) {
+    if (confirmDeleteAporteId !== a.id) { setConfirmDeleteAporteId(a.id); return }
+    if (!metaHistorico) return
+    setDeletandoAporteId(a.id)
+    const { error } = await supabase.from('lancamentos').delete().eq('id', a.id)
+    if (!error) {
+      const novoValorAtual = Math.max(Number(metaHistorico.valor_atual) - Number(a.valor), 0)
+      await supabase.from('metas').update({ valor_atual: novoValorAtual }).eq('id', metaHistorico.id)
+      setMetaHistorico({ ...metaHistorico, valor_atual: novoValorAtual })
+      setAportes(prev => prev.filter(x => x.id !== a.id))
+      await carregarMetas(familiaId)
+    }
+    setConfirmDeleteAporteId(null)
+    setDeletandoAporteId(null)
   }
 
   const totalMetas      = metas.length
@@ -341,6 +405,13 @@ export default function MetasPage() {
                     )}
                   </>
                 )}
+                {!m.automatica && Number(m.valor_atual) > 0 && (
+                  <button onClick={() => abrirHistorico(m)}
+                    className="w-full text-center text-xs font-medium"
+                    style={{ color: '#94A3B8', background: 'none', border: 'none', cursor: 'pointer', marginTop: '8px', textDecoration: 'underline' }}>
+                    Ver aportes
+                  </button>
+                )}
               </div>
             )
           })}
@@ -467,6 +538,13 @@ export default function MetasPage() {
                         </p>
                       )}
                     </>
+                  )}
+                  {!m.automatica && Number(m.valor_atual) > 0 && (
+                    <button onClick={() => abrirHistorico(m)}
+                      className="w-full text-center text-xs font-medium hover:opacity-80"
+                      style={{ color: '#94A3B8', background: 'none', border: 'none', cursor: 'pointer', marginTop: '8px', textDecoration: 'underline' }}>
+                      Ver aportes
+                    </button>
                   )}
                 </div>
               )
@@ -613,6 +691,88 @@ export default function MetasPage() {
               style={{ backgroundColor: metaSelecionada.cor || '#145A45', opacity: (salvandoAporte || !valorAporte) ? 0.6 : 1, border: 'none', cursor: 'pointer' }}>
               {salvandoAporte ? 'Salvando...' : 'Confirmar aporte'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL HISTÓRICO DE APORTES (inline) ── */}
+      {historicoOpen && metaHistorico && (
+        <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center"
+          style={{ backgroundColor: 'rgba(15,23,42,0.5)' }}
+          onClick={e => { if (e.target === e.currentTarget) setHistoricoOpen(false) }}>
+          <div className="w-full lg:max-w-md rounded-t-[28px] lg:rounded-[20px] overflow-hidden flex flex-col"
+            style={{ backgroundColor: '#fff', maxHeight: '85vh' }}>
+
+            <div className="w-10 h-1 rounded-full mx-auto mt-3 mb-1 lg:hidden flex-shrink-0" style={{ backgroundColor: '#E2E8F0' }} />
+
+            <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0" style={{ borderColor: '#F1F5F9' }}>
+              <div>
+                <h2 className="font-semibold text-lg" style={{ color: '#0F172A' }}>Aportes</h2>
+                <p className="text-xs" style={{ color: '#94A3B8' }}>{metaHistorico.nome}</p>
+              </div>
+              <button onClick={() => setHistoricoOpen(false)} style={{ color: '#94A3B8', background: 'none', border: 'none', cursor: 'pointer' }}>
+                <X size={20} strokeWidth={2} />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 px-6 py-4">
+              {carregandoAportes ? (
+                <p className="text-sm text-center py-8" style={{ color: '#94A3B8' }}>Carregando...</p>
+              ) : aportes.length === 0 ? (
+                <p className="text-sm text-center py-8" style={{ color: '#94A3B8' }}>Nenhum aporte encontrado para essa meta.</p>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {aportes.map(a => (
+                    <div key={a.id} className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: '#F8FAFC', border: '1px solid #F1F5F9' }}>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs" style={{ color: '#94A3B8' }}>{formatPrazo(a.data.slice(0, 7) + '-01')}</p>
+                        {editandoAporteId === a.id ? (
+                          <input
+                            type="text" inputMode="decimal" autoFocus
+                            value={valorEditAporte}
+                            onChange={e => setValorEditAporte(e.target.value)}
+                            className="w-full mt-1 px-2 h-8 rounded-lg border text-sm outline-none"
+                            style={{ borderColor: '#E2E8F0', color: '#0F172A' }}
+                          />
+                        ) : (
+                          <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>{fmt(Number(a.valor))}</p>
+                        )}
+                      </div>
+                      {editandoAporteId === a.id ? (
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <button onClick={() => salvarEdicaoAporte(a)} disabled={salvandoEdicaoAporte}
+                            className="px-3 h-8 rounded-lg text-xs font-semibold"
+                            style={{ backgroundColor: '#145A45', color: '#fff', border: 'none', cursor: 'pointer' }}>
+                            {salvandoEdicaoAporte ? '...' : 'Salvar'}
+                          </button>
+                          <button onClick={() => setEditandoAporteId(null)}
+                            className="px-2 h-8 rounded-lg text-xs"
+                            style={{ backgroundColor: '#F1F5F9', color: '#64748B', border: 'none', cursor: 'pointer' }}>
+                            Cancelar
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <button onClick={() => iniciarEdicaoAporte(a)}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center"
+                            style={{ backgroundColor: '#F1F5F9', border: 'none', cursor: 'pointer' }}>
+                            <Pencil size={13} color="#64748B" strokeWidth={1.75} />
+                          </button>
+                          <button onClick={() => deletarAporte(a)} disabled={deletandoAporteId === a.id}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center"
+                            style={{ backgroundColor: confirmDeleteAporteId === a.id ? '#EF4444' : '#FEF2F2', border: 'none', cursor: 'pointer' }}>
+                            <Trash2 size={13} color={confirmDeleteAporteId === a.id ? '#fff' : '#DC2626'} strokeWidth={1.75} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-center mt-4" style={{ color: '#94A3B8' }}>
+                Editar ou deletar um aporte aqui também ajusta o valor guardado da meta e o lançamento correspondente em Movimentos.
+              </p>
+            </div>
           </div>
         </div>
       )}
