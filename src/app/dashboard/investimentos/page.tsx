@@ -56,8 +56,11 @@ async function buscarTaxaIPCADiaria(): Promise<number> {
 }
 
 const INDEXADORES = [
-  { id: 'cdi',  label: '100% CDI',  cor: '#94A3B8' },
-  { id: 'ipca', label: 'IPCA',      cor: '#8B5CF6' },
+  { id: 'cdi',      label: '100% CDI',  cor: '#94A3B8', ticker: null },
+  { id: 'ipca',     label: 'IPCA',      cor: '#8B5CF6', ticker: null },
+  { id: 'ibov',     label: 'Ibovespa',  cor: '#3B82F6', ticker: '^BVSP' },
+  { id: 'ifix',     label: 'IFIX',      cor: '#EC4899', ticker: '^IFIX' },
+  { id: 'sp500',    label: 'S&P 500 (via IVVB11)', cor: '#059669', ticker: 'IVVB11' },
 ]
 
 // O CDI só "roda" em dia útil — sábado, domingo (e feriado, não coberto aqui ainda) não rendem.
@@ -83,6 +86,8 @@ export default function InvestimentosPage() {
   const [isMobile, setIsMobile]     = useState(true)
   const [taxaCDIDiaria, setTaxaCDIDiaria] = useState(0)
   const [taxaIPCADiaria, setTaxaIPCADiaria] = useState(0)
+  const [taxasIndices, setTaxasIndices] = useState<Record<string, number>>({})
+  const [indicesIndisponiveis, setIndicesIndisponiveis] = useState<Set<string>>(new Set())
   const [indexadoresAtivos, setIndexadoresAtivos] = useState<string[]>(['cdi'])
 
   // Posições individuais (Fase 1: Ação, FII, Renda Fixa CDI com % customizável, Tesouro)
@@ -117,6 +122,20 @@ export default function InvestimentosPage() {
 
   useEffect(() => { buscarTaxaCDIDiaria().then(setTaxaCDIDiaria) }, [])
   useEffect(() => { buscarTaxaIPCADiaria().then(setTaxaIPCADiaria) }, [])
+  useEffect(() => {
+    INDEXADORES.filter(idx => idx.ticker).forEach(idx => {
+      fetch(`/api/indice-taxa?ticker=${encodeURIComponent(idx.ticker!)}`)
+        .then(r => r.json())
+        .then(data => {
+          if (typeof data.taxaDiaria === 'number') {
+            setTaxasIndices(prev => ({ ...prev, [idx.id]: data.taxaDiaria }))
+          } else {
+            setIndicesIndisponiveis(prev => new Set(prev).add(idx.id))
+          }
+        })
+        .catch(() => setIndicesIndisponiveis(prev => new Set(prev).add(idx.id)))
+    })
+  }, [])
 
   useEffect(() => {
     const tickers = Array.from(new Set(
@@ -310,7 +329,7 @@ export default function InvestimentosPage() {
   const pctRF  = totalGeral > 0 ? (totalRF / totalGeral) * 100 : 0
   const pctVar = totalGeral > 0 ? (totalVar / totalGeral) * 100 : 0
 
-  const TAXAS_INDEXADOR: Record<string, number> = { cdi: taxaCDIDiaria, ipca: taxaIPCADiaria }
+  const TAXAS_INDEXADOR: Record<string, number> = { cdi: taxaCDIDiaria, ipca: taxaIPCADiaria, ...taxasIndices }
 
   // Evolução mensal reconstruída a partir das posições (últimos 6 meses + hoje), com uma
   // coluna por indexador selecionado — quanto valeriam os mesmos aportes se tivessem ido
@@ -793,17 +812,20 @@ export default function InvestimentosPage() {
             <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' }}>
               {INDEXADORES.map(idx => {
                 const ativo = indexadoresAtivos.includes(idx.id)
+                const indisponivel = indicesIndisponiveis.has(idx.id)
                 return (
-                  <button key={idx.id} type="button" onClick={() => toggleIndexador(idx.id)}
+                  <button key={idx.id} type="button" disabled={indisponivel} onClick={() => toggleIndexador(idx.id)}
+                    title={indisponivel ? 'Indisponível no momento' : undefined}
                     style={{
                       display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 12px', borderRadius: '999px',
-                      fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+                      fontSize: '12px', fontWeight: 600, cursor: indisponivel ? 'not-allowed' : 'pointer',
+                      opacity: indisponivel ? 0.45 : 1,
                       border: `1.5px solid ${ativo ? idx.cor : '#E5E7EB'}`,
                       backgroundColor: ativo ? idx.cor + '18' : '#fff',
                       color: ativo ? idx.cor : '#94A3B8',
                     }}>
                     <span style={{ width: '8px', height: '2px', backgroundColor: ativo ? idx.cor : '#CBD5E1' }} />
-                    {idx.label}
+                    {idx.label}{indisponivel ? ' (indisponível)' : ''}
                   </button>
                 )
               })}
@@ -811,7 +833,7 @@ export default function InvestimentosPage() {
 
             {posicoes.length > 0 && indexadoresAtivos.length > 0 && (
               <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', marginBottom: '12px' }}>
-                {indexadoresAtivos.map(id => {
+                {indexadoresAtivos.filter(id => !indicesIndisponiveis.has(id)).map(id => {
                   const idx = INDEXADORES.find(i => i.id === id)!
                   const ultimo = mesesEvolucao.length ? mesesEvolucao[mesesEvolucao.length - 1][id] : 0
                   const diff = totalGeral - ultimo
@@ -838,7 +860,7 @@ export default function InvestimentosPage() {
                   <YAxis tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
                   <Tooltip formatter={(v: any) => fmt(Number(v))} labelStyle={{ color: '#0F172A', fontWeight: 600 }} contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }} />
                   <Area type="monotone" dataKey="total" name="Carteira real" stroke="#2FB36A" strokeWidth={2.5} fill="url(#invGrad)" dot={{ fill: '#fff', stroke: '#2FB36A', strokeWidth: 2, r: 4 }} activeDot={{ fill: '#2FB36A', r: 6, strokeWidth: 0 }} />
-                  {INDEXADORES.filter(idx => indexadoresAtivos.includes(idx.id)).map(idx => (
+                  {INDEXADORES.filter(idx => indexadoresAtivos.includes(idx.id) && !indicesIndisponiveis.has(idx.id)).map(idx => (
                     <Line key={idx.id} type="monotone" dataKey={idx.id} name={idx.label} stroke={idx.cor} strokeWidth={1.5} strokeDasharray="4 4" dot={false} />
                   ))}
                 </AreaChart>
