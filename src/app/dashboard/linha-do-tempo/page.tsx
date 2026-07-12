@@ -45,6 +45,21 @@ async function buscarTaxaCDIDiaria(): Promise<number> {
   return 0.00039
 }
 
+// Mesma lógica de dias úteis usada na tela Investimentos — CDI não roda em fim de semana.
+function diasUteisEntre(inicio: Date, fim: Date): number {
+  let count = 0
+  const d = new Date(inicio)
+  d.setHours(0, 0, 0, 0)
+  const limite = new Date(fim)
+  limite.setHours(0, 0, 0, 0)
+  while (d < limite) {
+    d.setDate(d.getDate() + 1)
+    const diaSemana = d.getDay()
+    if (diaSemana !== 0 && diaSemana !== 6) count++
+  }
+  return count
+}
+
 export default function LinhaDoTempoPage() {
   const [loading, setLoading] = useState(true)
   const [familiaId, setFamiliaId] = useState('')
@@ -158,7 +173,7 @@ export default function LinhaDoTempoPage() {
   const anoAlvoProjecao = projecao.find(p => p.valor >= valorAlvoProjecao)?.ano || null
 
   const dataBaseInv = mesInvestimento ? new Date(mesInvestimento + 'T12:00:00') : null
-  const diasInv = dataBaseInv ? Math.max(Math.floor((Date.now() - dataBaseInv.getTime()) / 86400000), 0) : 0
+  const diasInv = dataBaseInv ? diasUteisEntre(dataBaseInv, new Date()) : 0
   const totalInvEstimado = dataBaseInv ? totalInv * Math.pow(1 + taxaCDIDiaria, diasInv) : totalInv
 
   const resumo = [

@@ -49,6 +49,22 @@ async function buscarTaxaCDIDiaria(): Promise<number> {
   return 0.00039 // fallback aproximado (~10% a.a.) se a API do Bacen estiver indisponível
 }
 
+// O CDI só "roda" em dia útil — sábado, domingo (e feriado, não coberto aqui ainda) não rendem.
+// Contar por dias corridos infla a estimativa; isso conta só segunda a sexta entre as duas datas.
+function diasUteisEntre(inicio: Date, fim: Date): number {
+  let count = 0
+  const d = new Date(inicio)
+  d.setHours(0, 0, 0, 0)
+  const limite = new Date(fim)
+  limite.setHours(0, 0, 0, 0)
+  while (d < limite) {
+    d.setDate(d.getDate() + 1)
+    const diaSemana = d.getDay() // 0 = domingo, 6 = sábado
+    if (diaSemana !== 0 && diaSemana !== 6) count++
+  }
+  return count
+}
+
 export default function InvestimentosPage() {
   const [loading, setLoading]       = useState(true)
   const [familiaId, setFamiliaId]   = useState('')
@@ -183,7 +199,7 @@ export default function InvestimentosPage() {
   // continua sendo o que você registra manualmente todo mês.
   const dataBaseCDI = atual ? new Date(atual.mes + 'T12:00:00') : null
   const diasDesdeRegistro = dataBaseCDI
-    ? Math.max(Math.floor((Date.now() - dataBaseCDI.getTime()) / 86400000), 0)
+    ? diasUteisEntre(dataBaseCDI, new Date())
     : 0
   const saldoEstimadoHoje = dataBaseCDI
     ? saldoAtual * Math.pow(1 + taxaCDIDiaria, diasDesdeRegistro)
