@@ -439,7 +439,7 @@ export default function InvestimentosPage() {
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
                 <p style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A', margin: 0 }}>{fmtOculto(valorAtual, ocultar)}</p>
                 <p style={{ fontSize: '11px', fontWeight: 600, color: rendimento >= 0 ? '#10B981' : '#EF4444', margin: 0 }}>
-                  {rendimento >= 0 ? '+' : ''}{fmtPct(rendPct)}
+                  {fmtPct(rendPct)}
                 </p>
               </div>
             </button>
