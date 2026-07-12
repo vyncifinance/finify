@@ -6,8 +6,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useOcultarValores, fmtOculto } from '@/hooks/useOcultarValores'
 import {
-  TrendingUp, TrendingDown, Plus, X, Pencil, Trash2,
-  ArrowUpRight, ArrowDownRight, Minus, BarChart2, Calendar
+  TrendingUp, TrendingDown, Plus, X, Trash2, BarChart2, Calendar
 } from 'lucide-react'
 import {
   AreaChart, Area, Line, XAxis, YAxis, CartesianGrid,
@@ -29,14 +28,6 @@ function fmtShort(val: number) {
 function fmtPct(val: number) {
   return `${val >= 0 ? '+' : ''}${val.toFixed(2)}%`
 }
-function fmtMes(dateStr: string) {
-  const d = new Date(dateStr + 'T12:00:00')
-  return `${MESES[d.getMonth()].substring(0, 3)} ${d.getFullYear()}`
-}
-function fmtMesLong(dateStr: string) {
-  const d = new Date(dateStr + 'T12:00:00')
-  return `${MESES[d.getMonth()]} ${d.getFullYear()}`
-}
 
 // Taxa diária do CDI (Sistema Gerenciador de Séries Temporais do Bacen, série 12).
 // Usada só como estimativa em tempo real — não altera o saldo salvo no banco.
@@ -48,6 +39,26 @@ async function buscarTaxaCDIDiaria(): Promise<number> {
   } catch {}
   return 0.00039 // fallback aproximado (~10% a.a.) se a API do Bacen estiver indisponível
 }
+
+// IPCA (Bacen SGS 433) só vem como variação mensal — distribuímos aproximadamente pelos ~21 dias
+// úteis do mês pra poder comparar no mesmo formato diário do CDI. É uma aproximação, o índice
+// oficial só fecha uma vez por mês.
+async function buscarTaxaIPCADiaria(): Promise<number> {
+  try {
+    const res = await fetch('https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados/ultimos/1?formato=json')
+    const json = await res.json()
+    if (json && json[0]?.valor) {
+      const mensal = Number(json[0].valor) / 100
+      return Math.pow(1 + mensal, 1 / 21) - 1
+    }
+  } catch {}
+  return 0.00016 // fallback aproximado (~4% a.a.) se a API do Bacen estiver indisponível
+}
+
+const INDEXADORES = [
+  { id: 'cdi',  label: '100% CDI',  cor: '#94A3B8' },
+  { id: 'ipca', label: 'IPCA',      cor: '#8B5CF6' },
+]
 
 // O CDI só "roda" em dia útil — sábado, domingo (e feriado, não coberto aqui ainda) não rendem.
 // Contar por dias corridos infla a estimativa; isso conta só segunda a sexta entre as duas datas.
@@ -69,20 +80,10 @@ export default function InvestimentosPage() {
   const [loading, setLoading]       = useState(true)
   const [familiaId, setFamiliaId]   = useState('')
   const [userId, setUserId]         = useState('')
-  const [registros, setRegistros]   = useState<any[]>([])
-  const [modalOpen, setModalOpen]   = useState(false)
-  const [editando, setEditando]     = useState<any>(null)
-  const [mes, setMes]               = useState(() => {
-    const d = new Date()
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-  })
-  const [saldo, setSaldo]           = useState('')
-  const [observacao, setObservacao] = useState('')
-  const [salvando, setSalvando]     = useState(false)
-  const [deletando, setDeletando]   = useState(false)
-  const [confirmDelete, setConfirmDelete] = useState(false)
   const [isMobile, setIsMobile]     = useState(true)
   const [taxaCDIDiaria, setTaxaCDIDiaria] = useState(0)
+  const [taxaIPCADiaria, setTaxaIPCADiaria] = useState(0)
+  const [indexadoresAtivos, setIndexadoresAtivos] = useState<string[]>(['cdi'])
 
   // Posições individuais (Fase 1: Ação, FII, Renda Fixa CDI com % customizável, Tesouro)
   const [posicoes, setPosicoes]                     = useState<any[]>([])
@@ -115,6 +116,7 @@ export default function InvestimentosPage() {
   const supabase = createClient()
 
   useEffect(() => { buscarTaxaCDIDiaria().then(setTaxaCDIDiaria) }, [])
+  useEffect(() => { buscarTaxaIPCADiaria().then(setTaxaIPCADiaria) }, [])
 
   useEffect(() => {
     const tickers = Array.from(new Set(
@@ -142,7 +144,6 @@ export default function InvestimentosPage() {
       .eq('id', session.user.id).single()
     if (profile) {
       setFamiliaId(profile.familia_id)
-      await carregar(profile.familia_id)
       await carregarPosicoes(profile.familia_id)
     }
     setLoading(false)
@@ -165,66 +166,6 @@ export default function InvestimentosPage() {
       // Falha silenciosa — as posições caem no fallback de valor manual
     }
     setCarregandoCotacoes(false)
-  }
-
-  async function carregar(fid: string) {
-    const { data } = await supabase
-      .from('investimentos').select('*')
-      .eq('familia_id', fid)
-      .order('mes', { ascending: true })
-    if (data) setRegistros(data)
-  }
-
-  function abrirNovo() {
-    setEditando(null)
-    const d = new Date()
-    setMes(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
-    setSaldo('')
-    setObservacao('')
-    setConfirmDelete(false)
-    setModalOpen(true)
-  }
-
-  function abrirEditar(r: any) {
-    setEditando(r)
-    setMes(r.mes.substring(0, 7))
-    setSaldo(Number(r.saldo).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
-    setObservacao(r.observacao || '')
-    setConfirmDelete(false)
-    setModalOpen(true)
-  }
-
-  async function handleSalvar() {
-    if (!saldo) return
-    setSalvando(true)
-    const saldoNum = parseFloat(saldo.replace(/\./g, '').replace(',', '.'))
-    const mesDate = `${mes}-01`
-
-    if (editando) {
-      const { error } = await supabase.from('investimentos').update({
-        mes: mesDate, saldo: saldoNum, observacao: observacao || null,
-      }).eq('id', editando.id)
-      if (!error) { setModalOpen(false); await carregar(familiaId) }
-    } else {
-      const { error } = await supabase.from('investimentos').insert({
-        familia_id: familiaId, user_id: userId,
-        mes: mesDate, saldo: saldoNum, observacao: observacao || null,
-      })
-      if (!error) { setModalOpen(false); await carregar(familiaId) }
-    }
-    setSalvando(false)
-  }
-
-  async function handleDeletar() {
-    if (!editando) return
-    if (!confirmDelete) { setConfirmDelete(true); return }
-    setDeletando(true)
-    const { error } = await supabase.from('investimentos').delete().eq('id', editando.id)
-    setDeletando(false)
-    if (!error) {
-      setRegistros(prev => prev.filter(r => r.id !== editando.id))
-      setModalOpen(false)
-    }
   }
 
   function abrirNovaPosicao() {
@@ -349,9 +290,6 @@ export default function InvestimentosPage() {
   function ehRendaFixa(tipo: string) { return tipo === 'renda_fixa_cdi' || tipo === 'tesouro' }
   function ehVariavel(tipo: string) { return tipo === 'acao' || tipo === 'fii' }
 
-  // Cálculos — registro manual antigo, mantido só pro histórico legado (não alimenta mais os KPIs do topo)
-  const ordenados = [...registros].sort((a, b) => a.mes.localeCompare(b.mes))
-
   // Posições — fonte única de verdade da carteira
   const posicoesRF  = posicoes.filter(p => ehRendaFixa(p.tipo))
   const posicoesVar = posicoes.filter(p => ehVariavel(p.tipo))
@@ -372,22 +310,29 @@ export default function InvestimentosPage() {
   const pctRF  = totalGeral > 0 ? (totalRF / totalGeral) * 100 : 0
   const pctVar = totalGeral > 0 ? (totalVar / totalGeral) * 100 : 0
 
-  // Evolução mensal reconstruída a partir das posições (últimos 6 meses + hoje)
+  const TAXAS_INDEXADOR: Record<string, number> = { cdi: taxaCDIDiaria, ipca: taxaIPCADiaria }
+
+  // Evolução mensal reconstruída a partir das posições (últimos 6 meses + hoje), com uma
+  // coluna por indexador selecionado — quanto valeriam os mesmos aportes se tivessem ido
+  // 100% pra aquele indexador, em vez da alocação real.
   const hojeRef = new Date()
-  const mesesEvolucao: { mes: string; total: number; rf: number; variavel: number; var: number; cdi100: number }[] = []
+  const mesesEvolucao: any[] = []
   for (let i = 5; i >= 0; i--) {
     const refDate = new Date(hojeRef.getFullYear(), hojeRef.getMonth() - i + 1, 0) // último dia do mês
     const dataCalc = refDate > hojeRef ? hojeRef : refDate
     const rf  = posicoesRF.reduce((s, p) => s + valorPosicaoEm(p, dataCalc), 0)
     const vr  = posicoesVar.reduce((s, p) => s + valorPosicaoEm(p, dataCalc), 0)
-    // Benchmark: quanto valeriam os mesmos aportes se tivessem ido 100% pro CDI, em vez da alocação real
-    const cdi100 = posicoes.reduce((s, p) => {
-      const dataAp = new Date(p.data_aplicacao + 'T12:00:00')
-      if (dataAp > dataCalc) return s
-      const dias = diasUteisEntre(dataAp, dataCalc)
-      return s + Number(p.valor_investido) * Math.pow(1 + taxaCDIDiaria, dias)
-    }, 0)
-    mesesEvolucao.push({ mes: `${MESES[dataCalc.getMonth()].substring(0, 3)} ${dataCalc.getFullYear()}`, total: rf + vr, rf, variavel: vr, var: 0, cdi100 })
+    const linha: any = { mes: `${MESES[dataCalc.getMonth()].substring(0, 3)} ${dataCalc.getFullYear()}`, total: rf + vr, rf, variavel: vr, var: 0 }
+    for (const idx of INDEXADORES) {
+      const taxa = TAXAS_INDEXADOR[idx.id] || 0
+      linha[idx.id] = posicoes.reduce((s, p) => {
+        const dataAp = new Date(p.data_aplicacao + 'T12:00:00')
+        if (dataAp > dataCalc) return s
+        const dias = diasUteisEntre(dataAp, dataCalc)
+        return s + Number(p.valor_investido) * Math.pow(1 + taxa, dias)
+      }, 0)
+    }
+    mesesEvolucao.push(linha)
   }
   for (let i = 1; i < mesesEvolucao.length; i++) {
     const prev = mesesEvolucao[i - 1].total
@@ -395,88 +340,10 @@ export default function InvestimentosPage() {
   }
   const varMesAtualR   = mesesEvolucao.length > 1 ? mesesEvolucao[5].total - mesesEvolucao[4].total : 0
   const varMesAtualPct = mesesEvolucao.length > 1 && mesesEvolucao[4].total > 0 ? (varMesAtualR / mesesEvolucao[4].total) * 100 : 0
-  const vsCDI = mesesEvolucao.length ? totalGeral - mesesEvolucao[mesesEvolucao.length - 1].cdi100 : 0
 
-  // Modal content
-  const modalContent = (
-    <>
-      {isMobile && <div style={{ width: '40px', height: '4px', borderRadius: '2px', backgroundColor: '#E2E8F0', margin: '12px auto 4px', flexShrink: 0 }} />}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 24px', borderBottom: '1px solid #F1F5F9', flexShrink: 0 }}>
-        <h2 style={{ fontSize: '17px', fontWeight: 700, color: '#0F172A', margin: 0, letterSpacing: '-0.3px' }}>
-          {editando ? 'Editar registro' : 'Novo registro'}
-        </h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {editando && (
-            <button onClick={handleDeletar} disabled={deletando} style={{
-              display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px',
-              borderRadius: '8px', fontSize: '12px', fontWeight: 600, border: 'none', cursor: 'pointer',
-              backgroundColor: confirmDelete ? '#EF4444' : '#FEF2F2',
-              color: confirmDelete ? '#fff' : '#DC2626',
-            }}>
-              <Trash2 size={12} strokeWidth={2} />
-              {deletando ? 'Deletando...' : confirmDelete ? 'Confirmar' : 'Deletar'}
-            </button>
-          )}
-          <button onClick={() => setModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}>
-            <X size={20} strokeWidth={2} />
-          </button>
-        </div>
-      </div>
-
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px 8px' }}>
-        {/* Mês */}
-        <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Mês de referência</p>
-        <input type="month" value={mes} onChange={e => setMes(e.target.value)}
-          style={{ width: '100%', height: '48px', padding: '0 14px', borderRadius: '12px', border: '1.5px solid #E5E7EB', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box', marginBottom: '16px', backgroundColor: '#FAFAFA' }}
-          onFocus={e => { e.target.style.borderColor = '#2FB36A'; e.target.style.boxShadow = '0 0 0 3px rgba(47,179,106,0.12)' }}
-          onBlur={e => { e.target.style.borderColor = '#E5E7EB'; e.target.style.boxShadow = 'none' }}
-        />
-
-        {/* Saldo */}
-        <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Saldo total da carteira (R$)</p>
-        <div style={{ backgroundColor: '#F8FAFC', border: '1.5px solid #E5E7EB', borderRadius: '14px', padding: '8px 16px', marginBottom: '16px', textAlign: 'center' }}>
-          <input
-            type="text" inputMode="numeric" value={saldo}
-            onChange={e => {
-              const digits = e.target.value.replace(/\D/g, '')
-              const num = parseInt(digits || '0', 10)
-              setSaldo(digits === '' ? '' : (num / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
-            }}
-            placeholder="0,00"
-            style={{ width: '100%', textAlign: 'center', fontSize: '32px', fontWeight: 700, border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#145A45' }}
-          />
-        </div>
-
-        {/* Observação */}
-        <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Observação (opcional)</p>
-        <textarea value={observacao} onChange={e => setObservacao(e.target.value)}
-          placeholder="Ex: Tesouro Direto, CDB, Ações..."
-          rows={2}
-          style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #E5E7EB', fontSize: '13px', color: '#0F172A', outline: 'none', resize: 'none', fontFamily: 'inherit', boxSizing: 'border-box', backgroundColor: '#FAFAFA' }}
-          onFocus={e => { e.target.style.borderColor = '#2FB36A'; e.target.style.boxShadow = '0 0 0 3px rgba(47,179,106,0.12)' }}
-          onBlur={e => { e.target.style.borderColor = '#E5E7EB'; e.target.style.boxShadow = 'none' }}
-        />
-
-        {confirmDelete && (
-          <p style={{ fontSize: '12px', color: '#EF4444', textAlign: 'center', marginTop: '8px' }}>
-            Toque em "Confirmar" para deletar permanentemente.
-          </p>
-        )}
-      </div>
-
-      <div style={{ padding: '12px 24px 20px', borderTop: '1px solid #F1F5F9', backgroundColor: '#fff', flexShrink: 0 }}>
-        <button onClick={handleSalvar} disabled={salvando || !saldo} style={{
-          width: '100%', height: '50px', borderRadius: '13px', border: 'none',
-          background: salvando || !saldo ? '#94A3B8' : 'linear-gradient(135deg, #07271F 0%, #145A45 100%)',
-          color: '#fff', fontSize: '15px', fontWeight: 600,
-          cursor: salvando || !saldo ? 'not-allowed' : 'pointer',
-          boxShadow: salvando || !saldo ? 'none' : '0 4px 14px rgba(11,59,46,0.3)',
-        }}>
-          {salvando ? 'Salvando...' : editando ? 'Salvar alterações' : 'Registrar saldo'}
-        </button>
-      </div>
-    </>
-  )
+  function toggleIndexador(id: string) {
+    setIndexadoresAtivos(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
 
   const TIPO_ICON: Record<string, any> = { acao: TrendingUp, fii: BarChart2, renda_fixa_cdi: Calendar, tesouro: BarChart2 }
 
@@ -842,73 +709,6 @@ export default function InvestimentosPage() {
           </ResponsiveContainer>
         </div>
 
-        {/* Lista mobile — registro manual legado, opcional */}
-        <div style={{ padding: '0 16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-            <div>
-              <p style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A', margin: 0 }}>Registro manual (opcional)</p>
-              <p style={{ fontSize: '11px', color: '#94A3B8', margin: '1px 0 0' }}>Não alimenta mais os números acima</p>
-            </div>
-            <button onClick={abrirNovo} style={{ width: '28px', height: '28px', borderRadius: '8px', border: '1px solid #E2E8F0', backgroundColor: '#fff', color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
-              <Plus size={14} />
-            </button>
-          </div>
-          {loading ? (
-            <p style={{ textAlign: 'center', padding: '32px 0', fontSize: '14px', color: '#94A3B8' }}>Carregando...</p>
-          ) : ordenados.length === 0 ? (
-            <div style={{ backgroundColor: '#fff', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '28px 20px', textAlign: 'center' }}>
-              <p style={{ fontSize: '13px', color: '#94A3B8' }}>Nenhum registro manual ainda.</p>
-            </div>
-          ) : (
-            <div style={{ backgroundColor: '#fff', borderRadius: '16px', border: '1px solid #E2E8F0', overflow: 'hidden' }}>
-              {[...ordenados].reverse().map((r, i) => {
-                const prev   = ordenados[ordenados.indexOf(r) - 1]
-                const varR   = prev ? Number(r.saldo) - Number(prev.saldo) : null
-                const varPct = prev && Number(prev.saldo) > 0 ? ((Number(r.saldo) - Number(prev.saldo)) / Number(prev.saldo)) * 100 : null
-                const subiu  = varR !== null && varR >= 0
-
-                return (
-                  <button key={r.id} onClick={() => abrirEditar(r)} style={{
-                    width: '100%', display: 'flex', alignItems: 'center', gap: '12px',
-                    padding: '14px 16px', borderTop: i > 0 ? '1px solid #F1F5F9' : 'none',
-                    background: 'none', border: i > 0 ? '1px solid #F1F5F9' : 'none',
-                    borderLeft: 'none', borderRight: 'none', borderBottom: 'none',
-                    cursor: 'pointer', textAlign: 'left',
-                  }}>
-                    <div style={{
-                      width: '36px', height: '36px', borderRadius: '10px', flexShrink: 0,
-                      backgroundColor: varR === null ? '#F0FDF4' : subiu ? '#ECFDF5' : '#FEF2F2',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
-                      {varR === null
-                        ? <BarChart2 size={15} color="#145A45" strokeWidth={1.75} />
-                        : subiu
-                          ? <ArrowUpRight size={15} color="#10B981" strokeWidth={2} />
-                          : <ArrowDownRight size={15} color="#EF4444" strokeWidth={2} />
-                      }
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A', margin: 0 }}>{fmtMesLong(r.mes)}</p>
-                      {r.observacao && <p style={{ fontSize: '11px', color: '#94A3B8', margin: 0, marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.observacao}</p>}
-                    </div>
-                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <p style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A', margin: 0 }}>{fmtShort(Number(r.saldo))}</p>
-                      {varR !== null && (
-                        <p style={{ fontSize: '11px', fontWeight: 600, color: subiu ? '#10B981' : '#EF4444', margin: 0 }}>
-                          {subiu ? '+' : ''}{fmtPct(varPct!)}
-                        </p>
-                      )}
-                    </div>
-                    <div style={{ width: '26px', height: '26px', borderRadius: '7px', backgroundColor: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Pencil size={11} color="#64748B" strokeWidth={1.75} />
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
         <button onClick={abrirNovaPosicao} style={{
           position: 'fixed', bottom: '80px', right: '24px',
           width: '56px', height: '56px', borderRadius: '50%',
@@ -987,15 +787,43 @@ export default function InvestimentosPage() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
           {/* Gráfico */}
           <div style={{ backgroundColor: '#fff', borderRadius: '20px', padding: '24px', border: '1px solid #ECEFF3', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '4px' }}>
-              <h2 style={{ fontSize: '16px', fontWeight: 600, color: '#0F172A', margin: 0, letterSpacing: '-0.3px' }}>Evolução da carteira</h2>
-              {posicoes.length > 0 && (
-                <span style={{ fontSize: '11.5px', fontWeight: 600, color: vsCDI >= 0 ? '#10B981' : '#EF4444' }}>
-                  {vsCDI >= 0 ? '+' : ''}{fmtShort(vsCDI)} vs. 100% CDI
-                </span>
-              )}
+            <h2 style={{ fontSize: '16px', fontWeight: 600, color: '#0F172A', margin: '0 0 4px', letterSpacing: '-0.3px' }}>Evolução da carteira</h2>
+            <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '12px' }}>Compare com os principais indexadores do mercado</p>
+
+            <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' }}>
+              {INDEXADORES.map(idx => {
+                const ativo = indexadoresAtivos.includes(idx.id)
+                return (
+                  <button key={idx.id} type="button" onClick={() => toggleIndexador(idx.id)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 12px', borderRadius: '999px',
+                      fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+                      border: `1.5px solid ${ativo ? idx.cor : '#E5E7EB'}`,
+                      backgroundColor: ativo ? idx.cor + '18' : '#fff',
+                      color: ativo ? idx.cor : '#94A3B8',
+                    }}>
+                    <span style={{ width: '8px', height: '2px', backgroundColor: ativo ? idx.cor : '#CBD5E1' }} />
+                    {idx.label}
+                  </button>
+                )
+              })}
             </div>
-            <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '20px' }}>Linha tracejada: quanto valeria se tudo fosse 100% CDI, pra comparar</p>
+
+            {posicoes.length > 0 && indexadoresAtivos.length > 0 && (
+              <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                {indexadoresAtivos.map(id => {
+                  const idx = INDEXADORES.find(i => i.id === id)!
+                  const ultimo = mesesEvolucao.length ? mesesEvolucao[mesesEvolucao.length - 1][id] : 0
+                  const diff = totalGeral - ultimo
+                  return (
+                    <span key={id} style={{ fontSize: '11.5px', fontWeight: 600, color: diff >= 0 ? '#10B981' : '#EF4444' }}>
+                      {diff >= 0 ? '+' : ''}{fmtShort(diff)} vs. {idx.label}
+                    </span>
+                  )
+                })}
+              </div>
+            )}
+
             {posicoes.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
                 <AreaChart data={mesesEvolucao}>
@@ -1010,7 +838,9 @@ export default function InvestimentosPage() {
                   <YAxis tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
                   <Tooltip formatter={(v: any) => fmt(Number(v))} labelStyle={{ color: '#0F172A', fontWeight: 600 }} contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }} />
                   <Area type="monotone" dataKey="total" name="Carteira real" stroke="#2FB36A" strokeWidth={2.5} fill="url(#invGrad)" dot={{ fill: '#fff', stroke: '#2FB36A', strokeWidth: 2, r: 4 }} activeDot={{ fill: '#2FB36A', r: 6, strokeWidth: 0 }} />
-                  <Line type="monotone" dataKey="cdi100" name="100% do CDI" stroke="#94A3B8" strokeWidth={1.5} strokeDasharray="4 4" dot={false} />
+                  {INDEXADORES.filter(idx => indexadoresAtivos.includes(idx.id)).map(idx => (
+                    <Line key={idx.id} type="monotone" dataKey={idx.id} name={idx.label} stroke={idx.cor} strokeWidth={1.5} strokeDasharray="4 4" dot={false} />
+                  ))}
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
@@ -1049,105 +879,9 @@ export default function InvestimentosPage() {
             )}
           </div>
         </div>
-
-        {/* Tabela desktop — registro manual legado, opcional */}
-        <div style={{ backgroundColor: '#fff', borderRadius: '20px', border: '1px solid #ECEFF3', boxShadow: '0 1px 3px rgba(0,0,0,0.03)', overflow: 'hidden' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px', borderBottom: '1px solid #F1F5F9' }}>
-            <div>
-              <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#0F172A', letterSpacing: '-0.3px', margin: 0 }}>Registro manual (opcional)</h2>
-              <p style={{ fontSize: '12px', color: '#94A3B8', margin: '2px 0 0' }}>Anotação livre de saldo total por mês — não alimenta mais os números acima, que agora vêm das posições</p>
-            </div>
-            <button onClick={abrirNovo} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '10px', border: '1px solid #E2E8F0', backgroundColor: '#fff', color: '#64748B', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
-              <Plus size={13} /> Registrar saldo
-            </button>
-          </div>
-
-          {loading ? (
-            <p style={{ textAlign: 'center', padding: '48px', fontSize: '14px', color: '#94A3B8' }}>Carregando...</p>
-          ) : ordenados.length === 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '48px', gap: '12px' }}>
-              <BarChart2 size={32} color="#E2E8F0" strokeWidth={1} />
-              <p style={{ fontSize: '14px', color: '#94A3B8' }}>Nenhum registro manual ainda.</p>
-            </div>
-          ) : (
-            <>
-              {/* Header tabela */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1.5fr 1fr 1fr 1fr 40px', gap: '0', padding: '10px 24px', backgroundColor: '#F8FAFC', borderBottom: '1px solid #F1F5F9' }}>
-                {['Mês', 'Saldo total', 'Variação R$', 'Variação %', 'Observação', ''].map(h => (
-                  <p key={h} style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 }}>{h}</p>
-                ))}
-              </div>
-              {[...ordenados].reverse().map((r, i) => {
-                const prev   = ordenados[ordenados.indexOf(r) - 1]
-                const varR   = prev ? Number(r.saldo) - Number(prev.saldo) : null
-                const varPct = prev && Number(prev.saldo) > 0 ? ((Number(r.saldo) - Number(prev.saldo)) / Number(prev.saldo)) * 100 : null
-                const subiu  = varR !== null && varR >= 0
-
-                return (
-                  <div key={r.id} style={{
-                    display: 'grid', gridTemplateColumns: '1.5fr 1.5fr 1fr 1fr 1fr 40px',
-                    gap: '0', padding: '14px 24px', alignItems: 'center',
-                    borderTop: i > 0 ? '1px solid #F1F5F9' : 'none',
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <div style={{
-                        width: '32px', height: '32px', borderRadius: '9px', flexShrink: 0,
-                        backgroundColor: varR === null ? '#F0FDF4' : subiu ? '#ECFDF5' : '#FEF2F2',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}>
-                        {varR === null
-                          ? <BarChart2 size={13} color="#145A45" strokeWidth={1.75} />
-                          : subiu
-                            ? <ArrowUpRight size={13} color="#10B981" strokeWidth={2} />
-                            : <ArrowDownRight size={13} color="#EF4444" strokeWidth={2} />
-                        }
-                      </div>
-                      <p style={{ fontSize: '14px', fontWeight: 600, color: '#0F172A', margin: 0 }}>{fmtMesLong(r.mes)}</p>
-                    </div>
-                    <p style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A', margin: 0 }}>{fmtOculto(Number(r.saldo), ocultar)}</p>
-                    <p style={{ fontSize: '13px', fontWeight: 600, color: varR === null ? '#94A3B8' : subiu ? '#10B981' : '#EF4444', margin: 0 }}>
-                      {varR === null ? '—' : `${subiu ? '+' : ''}${fmt(varR)}`}
-                    </p>
-                    <p style={{ fontSize: '13px', fontWeight: 600, color: varPct === null ? '#94A3B8' : subiu ? '#10B981' : '#EF4444', margin: 0 }}>
-                      {varPct === null ? '—' : fmtPct(varPct)}
-                    </p>
-                    <p style={{ fontSize: '12px', color: '#94A3B8', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {r.observacao || '—'}
-                    </p>
-                    <button onClick={() => abrirEditar(r)} style={{
-                      width: '28px', height: '28px', borderRadius: '7px', backgroundColor: '#F1F5F9',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      border: 'none', cursor: 'pointer',
-                    }}>
-                      <Pencil size={12} color="#64748B" strokeWidth={1.75} />
-                    </button>
-                  </div>
-                )
-              })}
-            </>
-          )}
-        </div>
       </div>
 
-      {/* Modal Mobile */}
-      {modalOpen && isMobile && (
-        <div onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}
-          style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
-          <div style={{ width: '100%', backgroundColor: '#fff', borderRadius: '28px 28px 0 0', display: 'flex', flexDirection: 'column', maxHeight: 'calc(80vh - 65px)', marginBottom: '65px' }}>
-            {modalContent}
-          </div>
-        </div>
-      )}
 
-      {/* Modal Desktop */}
-      {modalOpen && !isMobile && (
-        <div onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}
-          style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
-          <div style={{ width: '480px', backgroundColor: '#fff', borderRadius: '24px', display: 'flex', flexDirection: 'column', maxHeight: '90vh', margin: 'auto' }}>
-            {modalContent}
-          </div>
-        </div>
-      )}
 
       {/* Modal Posição Mobile */}
       {modalPosicaoOpen && isMobile && (
