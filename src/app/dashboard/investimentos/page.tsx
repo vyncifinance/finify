@@ -9,8 +9,8 @@ import {
   TrendingUp, TrendingDown, Plus, X, Trash2, BarChart2, Calendar
 } from 'lucide-react'
 import {
-  AreaChart, Area, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer
+  AreaChart, ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, Legend
 } from 'recharts'
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
@@ -56,10 +56,10 @@ async function buscarTaxaIPCADiaria(): Promise<number> {
 }
 
 const INDEXADORES = [
-  { id: 'cdi',      label: '100% CDI',  cor: '#94A3B8', ticker: null },
+  { id: 'cdi',      label: 'CDI',       cor: '#94A3B8', ticker: null },
   { id: 'ipca',     label: 'IPCA',      cor: '#8B5CF6', ticker: null },
   { id: 'ibov',     label: 'Ibovespa',  cor: '#3B82F6', ticker: '^BVSP' },
-  { id: 'ifix',     label: 'IFIX',      cor: '#EC4899', ticker: '^IFIX' },
+  { id: 'ifix',     label: 'IFIX (via XFIX11)',    cor: '#EC4899', ticker: 'XFIX11' },
   { id: 'sp500',    label: 'S&P 500 (via IVVB11)', cor: '#059669', ticker: 'IVVB11' },
 ]
 
@@ -847,8 +847,8 @@ export default function InvestimentosPage() {
             )}
 
             {posicoes.length > 0 ? (
-              <ResponsiveContainer width="100%" height={220}>
-                <AreaChart data={mesesEvolucao}>
+              <ResponsiveContainer width="100%" height={240}>
+                <ComposedChart data={mesesEvolucao}>
                   <defs>
                     <linearGradient id="invGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#2FB36A" stopOpacity={0.18}/>
@@ -859,11 +859,12 @@ export default function InvestimentosPage() {
                   <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
                   <Tooltip formatter={(v: any) => fmt(Number(v))} labelStyle={{ color: '#0F172A', fontWeight: 600 }} contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }} />
+                  <Legend wrapperStyle={{ fontSize: '11px' }} />
                   <Area type="monotone" dataKey="total" name="Carteira real" stroke="#2FB36A" strokeWidth={2.5} fill="url(#invGrad)" dot={{ fill: '#fff', stroke: '#2FB36A', strokeWidth: 2, r: 4 }} activeDot={{ fill: '#2FB36A', r: 6, strokeWidth: 0 }} />
                   {INDEXADORES.filter(idx => indexadoresAtivos.includes(idx.id) && !indicesIndisponiveis.has(idx.id)).map(idx => (
                     <Line key={idx.id} type="monotone" dataKey={idx.id} name={idx.label} stroke={idx.cor} strokeWidth={1.5} strokeDasharray="4 4" dot={false} />
                   ))}
-                </AreaChart>
+                </ComposedChart>
               </ResponsiveContainer>
             ) : (
               <div style={{ height: '220px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
