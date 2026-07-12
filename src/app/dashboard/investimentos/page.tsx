@@ -96,6 +96,7 @@ export default function InvestimentosPage() {
   const [valorAtualManual, setValorAtualManual]     = useState('')
   const [ticker, setTicker]                         = useState('')
   const [quantidade, setQuantidade]                 = useState('')
+  const [precoUnitario, setPrecoUnitario]            = useState('')
   const [salvandoPosicao, setSalvandoPosicao]       = useState(false)
   const [deletandoPosicao, setDeletandoPosicao]     = useState(false)
   const [confirmDeletePosicao, setConfirmDeletePosicao] = useState(false)
@@ -236,6 +237,7 @@ export default function InvestimentosPage() {
     setValorAtualManual('')
     setTicker('')
     setQuantidade('')
+    setPrecoUnitario('')
     setConfirmDeletePosicao(false)
     setModalPosicaoOpen(true)
   }
@@ -250,25 +252,33 @@ export default function InvestimentosPage() {
     setValorAtualManual(p.valor_atual != null ? Number(p.valor_atual).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '')
     setTicker(p.ticker || '')
     setQuantidade(p.quantidade != null ? String(p.quantidade) : '')
+    setPrecoUnitario(p.quantidade ? (Number(p.valor_investido) / Number(p.quantidade)).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '')
     setConfirmDeletePosicao(false)
     setModalPosicaoOpen(true)
   }
 
   async function handleSalvarPosicao() {
-    if (!nomePosicao.trim() || !valorInvestido) return
-    setSalvandoPosicao(true)
-    const valorInvestidoNum = parseFloat(valorInvestido.replace(/\./g, '').replace(',', '.'))
-    const ehCDI = tipoPosicao === 'renda_fixa_cdi'
     const ehVar = ehVariavel(tipoPosicao)
+    const quantidadeNum = ehVar ? parseFloat((quantidade || '0').replace(',', '.')) : 0
+    const precoUnitarioNum = ehVar ? parseFloat((precoUnitario || '0').replace(/\./g, '').replace(',', '.')) : 0
+    const nomeFinal = ehVar ? ticker.trim().toUpperCase() : nomePosicao.trim()
+
+    if (!nomeFinal) return
+    if (ehVar && (!ticker.trim() || !quantidadeNum || !precoUnitarioNum)) return
+    if (!ehVar && !valorInvestido) return
+
+    setSalvandoPosicao(true)
+    const valorInvestidoNum = ehVar ? quantidadeNum * precoUnitarioNum : parseFloat(valorInvestido.replace(/\./g, '').replace(',', '.'))
+    const ehCDI = tipoPosicao === 'renda_fixa_cdi'
     const payload = {
       familia_id: familiaId, user_id: userId,
-      nome: nomePosicao.trim(), tipo: tipoPosicao,
+      nome: nomeFinal, tipo: tipoPosicao,
       valor_investido: valorInvestidoNum,
       data_aplicacao: dataAplicacao,
       percentual_cdi: ehCDI ? parseFloat((percentualCDI || '100').replace(',', '.')) : null,
       valor_atual: ehCDI ? null : (valorAtualManual ? parseFloat(valorAtualManual.replace(/\./g, '').replace(',', '.')) : valorInvestidoNum),
       ticker: ehVar && ticker.trim() ? ticker.trim().toUpperCase() : null,
-      quantidade: ehVar && quantidade ? parseFloat(quantidade.replace(',', '.')) : null,
+      quantidade: ehVar ? quantidadeNum : null,
     }
 
     if (editandoPosicao) {
@@ -593,12 +603,6 @@ export default function InvestimentosPage() {
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px 8px' }}>
-        <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Nome</p>
-        <input type="text" value={nomePosicao} onChange={e => setNomePosicao(e.target.value)}
-          placeholder="Ex: CDB Banco X, PETR4, HGLG11..."
-          style={{ width: '100%', height: '46px', padding: '0 14px', borderRadius: '12px', border: '1.5px solid #E5E7EB', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box', marginBottom: '16px', backgroundColor: '#FAFAFA' }}
-        />
-
         <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Tipo</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '8px', marginBottom: '16px' }}>
           {(['renda_fixa_cdi', 'acao', 'fii', 'tesouro'] as const).map(t => (
@@ -614,24 +618,74 @@ export default function InvestimentosPage() {
           ))}
         </div>
 
-        <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>
-          {tipoPosicao === 'renda_fixa_cdi' ? 'Valor investido (R$)' : 'Valor investido / de compra (R$)'}
-        </p>
-        <input
-          type="text" inputMode="numeric" value={valorInvestido}
-          onChange={e => {
-            const digits = e.target.value.replace(/\D/g, '')
-            const num = parseInt(digits || '0', 10)
-            setValorInvestido(digits === '' ? '' : (num / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
-          }}
-          placeholder="0,00"
-          style={{ width: '100%', height: '46px', padding: '0 14px', borderRadius: '12px', border: '1.5px solid #E5E7EB', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box', marginBottom: '16px', backgroundColor: '#FAFAFA' }}
-        />
+        {(tipoPosicao === 'acao' || tipoPosicao === 'fii') ? (
+          <>
+            <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Ticker (código na bolsa)</p>
+            <input type="text" value={ticker} onChange={e => setTicker(e.target.value.toUpperCase())}
+              placeholder="Ex: PETR4, HGLG11"
+              style={{ width: '100%', height: '46px', padding: '0 14px', borderRadius: '12px', border: '1.5px solid #E5E7EB', fontSize: '14px', fontWeight: 600, color: '#0F172A', outline: 'none', boxSizing: 'border-box', marginBottom: '4px', backgroundColor: '#FAFAFA', textTransform: 'uppercase' }}
+            />
+            <p style={{ fontSize: '11px', color: '#94A3B8', marginBottom: '16px' }}>O ticker também é usado como nome da posição na lista.</p>
 
-        <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Data de aplicação / compra</p>
-        <input type="date" value={dataAplicacao} onChange={e => setDataAplicacao(e.target.value)}
-          style={{ width: '100%', height: '46px', padding: '0 14px', borderRadius: '12px', border: '1.5px solid #E5E7EB', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box', marginBottom: '16px', backgroundColor: '#FAFAFA' }}
-        />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '4px' }}>
+              <div>
+                <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Quantidade</p>
+                <input type="text" inputMode="decimal" value={quantidade} onChange={e => setQuantidade(e.target.value.replace(/[^\d,]/g, ''))}
+                  placeholder="Ex: 10"
+                  style={{ width: '100%', height: '46px', padding: '0 14px', borderRadius: '12px', border: '1.5px solid #E5E7EB', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box', backgroundColor: '#FAFAFA' }}
+                />
+              </div>
+              <div>
+                <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Preço pago (un.)</p>
+                <input
+                  type="text" inputMode="numeric" value={precoUnitario}
+                  onChange={e => {
+                    const digits = e.target.value.replace(/\D/g, '')
+                    const num = parseInt(digits || '0', 10)
+                    setPrecoUnitario(digits === '' ? '' : (num / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
+                  }}
+                  placeholder="0,00"
+                  style={{ width: '100%', height: '46px', padding: '0 14px', borderRadius: '12px', border: '1.5px solid #E5E7EB', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box', backgroundColor: '#FAFAFA' }}
+                />
+              </div>
+            </div>
+            {quantidade && precoUnitario && (
+              <p style={{ fontSize: '11.5px', color: '#64748B', marginBottom: '16px' }}>
+                Total investido: <strong style={{ color: '#0F172A' }}>{fmt(parseFloat(quantidade.replace(',', '.') || '0') * parseFloat(precoUnitario.replace(/\./g, '').replace(',', '.') || '0'))}</strong>
+              </p>
+            )}
+
+            <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Data da compra</p>
+            <input type="date" value={dataAplicacao} onChange={e => setDataAplicacao(e.target.value)}
+              style={{ width: '100%', height: '46px', padding: '0 14px', borderRadius: '12px', border: '1.5px solid #E5E7EB', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box', marginBottom: '16px', backgroundColor: '#FAFAFA' }}
+            />
+          </>
+        ) : (
+          <>
+            <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Nome</p>
+            <input type="text" value={nomePosicao} onChange={e => setNomePosicao(e.target.value)}
+              placeholder={tipoPosicao === 'renda_fixa_cdi' ? 'Ex: CDB Banco XP' : 'Ex: Tesouro Selic 2029'}
+              style={{ width: '100%', height: '46px', padding: '0 14px', borderRadius: '12px', border: '1.5px solid #E5E7EB', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box', marginBottom: '16px', backgroundColor: '#FAFAFA' }}
+            />
+
+            <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Valor investido (R$)</p>
+            <input
+              type="text" inputMode="numeric" value={valorInvestido}
+              onChange={e => {
+                const digits = e.target.value.replace(/\D/g, '')
+                const num = parseInt(digits || '0', 10)
+                setValorInvestido(digits === '' ? '' : (num / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
+              }}
+              placeholder="0,00"
+              style={{ width: '100%', height: '46px', padding: '0 14px', borderRadius: '12px', border: '1.5px solid #E5E7EB', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box', marginBottom: '16px', backgroundColor: '#FAFAFA' }}
+            />
+
+            <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Data de aplicação</p>
+            <input type="date" value={dataAplicacao} onChange={e => setDataAplicacao(e.target.value)}
+              style={{ width: '100%', height: '46px', padding: '0 14px', borderRadius: '12px', border: '1.5px solid #E5E7EB', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box', marginBottom: '16px', backgroundColor: '#FAFAFA' }}
+            />
+          </>
+        )}
 
         {tipoPosicao === 'renda_fixa_cdi' ? (
           <>
@@ -649,18 +703,6 @@ export default function InvestimentosPage() {
           </>
         ) : (tipoPosicao === 'acao' || tipoPosicao === 'fii') ? (
           <>
-            <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Ticker (código na bolsa)</p>
-            <input type="text" value={ticker} onChange={e => setTicker(e.target.value.toUpperCase())}
-              placeholder="Ex: PETR4, HGLG11"
-              style={{ width: '100%', height: '46px', padding: '0 14px', borderRadius: '12px', border: '1.5px solid #E5E7EB', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box', marginBottom: '16px', backgroundColor: '#FAFAFA', textTransform: 'uppercase' }}
-            />
-
-            <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Quantidade (ações/cotas)</p>
-            <input type="text" inputMode="decimal" value={quantidade} onChange={e => setQuantidade(e.target.value.replace(/[^\d,]/g, ''))}
-              placeholder="Ex: 100"
-              style={{ width: '100%', height: '46px', padding: '0 14px', borderRadius: '12px', border: '1.5px solid #E5E7EB', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box', marginBottom: '8px', backgroundColor: '#FAFAFA' }}
-            />
-
             {ticker.trim() && cotacoes[ticker.trim().toUpperCase()] != null ? (
               <p style={{ fontSize: '11.5px', color: '#10B981', marginBottom: '4px' }}>
                 Cotação encontrada: {fmt(cotacoes[ticker.trim().toUpperCase()])} — o valor atual é calculado automaticamente, não precisa digitar.
@@ -713,15 +755,23 @@ export default function InvestimentosPage() {
       </div>
 
       <div style={{ padding: '12px 24px 20px', borderTop: '1px solid #F1F5F9', backgroundColor: '#fff', flexShrink: 0 }}>
-        <button onClick={handleSalvarPosicao} disabled={salvandoPosicao || !nomePosicao.trim() || !valorInvestido} style={{
-          width: '100%', height: '50px', borderRadius: '13px', border: 'none',
-          background: salvandoPosicao || !nomePosicao.trim() || !valorInvestido ? '#94A3B8' : 'linear-gradient(135deg, #07271F 0%, #145A45 100%)',
-          color: '#fff', fontSize: '15px', fontWeight: 600,
-          cursor: salvandoPosicao || !nomePosicao.trim() || !valorInvestido ? 'not-allowed' : 'pointer',
-          boxShadow: salvandoPosicao || !nomePosicao.trim() || !valorInvestido ? 'none' : '0 4px 14px rgba(11,59,46,0.3)',
-        }}>
-          {salvandoPosicao ? 'Salvando...' : editandoPosicao ? 'Salvar alterações' : 'Adicionar posição'}
-        </button>
+        {(() => {
+          const ehVarForm = ehVariavel(tipoPosicao)
+          const invalido = ehVarForm
+            ? (!ticker.trim() || !quantidade || !precoUnitario)
+            : (!nomePosicao.trim() || !valorInvestido)
+          return (
+            <button onClick={handleSalvarPosicao} disabled={salvandoPosicao || invalido} style={{
+              width: '100%', height: '50px', borderRadius: '13px', border: 'none',
+              background: salvandoPosicao || invalido ? '#94A3B8' : 'linear-gradient(135deg, #07271F 0%, #145A45 100%)',
+              color: '#fff', fontSize: '15px', fontWeight: 600,
+              cursor: salvandoPosicao || invalido ? 'not-allowed' : 'pointer',
+              boxShadow: salvandoPosicao || invalido ? 'none' : '0 4px 14px rgba(11,59,46,0.3)',
+            }}>
+              {salvandoPosicao ? 'Salvando...' : editandoPosicao ? 'Salvar alterações' : 'Adicionar posição'}
+            </button>
+          )
+        })()}
       </div>
     </>
   )
