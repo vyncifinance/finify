@@ -288,6 +288,14 @@ export default function MovimentosPage() {
     }
   }
 
+  async function ajustarValorAtualMeta(metaId: string | null | undefined, delta: number) {
+    if (!metaId || delta === 0) return
+    const { data: meta } = await supabase.from('metas').select('valor_atual').eq('id', metaId).maybeSingle()
+    if (!meta) return // meta pode ter sido deletada — lançamento fica órfão, sem erro
+    const novoValor = Math.max(Number(meta.valor_atual) + delta, 0)
+    await supabase.from('metas').update({ valor_atual: novoValor }).eq('id', metaId)
+  }
+
   async function handleSalvar() {
     if (!valor) return
     setSalvando(true)
@@ -299,8 +307,8 @@ export default function MovimentosPage() {
     const empresaId = contextoAtivo.tipo === 'empresa' ? contextoAtivo.empresaId : null
 
     if (editando) {
-      const eraInvestimento   = ehCategoriaInvestimento(editando.categoria) && editando.tipo === 'despesa'
-      const eInvestimentoNovo = ehCategoriaInvestimento(categoria) && tipo === 'despesa'
+      const eraInvestimento   = ehCategoriaInvestimento(editando.categoria) && editando.tipo === 'despesa' && !editando.meta_id
+      const eInvestimentoNovo = ehCategoriaInvestimento(categoria) && tipo === 'despesa' && !editando.meta_id
 
       const { error } = await supabase.from('lancamentos').update({
         tipo, valor: valorNum, categoria, membro: membroForm, data: dataLanc,
@@ -311,6 +319,7 @@ export default function MovimentosPage() {
       if (!error) {
         if (eraInvestimento) await ajustarSaldoInvestimento(fid, editando.data, -Number(editando.valor), editando.empresa_id || null)
         if (eInvestimentoNovo) await ajustarSaldoInvestimento(fid, dataLanc, valorNum, empresaId)
+        if (editando.meta_id) await ajustarValorAtualMeta(editando.meta_id, valorNum - Number(editando.valor))
       }
       setSalvando(false)
       if (!error) { setModalOpen(false); await carregarLancamentos(fid) }
@@ -359,8 +368,11 @@ export default function MovimentosPage() {
     if (!confirmDelete) { setConfirmDelete(true); return }
     setDeletando(true)
     const { error } = await supabase.from('lancamentos').delete().eq('id', editando.id)
-    if (!error && editando.tipo === 'despesa' && ehCategoriaInvestimento(editando.categoria)) {
+    if (!error && editando.tipo === 'despesa' && ehCategoriaInvestimento(editando.categoria) && !editando.meta_id) {
       await ajustarSaldoInvestimento(familiaIdRef.current, editando.data, -Number(editando.valor), editando.empresa_id || null)
+    }
+    if (!error && editando.meta_id) {
+      await ajustarValorAtualMeta(editando.meta_id, -Number(editando.valor))
     }
     setDeletando(false)
     if (!error) {
