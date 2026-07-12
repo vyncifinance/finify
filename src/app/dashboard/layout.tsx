@@ -6,19 +6,27 @@ import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import {
-  LayoutDashboard, ArrowLeftRight, Target, User, LogOut, Menu, ChevronLeft, ChevronRight, TrendingUp, Eye, EyeOff
+  LayoutDashboard, ArrowLeftRight, Target, User, LogOut, Menu, ChevronLeft, ChevronRight, TrendingUp, Eye, EyeOff, Route
 } from 'lucide-react'
 
+// Portal (desktop, acessado pelo computador) — sidebar completa
 const NAV = [
   { href: '/dashboard',               icon: LayoutDashboard, label: 'Dashboard'     },
+  { href: '/dashboard/linha-do-tempo',icon: Route,           label: 'Linha do Tempo'},
   { href: '/dashboard/movimentos',    icon: ArrowLeftRight,  label: 'Movimentos'    },
   { href: '/dashboard/metas',         icon: Target,          label: 'Metas'         },
   { href: '/dashboard/investimentos', icon: TrendingUp,      label: 'Investimentos' },
   { href: '/dashboard/perfil',        icon: User,            label: 'Perfil'        },
 ]
 
-// Bottom nav mobile: só 5 itens (todos)
-const NAV_MOBILE = NAV
+// Aplicativo (PWA mobile) — bottom nav com sua própria lista, independente do Portal
+const NAV_MOBILE = [
+  { href: '/dashboard',               icon: LayoutDashboard, label: 'Dashboard'     },
+  { href: '/dashboard/movimentos',    icon: ArrowLeftRight,  label: 'Movimentos'    },
+  { href: '/dashboard/metas',         icon: Target,          label: 'Metas'         },
+  { href: '/dashboard/investimentos', icon: TrendingUp,      label: 'Investimentos' },
+  { href: '/dashboard/perfil',        icon: User,            label: 'Perfil'        },
+]
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [nome, setNome]           = useState('')

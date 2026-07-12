@@ -604,13 +604,52 @@ export default function MetasPage() {
               />
 
               <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Prazo (opcional)</label>
-              <input
-                type="month"
-                value={prazo}
-                onChange={e => setPrazo(e.target.value)}
-                className="w-full px-4 h-12 rounded-xl border text-sm mb-4 outline-none"
-                style={{ borderColor: '#E2E8F0', color: '#0F172A' }}
-              />
+              <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', marginBottom: '8px', paddingBottom: '2px' }}>
+                {MESES.map((m, i) => {
+                  const mm = String(i + 1).padStart(2, '0')
+                  const selecionado = prazo !== '' && prazo.slice(5, 7) === mm
+                  return (
+                    <button key={m} type="button" onClick={() => {
+                      const ano = prazo ? prazo.slice(0, 4) : String(new Date().getFullYear())
+                      setPrazo(`${ano}-${mm}`)
+                    }}
+                      style={{
+                        padding: '7px 13px', borderRadius: '999px', fontSize: '12px', fontWeight: 500, flexShrink: 0, cursor: 'pointer',
+                        border: `1px solid ${selecionado ? '#145A45' : '#E2E8F0'}`,
+                        backgroundColor: selecionado ? '#145A45' : '#fff',
+                        color: selecionado ? '#fff' : '#64748B',
+                      }}>
+                      {m.slice(0, 3)}
+                    </button>
+                  )
+                })}
+              </div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                {Array.from({ length: 7 }, (_, i) => new Date().getFullYear() + i).map(a => {
+                  const selecionado = prazo !== '' && Number(prazo.slice(0, 4)) === a
+                  return (
+                    <button key={a} type="button" onClick={() => {
+                      const mm = prazo ? prazo.slice(5, 7) : '01'
+                      setPrazo(`${a}-${mm}`)
+                    }}
+                      style={{
+                        padding: '7px 13px', borderRadius: '999px', fontSize: '12px', fontWeight: 500, cursor: 'pointer',
+                        border: `1px solid ${selecionado ? '#145A45' : '#E2E8F0'}`,
+                        backgroundColor: selecionado ? '#145A45' : '#fff',
+                        color: selecionado ? '#fff' : '#64748B',
+                      }}>
+                      {a}
+                    </button>
+                  )
+                })}
+              </div>
+              {prazo !== '' && (
+                <button type="button" onClick={() => setPrazo('')}
+                  className="text-xs font-medium mb-4" style={{ color: '#94A3B8', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+                  Remover prazo
+                </button>
+              )}
+              {prazo === '' && <div className="mb-4" />}
 
               <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Ícone</label>
               <div className="grid grid-cols-4 gap-2 mb-4">
