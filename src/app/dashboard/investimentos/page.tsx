@@ -254,58 +254,65 @@ export default function InvestimentosPage() {
     }
   }
 
-  // Valor atual de uma posição: CDI é calculado (principal + juros compostos a X% do CDI, dias úteis);
-  // os demais tipos ainda usam valor informado manualmente — cotação automática fica pra Fase 2 (API de mercado).
-  function valorAtualPosicao(p: any): number {
+  // Valor de uma posição numa data de referência (padrão: hoje). CDI é calculado com juros
+  // compostos a X% do CDI em dias úteis; renda variável e Tesouro (Fase 1, sem API de mercado
+  // ainda) usam o último valor informado, aplicado igual em qualquer data — é uma simplificação
+  // conhecida até a Fase 2 trazer cotação histórica real.
+  function valorPosicaoEm(p: any, dataRef: Date = new Date()): number {
+    const dataAp = new Date(p.data_aplicacao + 'T12:00:00')
+    if (dataAp > dataRef) return 0 // posição ainda não existia nessa data
     if (p.tipo === 'renda_fixa_cdi') {
-      const dataAp = new Date(p.data_aplicacao + 'T12:00:00')
-      const dias = diasUteisEntre(dataAp, new Date())
+      const dias = diasUteisEntre(dataAp, dataRef)
       const taxaAjustada = taxaCDIDiaria * (Number(p.percentual_cdi || 100) / 100)
       return Number(p.valor_investido) * Math.pow(1 + taxaAjustada, dias)
     }
     return p.valor_atual != null ? Number(p.valor_atual) : Number(p.valor_investido)
   }
+  const valorAtualPosicao = (p: any) => valorPosicaoEm(p)
 
   const TIPO_LABEL: Record<string, string> = {
     acao: 'Ação', fii: 'FII', renda_fixa_cdi: 'Renda Fixa (CDI)', tesouro: 'Tesouro Direto',
   }
+  function ehRendaFixa(tipo: string) { return tipo === 'renda_fixa_cdi' || tipo === 'tesouro' }
+  function ehVariavel(tipo: string) { return tipo === 'acao' || tipo === 'fii' }
 
-  // Cálculos
+  // Cálculos — registro manual antigo, mantido só pro histórico legado (não alimenta mais os KPIs do topo)
   const ordenados = [...registros].sort((a, b) => a.mes.localeCompare(b.mes))
-  const atual     = ordenados[ordenados.length - 1]
-  const anterior  = ordenados[ordenados.length - 2]
-  const primeiro  = ordenados[0]
 
-  const saldoAtual     = atual ? Number(atual.saldo) : 0
-  const saldoAnterior  = anterior ? Number(anterior.saldo) : 0
-  const saldoPrimeiro  = primeiro ? Number(primeiro.saldo) : 0
+  // Posições — fonte única de verdade da carteira
+  const posicoesRF  = posicoes.filter(p => ehRendaFixa(p.tipo))
+  const posicoesVar = posicoes.filter(p => ehVariavel(p.tipo))
 
-  const varMes     = atual && anterior ? saldoAtual - saldoAnterior : 0
-  const varMesPct  = saldoAnterior > 0 ? (varMes / saldoAnterior) * 100 : 0
-  const varTotal   = saldoAtual - saldoPrimeiro
-  const varTotalPct = saldoPrimeiro > 0 ? (varTotal / saldoPrimeiro) * 100 : 0
+  const totalRF  = posicoesRF.reduce((s, p) => s + valorPosicaoEm(p), 0)
+  const totalVar = posicoesVar.reduce((s, p) => s + valorPosicaoEm(p), 0)
+  const totalGeral = totalRF + totalVar
 
-  const dadosGrafico = ordenados.map((r, i) => {
-    const prev = ordenados[i - 1]
-    const var_ = prev ? ((Number(r.saldo) - Number(prev.saldo)) / Number(prev.saldo)) * 100 : 0
-    return { mes: fmtMes(r.mes), saldo: Number(r.saldo), var: var_ }
-  })
+  const investidoRF  = posicoesRF.reduce((s, p) => s + Number(p.valor_investido), 0)
+  const investidoVar = posicoesVar.reduce((s, p) => s + Number(p.valor_investido), 0)
+  const investidoTotal = investidoRF + investidoVar
 
-  // Estimativa em tempo real (não persistida): aplica o CDI diário sobre o saldo do último
-  // mês registrado até hoje. É só uma noção de "quanto já deve ter rendido" — o valor oficial
-  // continua sendo o que você registra manualmente todo mês.
-  const dataBaseCDI = atual ? new Date(atual.mes + 'T12:00:00') : null
-  const diasDesdeRegistro = dataBaseCDI
-    ? diasUteisEntre(dataBaseCDI, new Date())
-    : 0
-  const saldoEstimadoHoje = dataBaseCDI
-    ? saldoAtual * Math.pow(1 + taxaCDIDiaria, diasDesdeRegistro)
-    : 0
-  const rendimentoEstimado = saldoEstimadoHoje - saldoAtual
+  const rendimentoTotal = totalGeral - investidoTotal
+  const rendimentoTotalPct = investidoTotal > 0 ? (rendimentoTotal / investidoTotal) * 100 : 0
 
-  const totalPosicoes = posicoes.reduce((s, p) => s + valorAtualPosicao(p), 0)
-  const totalInvestidoPosicoes = posicoes.reduce((s, p) => s + Number(p.valor_investido), 0)
-  const rendimentoPosicoes = totalPosicoes - totalInvestidoPosicoes
+  const pctRF  = totalGeral > 0 ? (totalRF / totalGeral) * 100 : 0
+  const pctVar = totalGeral > 0 ? (totalVar / totalGeral) * 100 : 0
+
+  // Evolução mensal reconstruída a partir das posições (últimos 6 meses + hoje)
+  const hojeRef = new Date()
+  const mesesEvolucao: { mes: string; total: number; rf: number; variavel: number; var: number }[] = []
+  for (let i = 5; i >= 0; i--) {
+    const refDate = new Date(hojeRef.getFullYear(), hojeRef.getMonth() - i + 1, 0) // último dia do mês
+    const dataCalc = refDate > hojeRef ? hojeRef : refDate
+    const rf  = posicoesRF.reduce((s, p) => s + valorPosicaoEm(p, dataCalc), 0)
+    const vr  = posicoesVar.reduce((s, p) => s + valorPosicaoEm(p, dataCalc), 0)
+    mesesEvolucao.push({ mes: `${MESES[dataCalc.getMonth()].substring(0, 3)} ${dataCalc.getFullYear()}`, total: rf + vr, rf, variavel: vr, var: 0 })
+  }
+  for (let i = 1; i < mesesEvolucao.length; i++) {
+    const prev = mesesEvolucao[i - 1].total
+    mesesEvolucao[i].var = prev > 0 ? ((mesesEvolucao[i].total - prev) / prev) * 100 : 0
+  }
+  const varMesAtualR   = mesesEvolucao.length > 1 ? mesesEvolucao[5].total - mesesEvolucao[4].total : 0
+  const varMesAtualPct = mesesEvolucao.length > 1 && mesesEvolucao[4].total > 0 ? (varMesAtualR / mesesEvolucao[4].total) * 100 : 0
 
   // Modal content
   const modalContent = (
@@ -390,62 +397,92 @@ export default function InvestimentosPage() {
 
   const TIPO_ICON: Record<string, any> = { acao: TrendingUp, fii: BarChart2, renda_fixa_cdi: Calendar, tesouro: BarChart2 }
 
-  // Seção "Minhas posições" — compartilhada entre mobile e desktop
-  const posicoesSection = (
-    <div style={{ backgroundColor: '#fff', borderRadius: '20px', border: '1px solid #ECEFF3', overflow: 'hidden' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px', borderBottom: posicoes.length ? '1px solid #F1F5F9' : 'none' }}>
-        <div>
-          <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A', margin: 0, letterSpacing: '-0.2px' }}>Minhas posições</h2>
-          <p style={{ fontSize: '12px', color: '#94A3B8', margin: '2px 0 0' }}>
-            {posicoes.length === 0 ? 'Ações, FIIs, renda fixa e Tesouro' : `Total: ${fmtOculto(totalPosicoes, ocultar)}`}
-          </p>
+  // Lista de posições, reaproveitada pra Renda Fixa e pra Variável
+  function renderPosicoesList(lista: any[], titulo: string, subtitulo: string, vazio: string) {
+    return (
+      <div style={{ backgroundColor: '#fff', borderRadius: '20px', border: '1px solid #ECEFF3', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px', borderBottom: lista.length ? '1px solid #F1F5F9' : 'none' }}>
+          <div>
+            <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A', margin: 0, letterSpacing: '-0.2px' }}>{titulo}</h2>
+            <p style={{ fontSize: '12px', color: '#94A3B8', margin: '2px 0 0' }}>{subtitulo}</p>
+          </div>
+          <button onClick={abrirNovaPosicao} style={{
+            display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '10px',
+            background: 'linear-gradient(135deg, #07271F 0%, #145A45 100%)', color: '#fff',
+            border: 'none', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer',
+          }}>
+            <Plus size={14} /> Nova posição
+          </button>
         </div>
-        <button onClick={abrirNovaPosicao} style={{
-          display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '10px',
-          background: 'linear-gradient(135deg, #07271F 0%, #145A45 100%)', color: '#fff',
-          border: 'none', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer',
-        }}>
-          <Plus size={14} /> Nova posição
-        </button>
-      </div>
 
-      {posicoes.length === 0 ? (
-        <div style={{ padding: '32px 20px', textAlign: 'center' }}>
-          <p style={{ fontSize: '13px', color: '#94A3B8' }}>Nenhuma posição cadastrada ainda.</p>
+        {lista.length === 0 ? (
+          <div style={{ padding: '28px 20px', textAlign: 'center' }}>
+            <p style={{ fontSize: '13px', color: '#94A3B8' }}>{vazio}</p>
+          </div>
+        ) : (
+          lista.map((p, i) => {
+            const valorAtual = valorAtualPosicao(p)
+            const rendimento = valorAtual - Number(p.valor_investido)
+            const rendPct = Number(p.valor_investido) > 0 ? (rendimento / Number(p.valor_investido)) * 100 : 0
+            const Icon = TIPO_ICON[p.tipo] || BarChart2
+            return (
+              <button key={p.id} onClick={() => abrirEditarPosicao(p)} style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: '12px',
+                padding: '14px 20px', borderTop: i > 0 ? '1px solid #F1F5F9' : 'none',
+                background: 'none', border: i > 0 ? '1px solid #F1F5F9' : 'none',
+                borderLeft: 'none', borderRight: 'none', borderBottom: 'none',
+                cursor: 'pointer', textAlign: 'left',
+              }}>
+                <div style={{ width: '34px', height: '34px', borderRadius: '10px', flexShrink: 0, backgroundColor: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon size={15} color="#145A45" strokeWidth={1.75} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: '13.5px', fontWeight: 600, color: '#0F172A', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.nome}</p>
+                  <p style={{ fontSize: '11px', color: '#94A3B8', margin: '1px 0 0' }}>
+                    {TIPO_LABEL[p.tipo]}{p.tipo === 'renda_fixa_cdi' ? ` · ${p.percentual_cdi}% do CDI` : ''}
+                  </p>
+                </div>
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <p style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A', margin: 0 }}>{fmtOculto(valorAtual, ocultar)}</p>
+                  <p style={{ fontSize: '11px', fontWeight: 600, color: rendimento >= 0 ? '#10B981' : '#EF4444', margin: 0 }}>
+                    {fmtPct(rendPct)}
+                  </p>
+                </div>
+              </button>
+            )
+          })
+        )}
+      </div>
+    )
+  }
+
+  const posicoesRFSection = renderPosicoesList(
+    posicoesRF, 'Renda Fixa', posicoesRF.length ? `Total: ${fmtOculto(totalRF, ocultar)}` : 'CDI e Tesouro Direto',
+    'Nenhuma posição de renda fixa ainda.'
+  )
+  const posicoesVarSection = renderPosicoesList(
+    posicoesVar, 'Investimentos Variáveis', posicoesVar.length ? `Total: ${fmtOculto(totalVar, ocultar)}` : 'Ações e Fundos Imobiliários (FIIs)',
+    'Nenhuma posição de renda variável ainda.'
+  )
+
+  // Card de proporção Renda Fixa vs. Variável
+  const splitCard = totalGeral > 0 && (
+    <div style={{ backgroundColor: '#fff', borderRadius: '18px', border: '1px solid #ECEFF3', padding: '18px 20px' }}>
+      <p style={{ fontSize: '12.5px', fontWeight: 600, color: '#0F172A', marginBottom: '10px' }}>Composição da carteira</p>
+      <div style={{ display: 'flex', height: '8px', borderRadius: '4px', overflow: 'hidden', marginBottom: '10px' }}>
+        <div style={{ width: `${pctRF}%`, backgroundColor: '#145A45' }} />
+        <div style={{ width: `${pctVar}%`, backgroundColor: '#F59E0B' }} />
+      </div>
+      <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: '#145A45' }} />
+          <span style={{ fontSize: '12px', color: '#64748B' }}>Renda Fixa · {pctRF.toFixed(0)}% · {fmtOculto(totalRF, ocultar)}</span>
         </div>
-      ) : (
-        posicoes.map((p, i) => {
-          const valorAtual = valorAtualPosicao(p)
-          const rendimento = valorAtual - Number(p.valor_investido)
-          const rendPct = Number(p.valor_investido) > 0 ? (rendimento / Number(p.valor_investido)) * 100 : 0
-          const Icon = TIPO_ICON[p.tipo] || BarChart2
-          return (
-            <button key={p.id} onClick={() => abrirEditarPosicao(p)} style={{
-              width: '100%', display: 'flex', alignItems: 'center', gap: '12px',
-              padding: '14px 20px', borderTop: i > 0 ? '1px solid #F1F5F9' : 'none',
-              background: 'none', border: i > 0 ? '1px solid #F1F5F9' : 'none',
-              borderLeft: 'none', borderRight: 'none', borderBottom: 'none',
-              cursor: 'pointer', textAlign: 'left',
-            }}>
-              <div style={{ width: '34px', height: '34px', borderRadius: '10px', flexShrink: 0, backgroundColor: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Icon size={15} color="#145A45" strokeWidth={1.75} />
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: '13.5px', fontWeight: 600, color: '#0F172A', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.nome}</p>
-                <p style={{ fontSize: '11px', color: '#94A3B8', margin: '1px 0 0' }}>
-                  {TIPO_LABEL[p.tipo]}{p.tipo === 'renda_fixa_cdi' ? ` · ${p.percentual_cdi}% do CDI` : ''}
-                </p>
-              </div>
-              <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <p style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A', margin: 0 }}>{fmtOculto(valorAtual, ocultar)}</p>
-                <p style={{ fontSize: '11px', fontWeight: 600, color: rendimento >= 0 ? '#10B981' : '#EF4444', margin: 0 }}>
-                  {fmtPct(rendPct)}
-                </p>
-              </div>
-            </button>
-          )
-        })
-      )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: '#F59E0B' }} />
+          <span style={{ fontSize: '12px', color: '#64748B' }}>Variável · {pctVar.toFixed(0)}% · {fmtOculto(totalVar, ocultar)}</span>
+        </div>
+      </div>
     </div>
   )
 
@@ -578,9 +615,9 @@ export default function InvestimentosPage() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <h1 style={{ fontSize: '18px', fontWeight: 700, color: '#fff', margin: 0, letterSpacing: '-0.3px' }}>Investimentos</h1>
-              <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>Evolução da sua carteira</p>
+              <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>Renda fixa e variável</p>
             </div>
-            <button onClick={abrirNovo} style={{
+            <button onClick={abrirNovaPosicao} style={{
               width: '36px', height: '36px', borderRadius: '10px',
               backgroundColor: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
@@ -593,8 +630,8 @@ export default function InvestimentosPage() {
         {/* KPIs mobile */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '8px', padding: '0 16px', marginTop: '-24px', marginBottom: '16px' }}>
           {[
-            { label: 'Saldo atual', val: fmtShort(saldoAtual), cor: '#145A45', bg: '#F0FDF4', sub: atual ? fmtMesLong(atual.mes) : '—' },
-            { label: 'Variação do mês', val: varMes !== 0 ? fmtShort(varMes) : '—', cor: varMes >= 0 ? '#10B981' : '#EF4444', bg: varMes >= 0 ? '#ECFDF5' : '#FEF2F2', sub: varMes !== 0 ? fmtPct(varMesPct) : 'Sem anterior' },
+            { label: 'Total da carteira', val: fmtShort(totalGeral), cor: '#145A45', bg: '#F0FDF4', sub: `${posicoes.length} ${posicoes.length === 1 ? 'posição' : 'posições'}` },
+            { label: 'Rendimento total', val: rendimentoTotal !== 0 ? fmtShort(rendimentoTotal) : '—', cor: rendimentoTotal >= 0 ? '#10B981' : '#EF4444', bg: rendimentoTotal >= 0 ? '#ECFDF5' : '#FEF2F2', sub: rendimentoTotal !== 0 ? fmtPct(rendimentoTotalPct) : 'Sem posições' },
           ].map(c => (
             <div key={c.label} style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
               <div style={{ width: '28px', height: '28px', borderRadius: '8px', backgroundColor: c.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
@@ -607,53 +644,51 @@ export default function InvestimentosPage() {
           ))}
         </div>
 
-        {/* Estimativa CDI mobile */}
-        {atual && (
-          <div style={{ margin: '0 16px 16px', backgroundColor: '#F0FDF4', border: '1px solid #D1FAE5', borderRadius: '16px', padding: '14px' }}>
-            <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#145A45', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Estimativa hoje · 100% do CDI</p>
-            <p style={{ fontSize: '18px', fontWeight: 700, color: '#0F172A', letterSpacing: '-0.3px' }}>{loading ? '...' : fmtOculto(saldoEstimadoHoje, ocultar)}</p>
-            <p style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>
-              {rendimentoEstimado > 0 ? `+${fmtShort(rendimentoEstimado)} desde ${fmtMesLong(atual.mes)}` : 'Sem rendimento estimado ainda'}
-            </p>
-          </div>
-        )}
+        {/* Split Renda Fixa x Variável mobile */}
+        {splitCard && <div style={{ margin: '0 16px 16px' }}>{splitCard}</div>}
 
         {/* Posições mobile */}
-        <div style={{ margin: '0 16px 16px' }}>
-          {posicoesSection}
+        <div style={{ margin: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {posicoesRFSection}
+          {posicoesVarSection}
         </div>
 
         {/* Gráfico mobile */}
-        {dadosGrafico.length > 1 && (
-          <div style={{ margin: '0 16px 16px', backgroundColor: '#fff', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '16px' }}>
-            <p style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A', marginBottom: '4px' }}>Evolução da carteira</p>
-            <p style={{ fontSize: '11px', color: '#94A3B8', marginBottom: '12px' }}>Saldo mês a mês</p>
-            <ResponsiveContainer width="100%" height={140}>
-              <AreaChart data={dadosGrafico}>
-                <defs>
-                  <linearGradient id="invGradM" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#2FB36A" stopOpacity={0.2}/>
-                    <stop offset="100%" stopColor="#2FB36A" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
-                <XAxis dataKey="mes" tick={{ fontSize: 10, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
-                <Tooltip formatter={(v: any) => fmt(Number(v))} contentStyle={{ borderRadius: '10px', border: '1px solid #E2E8F0', fontSize: '11px' }} />
-                <Area type="monotone" dataKey="saldo" stroke="#2FB36A" strokeWidth={2} fill="url(#invGradM)" dot={{ fill: '#fff', stroke: '#2FB36A', strokeWidth: 2, r: 3 }} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        )}
+        <div style={{ margin: '0 16px 16px', backgroundColor: '#fff', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '16px' }}>
+          <p style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A', marginBottom: '4px' }}>Evolução da carteira</p>
+          <p style={{ fontSize: '11px', color: '#94A3B8', marginBottom: '12px' }}>Reconstruída a partir das posições — renda variável usa o último valor informado</p>
+          <ResponsiveContainer width="100%" height={140}>
+            <AreaChart data={mesesEvolucao}>
+              <defs>
+                <linearGradient id="invGradM" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#2FB36A" stopOpacity={0.2}/>
+                  <stop offset="100%" stopColor="#2FB36A" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
+              <XAxis dataKey="mes" tick={{ fontSize: 10, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
+              <Tooltip formatter={(v: any) => fmt(Number(v))} contentStyle={{ borderRadius: '10px', border: '1px solid #E2E8F0', fontSize: '11px' }} />
+              <Area type="monotone" dataKey="total" stroke="#2FB36A" strokeWidth={2} fill="url(#invGradM)" dot={{ fill: '#fff', stroke: '#2FB36A', strokeWidth: 2, r: 3 }} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
 
-        {/* Lista mobile */}
+        {/* Lista mobile — registro manual legado, opcional */}
         <div style={{ padding: '0 16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+            <div>
+              <p style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A', margin: 0 }}>Registro manual (opcional)</p>
+              <p style={{ fontSize: '11px', color: '#94A3B8', margin: '1px 0 0' }}>Não alimenta mais os números acima</p>
+            </div>
+            <button onClick={abrirNovo} style={{ width: '28px', height: '28px', borderRadius: '8px', border: '1px solid #E2E8F0', backgroundColor: '#fff', color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+              <Plus size={14} />
+            </button>
+          </div>
           {loading ? (
             <p style={{ textAlign: 'center', padding: '32px 0', fontSize: '14px', color: '#94A3B8' }}>Carregando...</p>
           ) : ordenados.length === 0 ? (
-            <div style={{ backgroundColor: '#fff', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '40px 20px', textAlign: 'center' }}>
-              <BarChart2 size={32} color="#E2E8F0" strokeWidth={1} style={{ margin: '0 auto 12px' }} />
-              <p style={{ fontSize: '14px', color: '#94A3B8', marginBottom: '4px' }}>Nenhum registro ainda.</p>
-              <p style={{ fontSize: '12px', color: '#CBD5E1' }}>Toque em + para registrar o saldo da sua carteira.</p>
+            <div style={{ backgroundColor: '#fff', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '28px 20px', textAlign: 'center' }}>
+              <p style={{ fontSize: '13px', color: '#94A3B8' }}>Nenhum registro manual ainda.</p>
             </div>
           ) : (
             <div style={{ backgroundColor: '#fff', borderRadius: '16px', border: '1px solid #E2E8F0', overflow: 'hidden' }}>
@@ -705,7 +740,7 @@ export default function InvestimentosPage() {
           )}
         </div>
 
-        <button onClick={abrirNovo} style={{
+        <button onClick={abrirNovaPosicao} style={{
           position: 'fixed', bottom: '80px', right: '24px',
           width: '56px', height: '56px', borderRadius: '50%',
           background: 'linear-gradient(135deg, #07271F 0%, #145A45 100%)',
@@ -721,51 +756,44 @@ export default function InvestimentosPage() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
           <div>
             <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#0F172A', letterSpacing: '-0.5px', margin: 0 }}>Investimentos</h1>
-            <p style={{ fontSize: '14px', color: '#64748B', marginTop: '4px' }}>Acompanhe a evolução da sua carteira mês a mês</p>
+            <p style={{ fontSize: '14px', color: '#64748B', marginTop: '4px' }}>Renda fixa e variável, tudo num só lugar</p>
           </div>
-          <button onClick={abrirNovo} style={{
+          <button onClick={abrirNovaPosicao} style={{
             display: 'flex', alignItems: 'center', gap: '8px',
             padding: '10px 20px', borderRadius: '12px', border: 'none',
             background: 'linear-gradient(135deg, #07271F 0%, #145A45 100%)',
             color: '#fff', fontSize: '14px', fontWeight: 600, cursor: 'pointer',
             boxShadow: '0 4px 14px rgba(11,59,46,0.3)',
           }}>
-            <Plus size={16} strokeWidth={2.5} /> Registrar saldo
+            <Plus size={16} strokeWidth={2.5} /> Nova posição
           </button>
         </div>
 
         {/* KPIs desktop */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '16px', marginBottom: '24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '16px', marginBottom: '24px' }}>
           {[
             {
-              label: 'Saldo atual',
-              val: loading ? '...' : saldoAtual > 0 ? fmtOculto(saldoAtual, ocultar) : '—',
-              sub: atual ? fmtMesLong(atual.mes) : 'Nenhum registro',
+              label: 'Total da carteira',
+              val: loading ? '...' : totalGeral > 0 ? fmtOculto(totalGeral, ocultar) : '—',
+              sub: `${posicoes.length} ${posicoes.length === 1 ? 'posição' : 'posições'}`,
               cor: '#145A45', bg: '#F0FDF4',
               Icon: BarChart2,
             },
             {
+              label: 'Rendimento total',
+              val: loading ? '...' : rendimentoTotal !== 0 ? fmtOculto(Math.abs(rendimentoTotal), ocultar) : '—',
+              sub: rendimentoTotal !== 0 ? fmtPct(rendimentoTotalPct) : 'Sem posições ainda',
+              cor: rendimentoTotal >= 0 ? '#10B981' : '#EF4444',
+              bg: rendimentoTotal >= 0 ? '#ECFDF5' : '#FEF2F2',
+              Icon: rendimentoTotal >= 0 ? TrendingUp : TrendingDown,
+            },
+            {
               label: 'Variação do mês',
-              val: loading ? '...' : varMes !== 0 ? fmtOculto(Math.abs(varMes), ocultar) : '—',
-              sub: varMes !== 0 ? fmtPct(varMesPct) : 'Sem mês anterior',
-              cor: varMes >= 0 ? '#10B981' : '#EF4444',
-              bg: varMes >= 0 ? '#ECFDF5' : '#FEF2F2',
-              Icon: varMes >= 0 ? TrendingUp : TrendingDown,
-            },
-            {
-              label: 'Variação total',
-              val: loading ? '...' : varTotal !== 0 ? fmtOculto(Math.abs(varTotal), ocultar) : '—',
-              sub: varTotal !== 0 ? fmtPct(varTotalPct) : 'Desde o início',
-              cor: varTotal >= 0 ? '#10B981' : '#EF4444',
-              bg: varTotal >= 0 ? '#ECFDF5' : '#FEF2F2',
-              Icon: varTotal >= 0 ? TrendingUp : TrendingDown,
-            },
-            {
-              label: 'Registros',
-              val: String(registros.length),
-              sub: registros.length > 0 ? `${fmtMesLong(ordenados[0].mes)} até hoje` : 'Nenhum ainda',
-              cor: '#8B5CF6', bg: '#F5F3FF',
-              Icon: Calendar,
+              val: loading ? '...' : varMesAtualR !== 0 ? fmtOculto(Math.abs(varMesAtualR), ocultar) : '—',
+              sub: varMesAtualR !== 0 ? fmtPct(varMesAtualPct) : 'Sem histórico ainda',
+              cor: varMesAtualR >= 0 ? '#10B981' : '#EF4444',
+              bg: varMesAtualR >= 0 ? '#ECFDF5' : '#FEF2F2',
+              Icon: varMesAtualR >= 0 ? TrendingUp : TrendingDown,
             },
           ].map(c => (
             <div key={c.label} style={{ backgroundColor: '#fff', borderRadius: '20px', padding: '24px', border: '1px solid #ECEFF3', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
@@ -779,36 +807,22 @@ export default function InvestimentosPage() {
           ))}
         </div>
 
-        {/* Estimativa CDI desktop */}
-        {atual && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F0FDF4', border: '1px solid #D1FAE5', borderRadius: '18px', padding: '18px 24px', marginBottom: '24px' }}>
-            <div>
-              <p style={{ fontSize: '11px', fontWeight: 700, color: '#145A45', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Estimativa de hoje · 100% do CDI</p>
-              <p style={{ fontSize: '13px', color: '#64748B' }}>
-                Projeção com base na taxa CDI diária do Bacen, aplicada sobre o saldo de {atual ? fmtMesLong(atual.mes) : '—'}. Não substitui o saldo oficial da corretora.
-              </p>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <p style={{ fontSize: '26px', fontWeight: 700, color: '#0F172A', letterSpacing: '-0.5px' }}>{loading ? '...' : fmtOculto(saldoEstimadoHoje, ocultar)}</p>
-              <p style={{ fontSize: '12px', color: '#10B981', fontWeight: 600 }}>
-                {rendimentoEstimado > 0 ? `+${fmt(rendimentoEstimado)} estimado` : 'Sem rendimento estimado ainda'}
-              </p>
-            </div>
-          </div>
-        )}
+        {/* Split Renda Fixa x Variável desktop */}
+        {splitCard && <div style={{ marginBottom: '24px' }}>{splitCard}</div>}
 
-        <div style={{ marginBottom: '24px' }}>
-          {posicoesSection}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
+          {posicoesRFSection}
+          {posicoesVarSection}
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
           {/* Gráfico */}
           <div style={{ backgroundColor: '#fff', borderRadius: '20px', padding: '24px', border: '1px solid #ECEFF3', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
             <h2 style={{ fontSize: '16px', fontWeight: 600, color: '#0F172A', marginBottom: '4px', letterSpacing: '-0.3px' }}>Evolução da carteira</h2>
-            <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '20px' }}>Saldo total mês a mês</p>
-            {dadosGrafico.length > 1 ? (
+            <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '20px' }}>Reconstruída a partir das posições — renda variável usa o último valor informado, sem histórico real de cotação</p>
+            {posicoes.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
-                <AreaChart data={dadosGrafico}>
+                <AreaChart data={mesesEvolucao}>
                   <defs>
                     <linearGradient id="invGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#2FB36A" stopOpacity={0.18}/>
@@ -819,13 +833,13 @@ export default function InvestimentosPage() {
                   <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
                   <Tooltip formatter={(v: any) => fmt(Number(v))} labelStyle={{ color: '#0F172A', fontWeight: 600 }} contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }} />
-                  <Area type="monotone" dataKey="saldo" stroke="#2FB36A" strokeWidth={2.5} fill="url(#invGrad)" dot={{ fill: '#fff', stroke: '#2FB36A', strokeWidth: 2, r: 4 }} activeDot={{ fill: '#2FB36A', r: 6, strokeWidth: 0 }} />
+                  <Area type="monotone" dataKey="total" stroke="#2FB36A" strokeWidth={2.5} fill="url(#invGrad)" dot={{ fill: '#fff', stroke: '#2FB36A', strokeWidth: 2, r: 4 }} activeDot={{ fill: '#2FB36A', r: 6, strokeWidth: 0 }} />
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
               <div style={{ height: '220px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                 <BarChart2 size={28} color="#E2E8F0" strokeWidth={1} />
-                <p style={{ fontSize: '13px', color: '#94A3B8' }}>Registre pelo menos 2 meses para ver o gráfico.</p>
+                <p style={{ fontSize: '13px', color: '#94A3B8' }}>Cadastre uma posição para ver o gráfico.</p>
               </div>
             )}
           </div>
@@ -834,9 +848,9 @@ export default function InvestimentosPage() {
           <div style={{ backgroundColor: '#fff', borderRadius: '20px', padding: '24px', border: '1px solid #ECEFF3', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
             <h2 style={{ fontSize: '16px', fontWeight: 600, color: '#0F172A', marginBottom: '4px', letterSpacing: '-0.3px' }}>Variação mensal</h2>
             <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '20px' }}>Rentabilidade por período</p>
-            {dadosGrafico.length > 1 ? (
+            {posicoes.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
-                <AreaChart data={dadosGrafico.slice(1)}>
+                <AreaChart data={mesesEvolucao.slice(1)}>
                   <defs>
                     <linearGradient id="varGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#8B5CF6" stopOpacity={0.15}/>
@@ -853,17 +867,22 @@ export default function InvestimentosPage() {
             ) : (
               <div style={{ height: '220px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                 <TrendingUp size={28} color="#E2E8F0" strokeWidth={1} />
-                <p style={{ fontSize: '13px', color: '#94A3B8' }}>Registre pelo menos 2 meses para ver a variação.</p>
+                <p style={{ fontSize: '13px', color: '#94A3B8' }}>Cadastre uma posição para ver a variação.</p>
               </div>
             )}
           </div>
         </div>
 
-        {/* Tabela desktop */}
+        {/* Tabela desktop — registro manual legado, opcional */}
         <div style={{ backgroundColor: '#fff', borderRadius: '20px', border: '1px solid #ECEFF3', boxShadow: '0 1px 3px rgba(0,0,0,0.03)', overflow: 'hidden' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px', borderBottom: '1px solid #F1F5F9' }}>
-            <h2 style={{ fontSize: '16px', fontWeight: 600, color: '#0F172A', letterSpacing: '-0.3px', margin: 0 }}>Histórico de registros</h2>
-            <span style={{ fontSize: '12px', color: '#94A3B8' }}>{registros.length} {registros.length === 1 ? 'registro' : 'registros'}</span>
+            <div>
+              <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#0F172A', letterSpacing: '-0.3px', margin: 0 }}>Registro manual (opcional)</h2>
+              <p style={{ fontSize: '12px', color: '#94A3B8', margin: '2px 0 0' }}>Anotação livre de saldo total por mês — não alimenta mais os números acima, que agora vêm das posições</p>
+            </div>
+            <button onClick={abrirNovo} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '10px', border: '1px solid #E2E8F0', backgroundColor: '#fff', color: '#64748B', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
+              <Plus size={13} /> Registrar saldo
+            </button>
           </div>
 
           {loading ? (
@@ -871,10 +890,7 @@ export default function InvestimentosPage() {
           ) : ordenados.length === 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '48px', gap: '12px' }}>
               <BarChart2 size={32} color="#E2E8F0" strokeWidth={1} />
-              <p style={{ fontSize: '14px', color: '#94A3B8' }}>Nenhum registro ainda.</p>
-              <button onClick={abrirNovo} style={{ fontSize: '13px', fontWeight: 600, color: '#145A45', background: 'none', border: 'none', cursor: 'pointer' }}>
-                Registrar primeiro saldo →
-              </button>
+              <p style={{ fontSize: '14px', color: '#94A3B8' }}>Nenhum registro manual ainda.</p>
             </div>
           ) : (
             <>
