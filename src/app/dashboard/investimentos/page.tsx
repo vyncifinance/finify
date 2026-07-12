@@ -387,11 +387,15 @@ export default function InvestimentosPage() {
             const rendPct = Number(p.valor_investido) > 0 ? (rendimento / Number(p.valor_investido)) * 100 : 0
             const Icon = TIPO_ICON[p.tipo] || BarChart2
             const temCotacao = (p.tipo === 'acao' || p.tipo === 'fii') && p.ticker && cotacoes[p.ticker] != null
+            const rendimentoDiario = p.tipo === 'renda_fixa_cdi'
+              ? valorAtual * (taxaCDIDiaria * (Number(p.percentual_cdi || 100) / 100))
+              : null
             return (
               <div key={p.id} style={{
-                display: 'flex', alignItems: 'center', gap: '12px',
+                display: 'flex', flexDirection: 'column',
                 padding: '14px 20px', borderTop: i > 0 ? '1px solid #F1F5F9' : 'none',
               }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <button onClick={() => abrirEditarPosicao(p)} style={{
                   flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '12px',
                   background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0,
@@ -424,6 +428,12 @@ export default function InvestimentosPage() {
                     <Plus size={13} color="#BA7517" strokeWidth={2} />
                   </button>
                 )}
+              </div>
+              {rendimentoDiario != null && (
+                <p style={{ fontSize: '10.5px', color: '#94A3B8', margin: '6px 0 0 46px' }}>
+                  Rende ≈ {fmtOculto(rendimentoDiario, ocultar)} por dia útil, na taxa de hoje
+                </p>
+              )}
               </div>
             )
           })
