@@ -30,6 +30,11 @@ function mesesEntre(hoje: Date, alvo: Date) {
   return diff > 0 ? diff : 0
 }
 
+function ehCategoriaAlocacao(cat: string) {
+  // Aportes em metas e investimentos: dinheiro que muda de lugar, não é consumido — mesma regra do Dashboard.
+  return cat === 'Investimento' || cat === 'Investimentos'
+}
+
 // Taxa diária do CDI (Bacen, série 12) — mesma estimativa usada na tela Investimentos
 async function buscarTaxaCDIDiaria(): Promise<number> {
   try {
@@ -89,7 +94,7 @@ export default function LinhaDoTempoPage() {
 
     if (lanc) {
       const r = lanc.filter((l: any) => l.tipo === 'receita').reduce((s: number, l: any) => s + Number(l.valor), 0)
-      const d = lanc.filter((l: any) => l.tipo === 'despesa').reduce((s: number, l: any) => s + Number(l.valor), 0)
+      const d = lanc.filter((l: any) => l.tipo === 'despesa' && !ehCategoriaAlocacao(l.categoria)).reduce((s: number, l: any) => s + Number(l.valor), 0)
       setTotalRec(r); setTotalDes(d)
     }
 

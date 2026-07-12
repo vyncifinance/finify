@@ -61,6 +61,11 @@ function fmtShort(val: number) {
   if (abs >= 1000) return `R$ ${(val / 1000).toFixed(1)}k`
   return fmt(val)
 }
+function ehCategoriaAlocacao(cat: string) {
+  // Aportes em metas e investimentos: dinheiro que muda de lugar, não é consumido.
+  // Não deve reduzir a Economia do mês nem inflar a média de despesas da Reserva de Emergência.
+  return cat === 'Investimento' || cat === 'Investimentos'
+}
 function getSaudacao() {
   const h = agora.getHours()
   if (h < 12) return 'Bom dia'
@@ -161,8 +166,9 @@ export default function DashboardPage() {
 
     if (lanc) {
       const r = lanc.filter((l: any) => l.tipo === 'receita').reduce((s: number, l: any) => s + Number(l.valor), 0)
-      const d = lanc.filter((l: any) => l.tipo === 'despesa').reduce((s: number, l: any) => s + Number(l.valor), 0)
-      setTotalRec(r); setTotalDes(d); setTotalEco(r - d)
+      const dBruto = lanc.filter((l: any) => l.tipo === 'despesa').reduce((s: number, l: any) => s + Number(l.valor), 0)
+      const dConsumo = lanc.filter((l: any) => l.tipo === 'despesa' && !ehCategoriaAlocacao(l.categoria)).reduce((s: number, l: any) => s + Number(l.valor), 0)
+      setTotalRec(r); setTotalDes(dConsumo); setTotalEco(r - dConsumo)
       setLancamentos(lanc.slice(0, 5))
 
       if (!ehEmpresa) {
@@ -198,7 +204,7 @@ export default function DashboardPage() {
 
       const catsOrdenadas = catsFinal.map(([nome, val], i) => ({
         nome, val: Number(val), cor: cores[i % cores.length],
-        pct: d > 0 ? Math.round((Number(val) / d) * 100) : 0
+        pct: dBruto > 0 ? Math.round((Number(val) / dBruto) * 100) : 0
       }))
       setCats(catsOrdenadas)
     }
@@ -209,12 +215,12 @@ export default function DashboardPage() {
       const d2 = new Date(agora.getFullYear(), agora.getMonth() - i, 1)
       const i2 = new Date(d2.getFullYear(), d2.getMonth(), 1).toISOString().split('T')[0]
       const f2 = new Date(d2.getFullYear(), d2.getMonth() + 1, 0).toISOString().split('T')[0]
-      let queryMes = supabase.from('lancamentos').select('tipo, valor')
+      let queryMes = supabase.from('lancamentos').select('tipo, valor, categoria')
         .eq('familia_id', fid).gte('data', i2).lte('data', f2)
       queryMes = ehEmpresa ? queryMes.eq('empresa_id', ctx.empresaId) : queryMes.is('empresa_id', null)
       const { data: mes } = await queryMes
       const r2 = (mes || []).filter((l: any) => l.tipo === 'receita').reduce((s: number, l: any) => s + Number(l.valor), 0)
-      const d3 = (mes || []).filter((l: any) => l.tipo === 'despesa').reduce((s: number, l: any) => s + Number(l.valor), 0)
+      const d3 = (mes || []).filter((l: any) => l.tipo === 'despesa' && !ehCategoriaAlocacao(l.categoria)).reduce((s: number, l: any) => s + Number(l.valor), 0)
       evo.push({ mes: MESES[d2.getMonth()].substring(0, 3), valor: r2 - d3 })
       despesasPorMes.push(d3)
     }
