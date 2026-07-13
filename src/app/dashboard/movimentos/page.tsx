@@ -475,7 +475,9 @@ export default function MovimentosPage() {
     const fid   = familiaIdRef.current
     const agora = new Date()
     const hora  = `${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}`
-    const dataStr = `${mesRef.getFullYear()}-${String(mesRef.getMonth() + 1).padStart(2, '0')}-${String(df.dia_vencimento).padStart(2, '0')}`
+    // Data real do pagamento (hoje), não a data de vencimento — evita lançamentos "no futuro"
+    // já marcados como pagos quando você quita a conta antes do dia de vencer.
+    const dataStr = dataLocalISO(agora)
     const ehReceita = df.tipo === 'receita'
     const { error } = await supabase.from('lancamentos').insert({
       familia_id: fid, user_id: userId, tipo: ehReceita ? 'receita' : 'despesa', valor,
@@ -560,7 +562,9 @@ export default function MovimentosPage() {
   const diasOrdenados = Object.keys(grupos).sort((a, b) => b.localeCompare(a))
 
   const totalRec = lancamentos.filter(l => l.tipo === 'receita').reduce((s, l) => s + Number(l.valor), 0)
-  const totalDes = lancamentos.filter(l => l.tipo === 'despesa').reduce((s, l) => s + Number(l.valor), 0)
+  // Aportes em investimento/meta não contam como despesa de consumo — mesma regra já aplicada
+  // no Dashboard e na Linha do Tempo, pra "Resultado do mês" bater igual nas três telas.
+  const totalDes = lancamentos.filter(l => l.tipo === 'despesa' && !ehCategoriaInvestimento(l.categoria)).reduce((s, l) => s + Number(l.valor), 0)
   const resultado = totalRec - totalDes
   const saldoProjetado = resultado + totalReceitasFixasPendentes - totalDespesasFixasPendentes
   const mesLabel  = `${MESES[mesRef.getMonth()]} ${mesRef.getFullYear()}`

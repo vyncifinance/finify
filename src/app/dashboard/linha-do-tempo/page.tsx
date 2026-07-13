@@ -129,10 +129,14 @@ export default function LinhaDoTempoPage() {
       const ref = new Date(anoAtual, new Date().getMonth() - i, 1)
       const ini = ref.toISOString().split('T')[0]
       const fim = new Date(ref.getFullYear(), ref.getMonth() + 1, 0).toISOString().split('T')[0]
-      const { data: lm } = await supabase.from('lancamentos').select('tipo, valor')
+      const { data: lm } = await supabase.from('lancamentos').select('tipo, valor, categoria')
         .eq('familia_id', profile.familia_id).is('empresa_id', null)
         .gte('data', ini).lte('data', fim)
-      const saldoMes = (lm || []).reduce((s: number, l: any) => s + (l.tipo === 'receita' ? Number(l.valor) : -Number(l.valor)), 0)
+      const saldoMes = (lm || []).reduce((s: number, l: any) => {
+        if (l.tipo === 'receita') return s + Number(l.valor)
+        if (ehCategoriaAlocacao(l.categoria)) return s // aporte em investimento/meta não é despesa de consumo
+        return s - Number(l.valor)
+      }, 0)
       acumulado += saldoMes
       evo.push({ mes: MESES[ref.getMonth()].slice(0, 3), valor: Math.max(acumulado, 0) })
     }

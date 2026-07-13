@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import {
-  LayoutDashboard, ArrowLeftRight, Target, User, LogOut, Menu, ChevronLeft, ChevronRight, TrendingUp, Eye, EyeOff, Route
+  LayoutDashboard, ArrowLeftRight, Target, User, LogOut, Menu, ChevronLeft, ChevronRight, TrendingUp, Eye, EyeOff, Route, HelpCircle
 } from 'lucide-react'
 
 // Portal (desktop, acessado pelo computador) — sidebar completa
@@ -203,6 +203,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 : <Eye size={17} strokeWidth={1.75} className="flex-shrink-0" />
               }
               {!collapsed && <span>{ocultarValores ? 'Mostrar valores' : 'Ocultar valores'}</span>}
+            </button>
+            <button onClick={() => navegar('/dashboard/ajuda')}
+              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-all text-xs font-medium mb-1"
+              style={{ color: '#64748B', border: '1px solid transparent', backgroundColor: 'transparent', cursor: 'pointer' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'rgba(15,23,42,0.04)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent' }}
+            >
+              <HelpCircle size={17} strokeWidth={1.75} className="flex-shrink-0" />
+              {!collapsed && <span>Central de Ajuda</span>}
             </button>
             <button onClick={handleLogout}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all"
