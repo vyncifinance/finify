@@ -154,7 +154,16 @@ export default function LinhaDoTempoPage() {
   const economiaMediaMensal = evolucao.length > 1
     ? Math.max((evolucao[evolucao.length - 1].valor - evolucao[0].valor) / (evolucao.length - 1), 200)
     : 500
-  const patrimonioAtual = evolucao.length ? evolucao[evolucao.length - 1].valor : 0
+
+  const dataBaseInv = mesInvestimento ? new Date(mesInvestimento + 'T12:00:00') : null
+  const diasInv = dataBaseInv ? diasUteisEntre(dataBaseInv, new Date()) : 0
+  const totalInvEstimado = dataBaseInv ? totalInv * Math.pow(1 + taxaCDIDiaria, diasInv) : totalInv
+
+  // Patrimônio estimado = acúmulo de fluxo de caixa (receita - despesa dos últimos meses)
+  // + carteira de investimentos. Antes só contava o fluxo de caixa, o que fazia esse número
+  // parecer bem menor que a realidade pra quem já tem dinheiro investido.
+  const acumuloCaixa = evolucao.length ? evolucao[evolucao.length - 1].valor : 0
+  const patrimonioAtual = acumuloCaixa + totalInvEstimado
 
   const metasAbertas = metas.filter(m => Number(m.valor_atual) < Number(m.valor_alvo))
   const hoje = new Date()
@@ -171,10 +180,6 @@ export default function LinhaDoTempoPage() {
     valorProj = valorProj * 1.006 + economiaMediaMensal * 12 // crescimento anual composto simplificado
   }
   const anoAlvoProjecao = projecao.find(p => p.valor >= valorAlvoProjecao)?.ano || null
-
-  const dataBaseInv = mesInvestimento ? new Date(mesInvestimento + 'T12:00:00') : null
-  const diasInv = dataBaseInv ? diasUteisEntre(dataBaseInv, new Date()) : 0
-  const totalInvEstimado = dataBaseInv ? totalInv * Math.pow(1 + taxaCDIDiaria, diasInv) : totalInv
 
   const resumo = [
     { label: 'Receitas',     val: totalRec, cor: '#378ADD', bg: '#EFF6FF', Icon: ArrowDownLeft },
