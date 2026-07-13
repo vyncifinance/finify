@@ -77,6 +77,9 @@ export default function DashboardPage() {
   const [nome, setNome]       = useState('')
   const [familia, setFamilia] = useState('')
   const [familiaId, setFamiliaId] = useState('')
+  const [saldoInicialData, setSaldoInicialData] = useState<string | null>(null)
+  const [saldoEmConta, setSaldoEmConta] = useState<number | null>(null)
+  const [carregandoSaldoConta, setCarregandoSaldoConta] = useState(false)
   const [userId, setUserId]       = useState('')
   const [loading, setLoading] = useState(true)
   const [totalRec, setTotalRec] = useState(0)
@@ -112,7 +115,7 @@ export default function DashboardPage() {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.user) return
     const { data: profile } = await supabase
-      .from('profiles').select('nome, familia_id, familias(nome, dizimista)')
+      .from('profiles').select('nome, familia_id, familias(nome, dizimista, saldo_inicial, saldo_inicial_data)')
       .eq('id', session.user.id).single()
     if (profile) {
       const fid = profile.familia_id
@@ -122,6 +125,11 @@ export default function DashboardPage() {
       setFamiliaId(fid)
       setUserId(session.user.id)
       setDizimista((profile.familias as any)?.dizimista !== false)
+
+      const saldoInicialVal  = Number((profile.familias as any)?.saldo_inicial || 0)
+      const saldoInicialData = (profile.familias as any)?.saldo_inicial_data || null
+      setSaldoInicialData(saldoInicialData)
+      if (saldoInicialData) carregarSaldoEmConta(fid, saldoInicialVal, saldoInicialData)
 
       const { data: empresasData } = await supabase.from('empresas')
         .select('*').eq('familia_id', fid).order('created_at', { ascending: true })
@@ -152,6 +160,19 @@ export default function DashboardPage() {
     setContextoAberto(false)
     try { localStorage.setItem('finify_contexto', JSON.stringify(novo)) } catch {}
     if (familiaId && userId) carregarDados(familiaId, userId, novo)
+  }
+
+  // Saldo em conta = saldo inicial (o que já tinha antes de usar o Finify) + tudo lançado
+  // desde a data de referência (inclusive), no contexto pessoal — bate com o saldo real do banco.
+  async function carregarSaldoEmConta(fid: string, saldoBase: number, dataReferencia: string) {
+    setCarregandoSaldoConta(true)
+    const { data: lancDesde } = await supabase.from('lancamentos')
+      .select('tipo, valor')
+      .eq('familia_id', fid).is('empresa_id', null)
+      .gte('data', dataReferencia)
+    const fluxo = (lancDesde || []).reduce((s: number, l: any) => s + (l.tipo === 'receita' ? Number(l.valor) : -Number(l.valor)), 0)
+    setSaldoEmConta(saldoBase + fluxo)
+    setCarregandoSaldoConta(false)
   }
 
   async function carregarDados(fid: string, uid: string, contexto?: { tipo: 'pessoal' | 'empresa'; empresaId?: string }) {
@@ -367,6 +388,14 @@ export default function DashboardPage() {
                 {loading ? '...' : fmtShortOculto(resultadoExibir, ocultar)}
               </p>
               <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.5)' }}>Resultado do mês · {mesAtual}</p>
+              {contextoAtivo.tipo === 'pessoal' && saldoInicialData && (
+                <p className="text-xs mt-2" style={{ color: 'rgba(255,255,255,0.7)' }}>
+                  Saldo em conta:{' '}
+                  <span style={{ fontWeight: 700, color: '#fff' }}>
+                    {carregandoSaldoConta || saldoEmConta === null ? '...' : fmtShortOculto(saldoEmConta, ocultar)}
+                  </span>
+                </p>
+              )}
 
               {contextoAberto && (
                 <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '8px', width: '230px', backgroundColor: '#fff', borderRadius: '14px', border: '1px solid #E2E8F0', boxShadow: '0 12px 32px rgba(0,0,0,0.25)', zIndex: 30, overflow: 'hidden' }}>
@@ -775,6 +804,14 @@ export default function DashboardPage() {
                 <p style={{ fontSize: '22px', fontWeight: 700, color: '#fff', letterSpacing: '-1.5px', lineHeight: 1, marginBottom: '14px' }}>
                   {loading ? '...' : fmtOculto(resultadoExibir, ocultar)}
                 </p>
+                {contextoAtivo.tipo === 'pessoal' && saldoInicialData && (
+                  <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', marginBottom: '14px', marginTop: '-6px' }}>
+                    Saldo em conta:{' '}
+                    <span style={{ fontWeight: 700, color: '#fff' }}>
+                      {carregandoSaldoConta || saldoEmConta === null ? '...' : fmtOculto(saldoEmConta, ocultar)}
+                    </span>
+                  </p>
+                )}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' }}>
                   {!semDados && (
                     <div style={{
