@@ -30,11 +30,6 @@ function mesesEntre(hoje: Date, alvo: Date) {
   return diff > 0 ? diff : 0
 }
 
-function ehCategoriaAlocacao(cat: string) {
-  // Aportes em metas e investimentos: dinheiro que muda de lugar, não é consumido — mesma regra do Dashboard.
-  return cat === 'Investimento' || cat === 'Investimentos'
-}
-
 // Taxa diária do CDI (Bacen, série 12) — mesma estimativa usada na tela Investimentos
 async function buscarTaxaCDIDiaria(): Promise<number> {
   try {
@@ -108,7 +103,7 @@ export default function LinhaDoTempoPage() {
 
     if (lanc) {
       const r = lanc.filter((l: any) => l.tipo === 'receita').reduce((s: number, l: any) => s + Number(l.valor), 0)
-      const d = lanc.filter((l: any) => l.tipo === 'despesa' && !ehCategoriaAlocacao(l.categoria)).reduce((s: number, l: any) => s + Number(l.valor), 0)
+      const d = lanc.filter((l: any) => l.tipo === 'despesa').reduce((s: number, l: any) => s + Number(l.valor), 0)
       setTotalRec(r); setTotalDes(d)
     }
 
@@ -132,11 +127,7 @@ export default function LinhaDoTempoPage() {
       const { data: lm } = await supabase.from('lancamentos').select('tipo, valor, categoria')
         .eq('familia_id', profile.familia_id).is('empresa_id', null)
         .gte('data', ini).lte('data', fim)
-      const saldoMes = (lm || []).reduce((s: number, l: any) => {
-        if (l.tipo === 'receita') return s + Number(l.valor)
-        if (ehCategoriaAlocacao(l.categoria)) return s // aporte em investimento/meta não é despesa de consumo
-        return s - Number(l.valor)
-      }, 0)
+      const saldoMes = (lm || []).reduce((s: number, l: any) => s + (l.tipo === 'receita' ? Number(l.valor) : -Number(l.valor)), 0)
       acumulado += saldoMes
       evo.push({ mes: MESES[ref.getMonth()].slice(0, 3), valor: Math.max(acumulado, 0) })
     }

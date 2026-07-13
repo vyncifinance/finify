@@ -564,7 +564,10 @@ export default function MovimentosPage() {
   const totalRec = lancamentos.filter(l => l.tipo === 'receita').reduce((s, l) => s + Number(l.valor), 0)
   // Aportes em investimento/meta não contam como despesa de consumo — mesma regra já aplicada
   // no Dashboard e na Linha do Tempo, pra "Resultado do mês" bater igual nas três telas.
-  const totalDes = lancamentos.filter(l => l.tipo === 'despesa' && !ehCategoriaInvestimento(l.categoria)).reduce((s, l) => s + Number(l.valor), 0)
+  // Bate com o saldo real do banco: aportes em investimento/meta saíram fisicamente da conta,
+  // então contam como despesa aqui (diferente da Reserva de Emergência no Dashboard, que
+  // olha só despesa de consumo).
+  const totalDes = lancamentos.filter(l => l.tipo === 'despesa').reduce((s, l) => s + Number(l.valor), 0)
   const resultado = totalRec - totalDes
   const saldoProjetado = resultado + totalReceitasFixasPendentes - totalDespesasFixasPendentes
   const mesLabel  = `${MESES[mesRef.getMonth()]} ${mesRef.getFullYear()}`

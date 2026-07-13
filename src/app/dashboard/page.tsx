@@ -167,8 +167,7 @@ export default function DashboardPage() {
     if (lanc) {
       const r = lanc.filter((l: any) => l.tipo === 'receita').reduce((s: number, l: any) => s + Number(l.valor), 0)
       const dBruto = lanc.filter((l: any) => l.tipo === 'despesa').reduce((s: number, l: any) => s + Number(l.valor), 0)
-      const dConsumo = lanc.filter((l: any) => l.tipo === 'despesa' && !ehCategoriaAlocacao(l.categoria)).reduce((s: number, l: any) => s + Number(l.valor), 0)
-      setTotalRec(r); setTotalDes(dConsumo); setTotalEco(r - dConsumo)
+      setTotalRec(r); setTotalDes(dBruto); setTotalEco(r - dBruto)
       setLancamentos(lanc.slice(0, 5))
 
       if (!ehEmpresa) {
@@ -220,8 +219,9 @@ export default function DashboardPage() {
       queryMes = ehEmpresa ? queryMes.eq('empresa_id', ctx.empresaId) : queryMes.is('empresa_id', null)
       const { data: mes } = await queryMes
       const r2 = (mes || []).filter((l: any) => l.tipo === 'receita').reduce((s: number, l: any) => s + Number(l.valor), 0)
+      const d2Bruto = (mes || []).filter((l: any) => l.tipo === 'despesa').reduce((s: number, l: any) => s + Number(l.valor), 0)
       const d3 = (mes || []).filter((l: any) => l.tipo === 'despesa' && !ehCategoriaAlocacao(l.categoria)).reduce((s: number, l: any) => s + Number(l.valor), 0)
-      evo.push({ mes: MESES[d2.getMonth()].substring(0, 3), valor: r2 - d3 })
+      evo.push({ mes: MESES[d2.getMonth()].substring(0, 3), valor: r2 - d2Bruto })
       despesasPorMes.push(d3)
     }
     setEvolucao(evo)
