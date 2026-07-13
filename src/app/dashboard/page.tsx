@@ -164,12 +164,22 @@ export default function DashboardPage() {
 
   // Saldo em conta = saldo inicial (o que já tinha antes de usar o Finify) + tudo lançado
   // desde a data de referência (inclusive), no contexto pessoal — bate com o saldo real do banco.
+  // toISOString() converte pra UTC — no Brasil (UTC-3), isso podia empurrar "hoje" pro dia seguinte.
+  function dataLocalISO(d: Date): string {
+    const ano = d.getFullYear()
+    const mes = String(d.getMonth() + 1).padStart(2, '0')
+    const dia = String(d.getDate()).padStart(2, '0')
+    return `${ano}-${mes}-${dia}`
+  }
+
   async function carregarSaldoEmConta(fid: string, saldoBase: number, dataReferencia: string) {
     setCarregandoSaldoConta(true)
+    const hoje = dataLocalISO(new Date())
     const { data: lancDesde } = await supabase.from('lancamentos')
       .select('tipo, valor')
       .eq('familia_id', fid).is('empresa_id', null)
       .gte('data', dataReferencia)
+      .lte('data', hoje) // nunca conta parcela futura — só o que já venceu/aconteceu até hoje
     const fluxo = (lancDesde || []).reduce((s: number, l: any) => s + (l.tipo === 'receita' ? Number(l.valor) : -Number(l.valor)), 0)
     setSaldoEmConta(saldoBase + fluxo)
     setCarregandoSaldoConta(false)
