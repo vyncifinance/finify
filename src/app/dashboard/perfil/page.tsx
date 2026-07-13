@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import {
   User, Users, Mail, LogOut, Lock, Save, Check, Copy, CheckCheck, Church, ChevronRight,
-  Building2, Plus, X, Trash2, Pencil
+  Building2, Plus, X, Trash2, Pencil, Wallet
 } from 'lucide-react'
 
 function formatCNPJ(v: string) {
@@ -31,6 +31,10 @@ export default function PerfilPage() {
   const [membros, setMembros]             = useState<any[]>([])
   const [dizimista, setDizimista]         = useState(true)
   const [salvandoDizimista, setSalvandoDizimista] = useState(false)
+  const [saldoInicial, setSaldoInicial]           = useState('')
+  const [saldoInicialData, setSaldoInicialData]   = useState('')
+  const [salvandoSaldoInicial, setSalvandoSaldoInicial] = useState(false)
+  const [saldoInicialSalvo, setSaldoInicialSalvo] = useState(false)
   const [salvandoNome, setSalvandoNome]   = useState(false)
   const [nomeSalvo, setNomeSalvo]         = useState(false)
   const [novaSenha, setNovaSenha]         = useState('')
@@ -62,7 +66,7 @@ export default function PerfilPage() {
     setUserId(session.user.id)
     setEmail(session.user.email || '')
     const { data: profile } = await supabase
-      .from('profiles').select('nome, familia_id, familias(nome, codigo_convite, dizimista)')
+      .from('profiles').select('nome, familia_id, familias(nome, codigo_convite, dizimista, saldo_inicial, saldo_inicial_data)')
       .eq('id', session.user.id).single()
     if (profile) {
       setNome(profile.nome || '')
@@ -70,6 +74,9 @@ export default function PerfilPage() {
       setFamiliaNome((profile.familias as any)?.nome || '')
       setCodigoConvite((profile.familias as any)?.codigo_convite || '')
       setDizimista((profile.familias as any)?.dizimista !== false)
+      const saldoInicialAtual = (profile.familias as any)?.saldo_inicial
+      setSaldoInicial(saldoInicialAtual ? Number(saldoInicialAtual).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '')
+      setSaldoInicialData((profile.familias as any)?.saldo_inicial_data || '')
       const res = await fetch('/api/membros')
       const json = await res.json()
       if (json.membros) setMembros(json.membros)
@@ -151,6 +158,23 @@ export default function PerfilPage() {
     setDizimista(valor); setSalvandoDizimista(true)
     await supabase.from('familias').update({ dizimista: valor }).eq('id', familiaId)
     setSalvandoDizimista(false)
+  }
+
+  async function handleSalvarSaldoInicial() {
+    if (!saldoInicialData) return
+    setSalvandoSaldoInicial(true); setSaldoInicialSalvo(false)
+    const valorNum = saldoInicial ? parseFloat(saldoInicial.replace(/\./g, '').replace(',', '.')) : 0
+    const { error } = await supabase.from('familias')
+      .update({ saldo_inicial: valorNum, saldo_inicial_data: saldoInicialData })
+      .eq('id', familiaId)
+    setSalvandoSaldoInicial(false)
+    if (!error) { setSaldoInicialSalvo(true); setTimeout(() => setSaldoInicialSalvo(false), 2000) }
+  }
+
+  function maskSaldoInicial(raw: string) {
+    const digits = raw.replace(/\D/g, '')
+    const num = parseInt(digits || '0', 10)
+    setSaldoInicial(digits === '' ? '' : (num / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
   }
 
   async function handleCopiarCodigo() {
@@ -289,6 +313,32 @@ export default function PerfilPage() {
                   style={{ left: dizimista ? '26px' : '2px' }} />
               </button>
             </div>
+          </div>
+
+          {/* Saldo inicial mobile */}
+          <div className="rounded-2xl border p-4" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0' }}>
+            <div className="flex items-center gap-2 mb-1">
+              <Wallet size={16} color="#0F172A" strokeWidth={1.75} />
+              <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>Saldo inicial</p>
+            </div>
+            <p className="text-xs mb-3" style={{ color: '#94A3B8' }}>
+              Quanto vocês já tinham na conta antes de começar a lançar no Finify. Use a data de referência exata desse valor — nunca "hoje" se já existirem lançamentos anteriores.
+            </p>
+            <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Valor (R$)</label>
+            <input type="text" inputMode="numeric" value={saldoInicial} onChange={e => maskSaldoInicial(e.target.value)}
+              placeholder="0,00"
+              className="w-full px-4 h-11 rounded-xl border text-sm outline-none mb-3"
+              style={{ borderColor: '#E2E8F0', color: '#0F172A' }} />
+            <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Data de referência</label>
+            <input type="date" value={saldoInicialData} onChange={e => setSaldoInicialData(e.target.value)}
+              className="w-full px-4 h-11 rounded-xl border text-sm outline-none mb-3"
+              style={{ borderColor: '#E2E8F0', color: '#0F172A' }} />
+            <button onClick={handleSalvarSaldoInicial} disabled={salvandoSaldoInicial || !saldoInicialData}
+              className="w-full flex items-center justify-center gap-1.5 h-11 rounded-xl text-sm font-semibold text-white"
+              style={{ backgroundColor: '#145A45', opacity: (salvandoSaldoInicial || !saldoInicialData) ? 0.6 : 1 }}>
+              {saldoInicialSalvo ? <Check size={15} /> : <Save size={15} />}
+              {salvandoSaldoInicial ? 'Salvando...' : saldoInicialSalvo ? 'Salvo' : 'Salvar'}
+            </button>
           </div>
 
           {/* Empresas / CNPJ mobile */}
@@ -451,6 +501,35 @@ export default function PerfilPage() {
                       style={{ left: dizimista ? '26px' : '2px' }} />
                   </button>
                 </div>
+              </div>
+
+              <div className="rounded-[20px] border p-6" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+                <div className="flex items-center gap-2 mb-1">
+                  <Wallet size={18} color="#0F172A" strokeWidth={1.75} />
+                  <h2 className="font-semibold" style={{ color: '#0F172A' }}>Saldo inicial</h2>
+                </div>
+                <p className="text-sm mb-5" style={{ color: '#64748B' }}>
+                  Quanto vocês já tinham na conta antes de começar a lançar no Finify. Use a data de referência exata desse valor — nunca "hoje" se já existirem lançamentos anteriores a essa data no sistema, senão duplica valores já contados.
+                </p>
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Valor (R$)</label>
+                    <input type="text" inputMode="numeric" value={saldoInicial} onChange={e => maskSaldoInicial(e.target.value)}
+                      placeholder="0,00"
+                      className="w-full px-4 h-12 rounded-xl border text-sm outline-none" style={{ borderColor: '#E2E8F0', color: '#0F172A' }} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Data de referência</label>
+                    <input type="date" value={saldoInicialData} onChange={e => setSaldoInicialData(e.target.value)}
+                      className="w-full px-4 h-12 rounded-xl border text-sm outline-none" style={{ borderColor: '#E2E8F0', color: '#0F172A' }} />
+                  </div>
+                </div>
+                <button onClick={handleSalvarSaldoInicial} disabled={salvandoSaldoInicial || !saldoInicialData}
+                  className="flex items-center gap-2 px-5 h-12 rounded-xl text-sm font-semibold text-white transition-opacity"
+                  style={{ backgroundColor: '#145A45', opacity: (salvandoSaldoInicial || !saldoInicialData) ? 0.6 : 1 }}>
+                  {saldoInicialSalvo ? <Check size={16} /> : <Save size={16} />}
+                  {salvandoSaldoInicial ? 'Salvando...' : saldoInicialSalvo ? 'Salvo' : 'Salvar'}
+                </button>
               </div>
 
               <div className="rounded-[20px] border p-6" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
