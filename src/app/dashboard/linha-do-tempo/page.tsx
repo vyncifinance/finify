@@ -66,8 +66,7 @@ export default function LinhaDoTempoPage() {
   const [nome, setNome] = useState('')
   const [totalRec, setTotalRec] = useState(0)
   const [totalDes, setTotalDes] = useState(0)
-  const [totalInv, setTotalInv] = useState(0)
-  const [mesInvestimento, setMesInvestimento] = useState<string | null>(null)
+  const [posicoes, setPosicoes] = useState<any[]>([])
   const [metas, setMetas] = useState<any[]>([])
   const [evolucao, setEvolucao] = useState<{ mes: string; valor: number }[]>([])
   const [anoSelecionado, setAnoSelecionado] = useState(new Date().getFullYear())
@@ -113,16 +112,11 @@ export default function LinhaDoTempoPage() {
       setTotalRec(r); setTotalDes(d)
     }
 
-    // Saldo real da carteira de investimentos (mesma fonte da tela Investimentos, não soma de lançamentos)
-    const { data: invMaisRecente } = await supabase.from('investimentos')
-      .select('saldo, mes').eq('familia_id', profile.familia_id)
-      .order('mes', { ascending: false }).limit(1).maybeSingle()
-    if (invMaisRecente) {
-      setTotalInv(Number(invMaisRecente.saldo))
-      setMesInvestimento(invMaisRecente.mes)
-    } else {
-      setTotalInv(0)
-    }
+    // Carteira de investimentos real — mesma fonte da tela Investimentos (posicoes_investimento),
+    // não mais a tabela de registro manual antiga (removida).
+    const { data: posicoesData } = await supabase.from('posicoes_investimento')
+      .select('*').eq('familia_id', profile.familia_id)
+    setPosicoes(posicoesData || [])
 
     const { data: metasData } = await supabase.from('metas')
       .select('*').eq('familia_id', profile.familia_id).order('prazo', { ascending: true })
@@ -155,9 +149,18 @@ export default function LinhaDoTempoPage() {
     ? Math.max((evolucao[evolucao.length - 1].valor - evolucao[0].valor) / (evolucao.length - 1), 200)
     : 500
 
-  const dataBaseInv = mesInvestimento ? new Date(mesInvestimento + 'T12:00:00') : null
-  const diasInv = dataBaseInv ? diasUteisEntre(dataBaseInv, new Date()) : 0
-  const totalInvEstimado = dataBaseInv ? totalInv * Math.pow(1 + taxaCDIDiaria, diasInv) : totalInv
+  // Mesmo cálculo usado na tela Investimentos: Renda Fixa CDI rende composto por dia útil;
+  // Ação/FII/Tesouro usam o último valor informado (cotação ao vivo fica só na tela Investimentos,
+  // pra não duplicar chamadas de API aqui).
+  const totalInvEstimado = posicoes.reduce((s, p) => {
+    if (p.tipo === 'renda_fixa_cdi') {
+      const dataAp = new Date(p.data_aplicacao + 'T12:00:00')
+      const dias = diasUteisEntre(dataAp, new Date())
+      const taxaAjustada = taxaCDIDiaria * (Number(p.percentual_cdi || 100) / 100)
+      return s + Number(p.valor_investido) * Math.pow(1 + taxaAjustada, dias)
+    }
+    return s + (p.valor_atual != null ? Number(p.valor_atual) : Number(p.valor_investido))
+  }, 0)
 
   // Patrimônio estimado = acúmulo de fluxo de caixa (receita - despesa dos últimos meses)
   // + carteira de investimentos. Antes só contava o fluxo de caixa, o que fazia esse número
