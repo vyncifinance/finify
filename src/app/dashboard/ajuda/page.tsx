@@ -34,6 +34,16 @@ const SECOES: Secao[] = [
           <p>Eles não deveriam. Dashboard, Movimentos e Linha do Tempo usam a mesma regra de cálculo. Se você notar uma diferença, pode ser um lançamento categorizado de forma diferente do esperado, ou uma tela desatualizada no seu navegador — nesse caso, um recarregamento da página costuma resolver.</p>
         ),
       },
+      {
+        pergunta: 'Qual a diferença entre "Resultado do mês" e "Saldo em conta"?',
+        resposta: (
+          <>
+            <p><strong>Resultado do mês</strong> é só o fluxo do mês corrente, isolado: tudo que você recebeu menos tudo que gastou, só naquele mês.</p>
+            <p><strong>Saldo em conta</strong> é diferente: parte do "Saldo inicial" que você cadastrou em Perfil (quanto já tinha guardado antes de usar o Finify) e soma tudo que foi lançado desde então até hoje. Ele só aparece se você preencheu esse campo em Perfil.</p>
+            <p>Por isso os dois números normalmente não batem — e não deveriam. O "Saldo em conta" é o mais próximo do saldo real do seu banco; o "Resultado do mês" te mostra só como foi esse mês específico.</p>
+          </>
+        ),
+      },
     ],
   },
   {
