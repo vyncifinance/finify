@@ -193,7 +193,7 @@ export default function DashboardPage() {
     let queryLanc = supabase.from('lancamentos').select('*')
       .eq('familia_id', fid).gte('data', ini).lte('data', fim)
     queryLanc = ehEmpresa ? queryLanc.eq('empresa_id', ctx.empresaId) : queryLanc.is('empresa_id', null)
-    const { data: lanc } = await queryLanc.order('data', { ascending: false })
+    const { data: lanc } = await queryLanc.order('data', { ascending: false }).order('hora', { ascending: false })
 
     if (lanc) {
       const r = lanc.filter((l: any) => l.tipo === 'receita').reduce((s: number, l: any) => s + Number(l.valor), 0)
