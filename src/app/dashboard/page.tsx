@@ -172,6 +172,17 @@ export default function DashboardPage() {
     return `${ano}-${mes}-${dia}`
   }
 
+  // Pra "Últimos Lançamentos": deixa claro quando um item não é de hoje, senão a hora
+  // sozinha (ex: "20:46") engana quem olha rápido e acha que é de hoje.
+  function labelDataHora(l: any) {
+    const hoje  = dataLocalISO(new Date())
+    if (l.data === hoje) return l.hora
+    const ontem = dataLocalISO(new Date(Date.now() - 86400000))
+    if (l.data === ontem) return `Ontem · ${l.hora}`
+    const d = new Date(l.data + 'T12:00:00')
+    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} · ${l.hora}`
+  }
+
   async function carregarSaldoEmConta(fid: string, saldoBase: number, dataReferencia: string) {
     setCarregandoSaldoConta(true)
     const hoje = dataLocalISO(new Date())
@@ -683,7 +694,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate" style={{ color: '#0F172A' }}>{l.categoria}</p>
-                  <p className="text-xs" style={{ color: '#94A3B8' }}>{l.membro?.split(' ')[0]} · {l.hora}</p>
+                  <p className="text-xs" style={{ color: '#94A3B8' }}>{l.membro?.split(' ')[0]} · {labelDataHora(l)}</p>
                 </div>
                 <p className="text-sm font-semibold flex-shrink-0"
                   style={{ color: l.tipo === 'receita' ? '#10B981' : '#EF4444' }}>
@@ -1299,7 +1310,7 @@ export default function DashboardPage() {
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ fontSize: '14px', fontWeight: 500, color: '#0B1F18', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.categoria}</p>
-                  <p style={{ fontSize: '12.5px', color: '#94A3B8' }}>{l.membro} · {l.hora}</p>
+                  <p style={{ fontSize: '12.5px', color: '#94A3B8' }}>{l.membro} · {labelDataHora(l)}</p>
                 </div>
                 <p style={{ fontSize: '14px', fontWeight: 600, flexShrink: 0, color: l.tipo === 'receita' ? '#2F8F68' : '#DC2626' }}>
                   {l.tipo === 'receita' ? '+' : '-'} {fmtOculto(Number(l.valor), ocultar)}
