@@ -369,26 +369,36 @@ export default function InvestimentosPage() {
   // aporte separadamente — cada um rende juros compostos só pelo tempo que ele de fato está
   // investido, não desde a data do primeiro aporte. Ação/FII com ticker+quantidade usam a
   // cotação ao vivo (Fase 2, via brapi.dev) só pra "hoje".
+  // Compara só o dia, não o horário exato — um aporte lançado "hoje de manhã" não pode ser
+  // tratado como "no futuro" só porque a data fixa em T12:00:00 ainda não chegou no relógio.
+  function dataLocalISO(d: Date): string {
+    const ano = d.getFullYear()
+    const mes = String(d.getMonth() + 1).padStart(2, '0')
+    const dia = String(d.getDate()).padStart(2, '0')
+    return `${ano}-${mes}-${dia}`
+  }
+
   function valorPosicaoEm(p: any, dataRef: Date = new Date()): number {
+    const hojeRef = dataLocalISO(dataRef)
     if (p.tipo === 'renda_fixa_cdi') {
       const taxaAjustada = taxaCDIDiaria * (Number(p.percentual_cdi || 100) / 100)
       const aportes = aportesPorPosicao[p.id]
       if (aportes && aportes.length > 0) {
         return aportes.reduce((total: number, ap: any) => {
+          if (ap.data_aporte > hojeRef) return total
           const dataAp = new Date(ap.data_aporte + 'T12:00:00')
-          if (dataAp > dataRef) return total
           const dias = diasUteisEntre(dataAp, dataRef)
           return total + Number(ap.valor) * Math.pow(1 + taxaAjustada, dias)
         }, 0)
       }
       // Fallback (aportes ainda não carregados, ou posição sem nenhum registrado): valor único antigo
+      if (p.data_aplicacao > hojeRef) return 0
       const dataAp = new Date(p.data_aplicacao + 'T12:00:00')
-      if (dataAp > dataRef) return 0
       const dias = diasUteisEntre(dataAp, dataRef)
       return Number(p.valor_investido) * Math.pow(1 + taxaAjustada, dias)
     }
+    if (p.data_aplicacao > hojeRef) return 0 // posição ainda não existia nessa data
     const dataAp = new Date(p.data_aplicacao + 'T12:00:00')
-    if (dataAp > dataRef) return 0 // posição ainda não existia nessa data
     const ehHoje = dataRef.toDateString() === new Date().toDateString()
     if (ehHoje && (p.tipo === 'acao' || p.tipo === 'fii') && p.ticker && p.quantidade && cotacoes[p.ticker] != null) {
       return cotacoes[p.ticker] * Number(p.quantidade)
@@ -439,8 +449,8 @@ export default function InvestimentosPage() {
     for (const idx of INDEXADORES) {
       const taxa = TAXAS_INDEXADOR[idx.id] || 0
       linha[idx.id] = posicoes.reduce((s, p) => {
+        if (p.data_aplicacao > dataLocalISO(dataCalc)) return s
         const dataAp = new Date(p.data_aplicacao + 'T12:00:00')
-        if (dataAp > dataCalc) return s
         const dias = diasUteisEntre(dataAp, dataCalc)
         return s + Number(p.valor_investido) * Math.pow(1 + taxa, dias)
       }, 0)
