@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useOcultarValores, fmtOculto } from '@/hooks/useOcultarValores'
 import {
-  TrendingUp, TrendingDown, Plus, X, Trash2, BarChart2, Calendar
+  TrendingUp, TrendingDown, Plus, X, Trash2, BarChart2, Calendar, Pencil
 } from 'lucide-react'
 import {
   AreaChart, ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid,
@@ -92,6 +92,15 @@ export default function InvestimentosPage() {
 
   // Posições individuais (Fase 1: Ação, FII, Renda Fixa CDI com % customizável, Tesouro)
   const [posicoes, setPosicoes]                     = useState<any[]>([])
+  const [aportesPorPosicao, setAportesPorPosicao]   = useState<Record<string, any[]>>({})
+  const [aportesModalOpen, setAportesModalOpen]     = useState(false)
+  const [posicaoAportes, setPosicaoAportes]         = useState<any>(null)
+  const [novoAporteValor, setNovoAporteValor]       = useState('')
+  const [novoAporteData, setNovoAporteData]         = useState(() => new Date().toISOString().split('T')[0])
+  const [salvandoAporte, setSalvandoAporte]         = useState(false)
+  const [editandoAporteId, setEditandoAporteId]     = useState<string | null>(null)
+  const [valorEditAporte, setValorEditAporte]       = useState('')
+  const [confirmDeleteAporteId, setConfirmDeleteAporteId] = useState<string | null>(null)
   const [modalPosicaoOpen, setModalPosicaoOpen]     = useState(false)
   const [editandoPosicao, setEditandoPosicao]       = useState<any>(null)
   const [nomePosicao, setNomePosicao]               = useState('')
@@ -171,7 +180,24 @@ export default function InvestimentosPage() {
   async function carregarPosicoes(fid: string) {
     const { data } = await supabase.from('posicoes_investimento').select('*')
       .eq('familia_id', fid).order('created_at', { ascending: false })
-    if (data) setPosicoes(data)
+    if (data) {
+      setPosicoes(data)
+      const idsRF = data.filter((p: any) => p.tipo === 'renda_fixa_cdi').map((p: any) => p.id)
+      if (idsRF.length > 0) carregarAportes(idsRF)
+    }
+  }
+
+  async function carregarAportes(posicaoIds: string[]) {
+    const { data } = await supabase.from('aportes_posicao').select('*')
+      .in('posicao_id', posicaoIds).order('data_aporte', { ascending: false })
+    if (data) {
+      const agrupado: Record<string, any[]> = {}
+      data.forEach((a: any) => {
+        if (!agrupado[a.posicao_id]) agrupado[a.posicao_id] = []
+        agrupado[a.posicao_id].push(a)
+      })
+      setAportesPorPosicao(agrupado)
+    }
   }
 
   async function buscarCotacoes(tickers: string[]) {
@@ -245,8 +271,17 @@ export default function InvestimentosPage() {
       const { error } = await supabase.from('posicoes_investimento').update(payload).eq('id', editandoPosicao.id)
       if (!error) { setModalPosicaoOpen(false); await carregarPosicoes(familiaId) }
     } else {
-      const { error } = await supabase.from('posicoes_investimento').insert(payload)
-      if (!error) { setModalPosicaoOpen(false); await carregarPosicoes(familiaId) }
+      const { data: novaPosicao, error } = await supabase.from('posicoes_investimento').insert(payload).select().single()
+      if (!error && novaPosicao) {
+        if (ehCDI) {
+          await supabase.from('aportes_posicao').insert({
+            posicao_id: novaPosicao.id, valor: valorInvestidoNum, data_aporte: dataAplicacao,
+            observacao: 'Aporte inicial',
+          })
+        }
+        setModalPosicaoOpen(false)
+        await carregarPosicoes(familiaId)
+      }
     }
     setSalvandoPosicao(false)
   }
@@ -261,6 +296,53 @@ export default function InvestimentosPage() {
       setPosicoes(prev => prev.filter(p => p.id !== editandoPosicao.id))
       setModalPosicaoOpen(false)
     }
+  }
+
+  function abrirAportes(p: any) {
+    setPosicaoAportes(p)
+    setNovoAporteValor('')
+    setNovoAporteData(new Date().toISOString().split('T')[0])
+    setEditandoAporteId(null)
+    setConfirmDeleteAporteId(null)
+    setAportesModalOpen(true)
+  }
+
+  async function handleNovoAporte() {
+    if (!posicaoAportes || !novoAporteValor) return
+    setSalvandoAporte(true)
+    const valor = parseFloat(novoAporteValor.replace(/\./g, '').replace(',', '.'))
+    const { error } = await supabase.from('aportes_posicao').insert({
+      posicao_id: posicaoAportes.id, valor, data_aporte: novoAporteData,
+    })
+    if (!error) {
+      setNovoAporteValor('')
+      await carregarAportes([posicaoAportes.id])
+    }
+    setSalvandoAporte(false)
+  }
+
+  function iniciarEdicaoAporte(a: any) {
+    setEditandoAporteId(a.id)
+    setValorEditAporte(Number(a.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
+    setConfirmDeleteAporteId(null)
+  }
+
+  async function salvarEdicaoAporte(a: any) {
+    if (!valorEditAporte) return
+    const novoValor = parseFloat(valorEditAporte.replace(/\./g, '').replace(',', '.'))
+    if (isNaN(novoValor) || novoValor <= 0) return
+    setSalvandoAporte(true)
+    const { error } = await supabase.from('aportes_posicao').update({ valor: novoValor }).eq('id', a.id)
+    if (!error) await carregarAportes([a.posicao_id])
+    setEditandoAporteId(null)
+    setSalvandoAporte(false)
+  }
+
+  async function deletarAporte(a: any) {
+    if (confirmDeleteAporteId !== a.id) { setConfirmDeleteAporteId(a.id); return }
+    const { error } = await supabase.from('aportes_posicao').delete().eq('id', a.id)
+    if (!error) await carregarAportes([a.posicao_id])
+    setConfirmDeleteAporteId(null)
   }
 
   function abrirProvento(p: any) {
@@ -283,18 +365,30 @@ export default function InvestimentosPage() {
     setSalvandoProvento(false)
   }
 
-  // Valor de uma posição numa data de referência (padrão: hoje). CDI é calculado com juros
-  // compostos a X% do CDI em dias úteis; Ação/FII com ticker+quantidade usam a cotação ao vivo
-  // (Fase 2, via brapi.dev) só pra "hoje" — pra datas passadas (gráfico histórico) ainda cai no
-  // valor manual, já que não buscamos série histórica de preço.
+  // Valor de uma posição numa data de referência (padrão: hoje). Renda Fixa CDI soma cada
+  // aporte separadamente — cada um rende juros compostos só pelo tempo que ele de fato está
+  // investido, não desde a data do primeiro aporte. Ação/FII com ticker+quantidade usam a
+  // cotação ao vivo (Fase 2, via brapi.dev) só pra "hoje".
   function valorPosicaoEm(p: any, dataRef: Date = new Date()): number {
-    const dataAp = new Date(p.data_aplicacao + 'T12:00:00')
-    if (dataAp > dataRef) return 0 // posição ainda não existia nessa data
     if (p.tipo === 'renda_fixa_cdi') {
-      const dias = diasUteisEntre(dataAp, dataRef)
       const taxaAjustada = taxaCDIDiaria * (Number(p.percentual_cdi || 100) / 100)
+      const aportes = aportesPorPosicao[p.id]
+      if (aportes && aportes.length > 0) {
+        return aportes.reduce((total: number, ap: any) => {
+          const dataAp = new Date(ap.data_aporte + 'T12:00:00')
+          if (dataAp > dataRef) return total
+          const dias = diasUteisEntre(dataAp, dataRef)
+          return total + Number(ap.valor) * Math.pow(1 + taxaAjustada, dias)
+        }, 0)
+      }
+      // Fallback (aportes ainda não carregados, ou posição sem nenhum registrado): valor único antigo
+      const dataAp = new Date(p.data_aplicacao + 'T12:00:00')
+      if (dataAp > dataRef) return 0
+      const dias = diasUteisEntre(dataAp, dataRef)
       return Number(p.valor_investido) * Math.pow(1 + taxaAjustada, dias)
     }
+    const dataAp = new Date(p.data_aplicacao + 'T12:00:00')
+    if (dataAp > dataRef) return 0 // posição ainda não existia nessa data
     const ehHoje = dataRef.toDateString() === new Date().toDateString()
     if (ehHoje && (p.tipo === 'acao' || p.tipo === 'fii') && p.ticker && p.quantidade && cotacoes[p.ticker] != null) {
       return cotacoes[p.ticker] * Number(p.quantidade)
@@ -428,7 +522,21 @@ export default function InvestimentosPage() {
                     <Plus size={13} color="#BA7517" strokeWidth={2} />
                   </button>
                 )}
+                {p.tipo === 'renda_fixa_cdi' && (
+                  <button onClick={() => abrirAportes(p)} title="Ver aportes" style={{
+                    width: '28px', height: '28px', borderRadius: '8px', flexShrink: 0,
+                    backgroundColor: '#D1FAE5', border: 'none', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <Plus size={13} color="#145A45" strokeWidth={2} />
+                  </button>
+                )}
               </div>
+              {p.tipo === 'renda_fixa_cdi' && aportesPorPosicao[p.id] && (
+                <p style={{ fontSize: '10.5px', color: '#94A3B8', margin: '6px 0 0 46px' }}>
+                  {aportesPorPosicao[p.id].length} {aportesPorPosicao[p.id].length === 1 ? 'aporte' : 'aportes'} · <button onClick={() => abrirAportes(p)} style={{ background: 'none', border: 'none', color: '#145A45', fontWeight: 600, cursor: 'pointer', padding: 0, fontSize: '10.5px' }}>ver histórico</button>
+                </p>
+              )}
               {rendimentoDiario != null && (
                 <p style={{ fontSize: '10.5px', color: '#94A3B8', margin: '6px 0 0 46px' }}>
                   Rende ≈ {fmtOculto(rendimentoDiario, ocultar)} por dia útil, na taxa de hoje
@@ -969,6 +1077,92 @@ export default function InvestimentosPage() {
             }}>
               {salvandoProvento ? 'Salvando...' : 'Registrar provento'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Aportes (histórico por posição de Renda Fixa) */}
+      {aportesModalOpen && posicaoAportes && (
+        <div onClick={e => { if (e.target === e.currentTarget) setAportesModalOpen(false) }}
+          style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
+          <div style={{ width: isMobile ? '100%' : '440px', backgroundColor: '#fff', borderRadius: isMobile ? '28px 28px 0 0' : '20px', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+            {isMobile && <div style={{ width: '40px', height: '4px', borderRadius: '2px', backgroundColor: '#E2E8F0', margin: '12px auto 4px', flexShrink: 0 }} />}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '1px solid #F1F5F9', flexShrink: 0 }}>
+              <div>
+                <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', margin: 0 }}>Aportes</h2>
+                <p style={{ fontSize: '12px', color: '#64748B', margin: '2px 0 0' }}>{posicaoAportes.nome}</p>
+              </div>
+              <button onClick={() => setAportesModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}>
+                <X size={20} strokeWidth={2} />
+              </button>
+            </div>
+
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #F1F5F9', flexShrink: 0 }}>
+              <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Novo aporte</p>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input type="text" inputMode="numeric" value={novoAporteValor} placeholder="0,00"
+                  onChange={e => {
+                    const digits = e.target.value.replace(/\D/g, '')
+                    const num = parseInt(digits || '0', 10)
+                    setNovoAporteValor(digits === '' ? '' : (num / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
+                  }}
+                  style={{ flex: 1, height: '42px', padding: '0 12px', borderRadius: '10px', border: '1.5px solid #E5E7EB', fontSize: '13px', color: '#0F172A', outline: 'none', backgroundColor: '#FAFAFA' }}
+                />
+                <input type="date" value={novoAporteData} onChange={e => setNovoAporteData(e.target.value)}
+                  style={{ width: '140px', height: '42px', padding: '0 10px', borderRadius: '10px', border: '1.5px solid #E5E7EB', fontSize: '13px', color: '#0F172A', outline: 'none', backgroundColor: '#FAFAFA' }}
+                />
+              </div>
+              <button onClick={handleNovoAporte} disabled={salvandoAporte || !novoAporteValor} style={{
+                width: '100%', height: '38px', marginTop: '8px', borderRadius: '10px', border: 'none',
+                background: salvandoAporte || !novoAporteValor ? '#94A3B8' : '#145A45', color: '#fff',
+                fontSize: '12.5px', fontWeight: 600, cursor: salvandoAporte || !novoAporteValor ? 'not-allowed' : 'pointer',
+              }}>
+                {salvandoAporte ? 'Salvando...' : '+ Adicionar aporte'}
+              </button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px 20px' }}>
+              {(aportesPorPosicao[posicaoAportes.id] || []).length === 0 ? (
+                <p style={{ fontSize: '12.5px', color: '#94A3B8', textAlign: 'center', padding: '20px 0' }}>Nenhum aporte ainda.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {(aportesPorPosicao[posicaoAportes.id] || []).map((a: any) => (
+                    <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '10px', backgroundColor: '#F8FAFC', border: '1px solid #F1F5F9' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontSize: '11px', color: '#94A3B8', margin: 0 }}>{new Date(a.data_aporte + 'T12:00:00').toLocaleDateString('pt-BR')}</p>
+                        {editandoAporteId === a.id ? (
+                          <input type="text" inputMode="numeric" autoFocus value={valorEditAporte}
+                            onChange={e => {
+                              const digits = e.target.value.replace(/\D/g, '')
+                              const num = parseInt(digits || '0', 10)
+                              setValorEditAporte(digits === '' ? '' : (num / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
+                            }}
+                            style={{ width: '100%', marginTop: '2px', height: '30px', padding: '0 8px', borderRadius: '8px', border: '1px solid #E2E8F0', fontSize: '13px', outline: 'none' }}
+                          />
+                        ) : (
+                          <p style={{ fontSize: '13.5px', fontWeight: 600, color: '#0F172A', margin: 0 }}>{fmt(Number(a.valor))}</p>
+                        )}
+                      </div>
+                      {editandoAporteId === a.id ? (
+                        <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                          <button onClick={() => salvarEdicaoAporte(a)} style={{ padding: '6px 10px', borderRadius: '8px', border: 'none', backgroundColor: '#145A45', color: '#fff', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Salvar</button>
+                          <button onClick={() => setEditandoAporteId(null)} style={{ padding: '6px 10px', borderRadius: '8px', border: 'none', backgroundColor: '#F1F5F9', color: '#64748B', fontSize: '11px', cursor: 'pointer' }}>Cancelar</button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                          <button onClick={() => iniciarEdicaoAporte(a)} style={{ width: '28px', height: '28px', borderRadius: '8px', border: 'none', backgroundColor: '#F1F5F9', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Pencil size={12} color="#64748B" strokeWidth={1.75} />
+                          </button>
+                          <button onClick={() => deletarAporte(a)} style={{ width: '28px', height: '28px', borderRadius: '8px', border: 'none', backgroundColor: confirmDeleteAporteId === a.id ? '#EF4444' : '#FEF2F2', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Trash2 size={12} color={confirmDeleteAporteId === a.id ? '#fff' : '#DC2626'} strokeWidth={1.75} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -72,6 +72,7 @@ export default function LinhaDoTempoPage() {
   const [totalRec, setTotalRec] = useState(0)
   const [totalDes, setTotalDes] = useState(0)
   const [posicoes, setPosicoes] = useState<any[]>([])
+  const [aportesPorPosicao, setAportesPorPosicao] = useState<Record<string, any[]>>({})
   const [metas, setMetas] = useState<any[]>([])
   const [evolucao, setEvolucao] = useState<{ mes: string; valor: number }[]>([])
   const [anoSelecionado, setAnoSelecionado] = useState(new Date().getFullYear())
@@ -142,6 +143,17 @@ export default function LinhaDoTempoPage() {
       .select('*').eq('familia_id', profile.familia_id)
     setPosicoes(posicoesData || [])
 
+    const idsRF = (posicoesData || []).filter((p: any) => p.tipo === 'renda_fixa_cdi').map((p: any) => p.id)
+    if (idsRF.length > 0) {
+      const { data: aportesData } = await supabase.from('aportes_posicao').select('*').in('posicao_id', idsRF)
+      const agrupado: Record<string, any[]> = {}
+      ;(aportesData || []).forEach((a: any) => {
+        if (!agrupado[a.posicao_id]) agrupado[a.posicao_id] = []
+        agrupado[a.posicao_id].push(a)
+      })
+      setAportesPorPosicao(agrupado)
+    }
+
     const { data: metasData } = await supabase.from('metas')
       .select('*').eq('familia_id', profile.familia_id).order('prazo', { ascending: true })
     if (metasData) setMetas(metasData)
@@ -173,14 +185,23 @@ export default function LinhaDoTempoPage() {
     ? Math.max((evolucao[evolucao.length - 1].valor - evolucao[0].valor) / (evolucao.length - 1), 200)
     : 500
 
-  // Mesmo cálculo usado na tela Investimentos: Renda Fixa CDI rende composto por dia útil;
-  // Ação/FII/Tesouro usam o último valor informado (cotação ao vivo fica só na tela Investimentos,
-  // pra não duplicar chamadas de API aqui).
+  // Mesmo cálculo usado na tela Investimentos: cada aporte de Renda Fixa CDI rende juros
+  // compostos só pelo tempo que ele está investido (não desde o primeiro aporte da posição).
+  // Ação/FII/Tesouro usam o último valor informado (cotação ao vivo fica só na tela Investimentos).
   const totalInvEstimado = posicoes.reduce((s, p) => {
     if (p.tipo === 'renda_fixa_cdi') {
+      const taxaAjustada = taxaCDIDiaria * (Number(p.percentual_cdi || 100) / 100)
+      const aportes = aportesPorPosicao[p.id]
+      if (aportes && aportes.length > 0) {
+        const totalPosicao = aportes.reduce((sub: number, ap: any) => {
+          const dataAp = new Date(ap.data_aporte + 'T12:00:00')
+          const dias = diasUteisEntre(dataAp, new Date())
+          return sub + Number(ap.valor) * Math.pow(1 + taxaAjustada, dias)
+        }, 0)
+        return s + totalPosicao
+      }
       const dataAp = new Date(p.data_aplicacao + 'T12:00:00')
       const dias = diasUteisEntre(dataAp, new Date())
-      const taxaAjustada = taxaCDIDiaria * (Number(p.percentual_cdi || 100) / 100)
       return s + Number(p.valor_investido) * Math.pow(1 + taxaAjustada, dias)
     }
     return s + (p.valor_atual != null ? Number(p.valor_atual) : Number(p.valor_investido))
