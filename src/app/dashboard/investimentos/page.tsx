@@ -113,6 +113,7 @@ export default function InvestimentosPage() {
   const [quantidade, setQuantidade]                 = useState('')
   const [precoUnitario, setPrecoUnitario]            = useState('')
   const [sugestoesTicker, setSugestoesTicker]         = useState<any[]>([])
+  const [erroTicker, setErroTicker]                   = useState('')
   const [buscandoTicker, setBuscandoTicker]           = useState(false)
   const [dropdownTickerAberto, setDropdownTickerAberto] = useState(false)
   const [salvandoPosicao, setSalvandoPosicao]       = useState(false)
@@ -124,10 +125,7 @@ export default function InvestimentosPage() {
   const [carregandoCotacoes, setCarregandoCotacoes] = useState(false)
 
   // Fase 3: proventos/dividendos
-  const [proventoOpen, setProventoOpen]           = useState(false)
-  const [posicaoProvento, setPosicaoProvento]     = useState<any>(null)
-  const [valorProvento, setValorProvento]         = useState('')
-  const [salvandoProvento, setSalvandoProvento]   = useState(false)
+
 
   // Proventos automáticos (sugestão via brapi.dev, com confirmação manual)
   const [sugestoesOpen, setSugestoesOpen]         = useState(false)
@@ -155,8 +153,10 @@ export default function InvestimentosPage() {
         const res = await fetch(`/api/tickers?search=${encodeURIComponent(ticker.trim())}&tipo=${tipoPosicao}`)
         const data = await res.json()
         setSugestoesTicker(data.resultados || [])
+        setErroTicker(data.error || '')
       } catch {
         setSugestoesTicker([])
+        setErroTicker('Falha de conexão')
       }
       setBuscandoTicker(false)
     }, 350)
@@ -377,26 +377,6 @@ export default function InvestimentosPage() {
     setConfirmDeleteAporteId(null)
   }
 
-  function abrirProvento(p: any) {
-    setPosicaoProvento(p)
-    setValorProvento('')
-    setProventoOpen(true)
-  }
-
-  async function handleSalvarProvento() {
-    if (!valorProvento || !posicaoProvento) return
-    setSalvandoProvento(true)
-    const valor = parseFloat(valorProvento.replace(/\./g, '').replace(',', '.'))
-    const novoTotal = Number(posicaoProvento.proventos_recebidos || 0) + valor
-    const { error } = await supabase.from('posicoes_investimento')
-      .update({ proventos_recebidos: novoTotal }).eq('id', posicaoProvento.id)
-    if (!error) {
-      setPosicoes(prev => prev.map(p => p.id === posicaoProvento.id ? { ...p, proventos_recebidos: novoTotal } : p))
-      setProventoOpen(false)
-    }
-    setSalvandoProvento(false)
-  }
-
   async function buscarSugestoesProventos(p: any) {
     if (!p.ticker) return
     setPosicaoSugestoes(p)
@@ -409,8 +389,8 @@ export default function InvestimentosPage() {
       const jaProcessados: any[] = p.proventos_processados || []
       const dataAplicacao = p.data_aplicacao
       const novos = (data.proventos || []).filter((prov: any) =>
-        prov.data >= dataAplicacao && // só proventos pagos depois que você já tinha o ativo
-        !jaProcessados.some((jp: any) => jp.data === prov.data && Math.abs(jp.valorPorAcao - prov.valorPorAcao) < 0.001)
+        prov.dataPagamento >= dataAplicacao && // só proventos pagos depois que você já tinha o ativo
+        !jaProcessados.some((jp: any) => jp.data === prov.dataPagamento && Math.abs(jp.valorPorAcao - prov.valorPorAcao) < 0.001)
       )
       setSugestoesProventos(novos)
     } catch {
@@ -425,7 +405,7 @@ export default function InvestimentosPage() {
     const valorTotal = sugestao.valorPorAcao * Number(posicaoSugestoes.quantidade || 0)
     const novoTotalProventos = Number(posicaoSugestoes.proventos_recebidos || 0) + valorTotal
     const processadosAtuais: any[] = posicaoSugestoes.proventos_processados || []
-    const novosProcessados = [...processadosAtuais, { data: sugestao.data, valorPorAcao: sugestao.valorPorAcao }]
+    const novosProcessados = [...processadosAtuais, { data: sugestao.dataPagamento, valorPorAcao: sugestao.valorPorAcao }]
 
     const { error } = await supabase.from('posicoes_investimento').update({
       proventos_recebidos: novoTotalProventos,
@@ -613,17 +593,8 @@ export default function InvestimentosPage() {
                     </p>
                   </div>
                 </button>
-                {ehVariavel(p.tipo) && (
-                  <button onClick={() => abrirProvento(p)} title="Registrar provento/dividendo" style={{
-                    width: '28px', height: '28px', borderRadius: '8px', flexShrink: 0,
-                    backgroundColor: '#FAEEDA', border: 'none', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <Plus size={13} color="#BA7517" strokeWidth={2} />
-                  </button>
-                )}
                 {ehVariavel(p.tipo) && p.ticker && (
-                  <button onClick={() => buscarSugestoesProventos(p)} title="Buscar proventos automaticamente" style={{
+                  <button onClick={() => buscarSugestoesProventos(p)} title="Ver proventos automaticamente" style={{
                     width: '28px', height: '28px', borderRadius: '8px', flexShrink: 0,
                     backgroundColor: '#EFF6FF', border: 'none', cursor: 'pointer',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -748,7 +719,9 @@ export default function InvestimentosPage() {
                   {buscandoTicker ? (
                     <p style={{ padding: '12px 14px', fontSize: '12.5px', color: '#94A3B8', margin: 0 }}>Buscando...</p>
                   ) : sugestoesTicker.length === 0 ? (
-                    <p style={{ padding: '12px 14px', fontSize: '12.5px', color: '#94A3B8', margin: 0 }}>Nenhum ativo encontrado com esse código.</p>
+                    <p style={{ padding: '12px 14px', fontSize: '12.5px', color: erroTicker ? '#DC2626' : '#94A3B8', margin: 0 }}>
+                      {erroTicker ? `Erro na busca: ${erroTicker}` : 'Nenhum ativo encontrado com esse código.'}
+                    </p>
                   ) : (
                     sugestoesTicker.map((s: any) => (
                       <button key={s.ticker} type="button"
@@ -1177,43 +1150,6 @@ export default function InvestimentosPage() {
         </div>
       )}
 
-      {/* Modal Provento (Fase 3) */}
-      {proventoOpen && posicaoProvento && (
-        <div onClick={e => { if (e.target === e.currentTarget) setProventoOpen(false) }}
-          style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
-          <div style={{ width: isMobile ? '100%' : '380px', backgroundColor: '#fff', borderRadius: isMobile ? '28px 28px 0 0' : '20px', padding: '24px' }}>
-            {isMobile && <div style={{ width: '40px', height: '4px', borderRadius: '2px', backgroundColor: '#E2E8F0', margin: '-8px auto 16px' }} />}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-              <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', margin: 0 }}>Registrar provento</h2>
-              <button onClick={() => setProventoOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}>
-                <X size={20} strokeWidth={2} />
-              </button>
-            </div>
-            <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '16px' }}>{posicaoProvento.nome}</p>
-            <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Valor recebido (R$)</p>
-            <input type="text" inputMode="numeric" value={valorProvento} autoFocus
-              onChange={e => {
-                const digits = e.target.value.replace(/\D/g, '')
-                const num = parseInt(digits || '0', 10)
-                setValorProvento(digits === '' ? '' : (num / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
-              }}
-              placeholder="0,00"
-              style={{ width: '100%', height: '46px', padding: '0 14px', borderRadius: '12px', border: '1.5px solid #E5E7EB', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box', marginBottom: '8px', backgroundColor: '#FAFAFA' }}
-            />
-            <p style={{ fontSize: '11.5px', color: '#94A3B8', marginBottom: '18px' }}>
-              Soma ao total de proventos já recebidos nessa posição ({fmtShort(Number(posicaoProvento.proventos_recebidos || 0))} até agora). Não gera lançamento em Movimentos.
-            </p>
-            <button onClick={handleSalvarProvento} disabled={salvandoProvento || !valorProvento} style={{
-              width: '100%', height: '48px', borderRadius: '13px', border: 'none',
-              background: salvandoProvento || !valorProvento ? '#94A3B8' : 'linear-gradient(135deg, #07271F 0%, #145A45 100%)',
-              color: '#fff', fontSize: '14px', fontWeight: 600, cursor: salvandoProvento || !valorProvento ? 'not-allowed' : 'pointer',
-            }}>
-              {salvandoProvento ? 'Salvando...' : 'Registrar provento'}
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Modal Sugestões de Proventos (automático via brapi.dev) */}
       {sugestoesOpen && posicaoSugestoes && (
         <div onClick={e => { if (e.target === e.currentTarget) setSugestoesOpen(false) }}
@@ -1231,35 +1167,76 @@ export default function InvestimentosPage() {
             </div>
 
             <div style={{ padding: '12px 20px 20px', overflowY: 'auto', flex: 1 }}>
-              <p style={{ fontSize: '11.5px', color: '#94A3B8', marginBottom: '12px' }}>
-                Lista de proventos pagos, buscada direto na brapi.dev. Fica aqui pra você conferir quando quiser — só soma no seu total se você clicar "Adicionar".
-              </p>
               {buscandoSugestoes ? (
                 <p style={{ fontSize: '12.5px', color: '#94A3B8', textAlign: 'center', padding: '24px 0' }}>Buscando...</p>
               ) : sugestoesProventos.length === 0 ? (
                 <p style={{ fontSize: '12.5px', color: '#94A3B8', textAlign: 'center', padding: '24px 0' }}>Nenhum provento encontrado desde que você tem essa posição.</p>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {sugestoesProventos.map((s, idx) => {
-                    const valorTotal = s.valorPorAcao * Number(posicaoSugestoes.quantidade || 0)
+                <>
+                  {/* Card destaque: último rendimento */}
+                  {(() => {
+                    const ultimo = sugestoesProventos[0]
+                    const cotacaoAtual = posicaoSugestoes.ticker ? cotacoes[posicaoSugestoes.ticker] : null
+                    const rendPct = cotacaoAtual ? (ultimo.valorPorAcao / cotacaoAtual) * 100 : null
                     return (
-                      <div key={`${s.data}-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '10px', backgroundColor: '#F8FAFC', border: '1px solid #F1F5F9' }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ fontSize: '11px', color: '#94A3B8', margin: 0 }}>{new Date(s.data + 'T12:00:00').toLocaleDateString('pt-BR')} · {s.label}</p>
-                          <p style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A', margin: 0 }}>{fmt(valorTotal)}</p>
-                          <p style={{ fontSize: '10.5px', color: '#94A3B8', margin: 0 }}>{fmt(s.valorPorAcao)}/ação × {posicaoSugestoes.quantidade}</p>
+                      <div style={{ background: 'linear-gradient(135deg, #0D3F31 0%, #145A45 100%)', borderRadius: '16px', padding: '18px', marginBottom: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+                          <Calendar size={13} color="rgba(255,255,255,0.7)" strokeWidth={1.75} />
+                          <span style={{ fontSize: '10.5px', fontWeight: 700, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Último rendimento</span>
                         </div>
-                        <button onClick={() => confirmarSugestaoProvento(s, idx)} disabled={confirmandoSugestaoIdx === idx} style={{
-                          padding: '0 12px', height: '28px', borderRadius: '8px', border: 'none',
-                          backgroundColor: '#145A45', color: '#fff', fontSize: '11px', fontWeight: 600,
-                          cursor: confirmandoSugestaoIdx === idx ? 'not-allowed' : 'pointer', flexShrink: 0,
-                        }}>
-                          {confirmandoSugestaoIdx === idx ? '...' : 'Adicionar'}
-                        </button>
+                        <p style={{ fontSize: '26px', fontWeight: 700, color: '#fff', margin: '0 0 12px', letterSpacing: '-0.5px' }}>
+                          {fmt(ultimo.valorPorAcao * Number(posicaoSugestoes.quantidade || 0))}
+                        </p>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.15)' }}>
+                          <div>
+                            <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.6)', margin: '0 0 2px' }}>Rendimento</p>
+                            <p style={{ fontSize: '13px', fontWeight: 600, color: '#fff', margin: 0 }}>{rendPct != null ? `${rendPct.toFixed(4)}%` : '—'}</p>
+                          </div>
+                          <div>
+                            <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.6)', margin: '0 0 2px' }}>Cotação atual</p>
+                            <p style={{ fontSize: '13px', fontWeight: 600, color: '#fff', margin: 0 }}>{cotacaoAtual ? fmt(cotacaoAtual) : '—'}</p>
+                          </div>
+                          <div>
+                            <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.6)', margin: '0 0 2px' }}>Data base</p>
+                            <p style={{ fontSize: '13px', fontWeight: 600, color: '#fff', margin: 0 }}>{ultimo.dataBase ? new Date(ultimo.dataBase + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}</p>
+                          </div>
+                          <div>
+                            <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.6)', margin: '0 0 2px' }}>Data pagamento</p>
+                            <p style={{ fontSize: '13px', fontWeight: 600, color: '#fff', margin: 0 }}>{new Date(ultimo.dataPagamento + 'T12:00:00').toLocaleDateString('pt-BR')}</p>
+                          </div>
+                        </div>
+                        <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.55)', marginTop: '10px', marginBottom: 0 }}>
+                          "Rendimento" usa a cotação de hoje como referência (não a cotação exata da data base) — estimativa.
+                        </p>
                       </div>
                     )
-                  })}
-                </div>
+                  })()}
+
+                  <p style={{ fontSize: '11.5px', color: '#94A3B8', marginBottom: '10px' }}>
+                    Histórico completo — fica aqui pra você conferir quando quiser, só soma no seu total se clicar "Adicionar".
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {sugestoesProventos.map((s, idx) => {
+                      const valorTotal = s.valorPorAcao * Number(posicaoSugestoes.quantidade || 0)
+                      return (
+                        <div key={`${s.dataPagamento}-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '10px', backgroundColor: '#F8FAFC', border: '1px solid #F1F5F9' }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ fontSize: '11px', color: '#94A3B8', margin: 0 }}>{new Date(s.dataPagamento + 'T12:00:00').toLocaleDateString('pt-BR')} · {s.label}</p>
+                            <p style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A', margin: 0 }}>{fmt(valorTotal)}</p>
+                            <p style={{ fontSize: '10.5px', color: '#94A3B8', margin: 0 }}>{fmt(s.valorPorAcao)}/ação × {posicaoSugestoes.quantidade}</p>
+                          </div>
+                          <button onClick={() => confirmarSugestaoProvento(s, idx)} disabled={confirmandoSugestaoIdx === idx} style={{
+                            padding: '0 12px', height: '28px', borderRadius: '8px', border: 'none',
+                            backgroundColor: '#145A45', color: '#fff', fontSize: '11px', fontWeight: 600,
+                            cursor: confirmandoSugestaoIdx === idx ? 'not-allowed' : 'pointer', flexShrink: 0,
+                          }}>
+                            {confirmandoSugestaoIdx === idx ? '...' : 'Adicionar'}
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </>
               )}
             </div>
           </div>

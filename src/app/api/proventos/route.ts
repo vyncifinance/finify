@@ -24,15 +24,17 @@ export async function GET(req: NextRequest) {
     const data = await res.json()
     const cash = data.results?.[0]?.dividendsData?.cashDividends || []
 
-    // Campos exatos da brapi podem variar (paymentDate/approvedOn, rate/value) — cobre as
-    // variações conhecidas em vez de assumir um único nome de campo.
+    // Campos exatos da brapi podem variar — cobre as variações conhecidas em vez de assumir
+    // um único nome de campo. "Data base" (lastDatePrior, ex-dividendo) nem sempre vem preenchida.
     const proventos = cash
       .map((d: any) => ({
-        data: d.paymentDate || d.approvedOn || d.lastDatePrior || null,
+        dataPagamento: d.paymentDate || d.approvedOn || null,
+        dataBase: d.lastDatePrior || null,
         valorPorAcao: Number(d.rate ?? d.value ?? 0),
         label: d.label || (d.relatedTo ? `Provento — ${d.relatedTo}` : 'Provento'),
       }))
-      .filter((p: any) => p.data && p.valorPorAcao > 0)
+      .filter((p: any) => p.dataPagamento && p.valorPorAcao > 0)
+      .sort((a: any, b: any) => (a.dataPagamento < b.dataPagamento ? 1 : -1)) // mais recente primeiro
 
     return NextResponse.json({ proventos })
   } catch (e) {
