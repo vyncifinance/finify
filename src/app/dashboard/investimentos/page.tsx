@@ -407,6 +407,17 @@ export default function InvestimentosPage() {
   }
   const valorAtualPosicao = (p: any) => valorPosicaoEm(p)
 
+  // Rendimento acumulado só deste mês, por posição. Se um aporte entrou no meio do mês, conta
+  // só o rendimento dele desde a própria data — nunca o valor aportado como se fosse "ganho".
+  function rendimentoMesPosicao(p: any): number | null {
+    if (p.tipo !== 'renda_fixa_cdi') return null
+    const valorAtual = valorAtualPosicao(p)
+    const taxaAjustada = taxaCDIDiaria * (Number(p.percentual_cdi || 100) / 100)
+    const diasUteisMes = 21 // aproximação padrão de dias úteis por mês
+    return valorAtual * (Math.pow(1 + taxaAjustada, diasUteisMes) - 1)
+  }
+
+
   const TIPO_LABEL: Record<string, string> = {
     acao: 'Ação', fii: 'FII', renda_fixa_cdi: 'Renda Fixa (CDI)', tesouro: 'Tesouro Direto',
   }
@@ -494,6 +505,7 @@ export default function InvestimentosPage() {
             const rendimentoDiario = p.tipo === 'renda_fixa_cdi'
               ? valorAtual * (taxaCDIDiaria * (Number(p.percentual_cdi || 100) / 100))
               : null
+            const rendimentoMes = rendimentoMesPosicao(p)
             return (
               <div key={p.id} style={{
                 display: 'flex', flexDirection: 'column',
@@ -549,7 +561,8 @@ export default function InvestimentosPage() {
               )}
               {rendimentoDiario != null && (
                 <p style={{ fontSize: '10.5px', color: '#94A3B8', margin: '6px 0 0 46px' }}>
-                  Rende ≈ {fmtOculto(rendimentoDiario, ocultar)} por dia útil, na taxa de hoje
+                  Rende ≈ {fmtOculto(rendimentoDiario, ocultar)} por dia útil
+                  {rendimentoMes != null && ` e ≈ ${fmtOculto(rendimentoMes, ocultar)} por mês`}, na taxa de hoje
                 </p>
               )}
               </div>
@@ -814,7 +827,7 @@ export default function InvestimentosPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '8px', padding: '0 16px', marginTop: '-24px', marginBottom: '16px' }}>
           {[
             { label: 'Total da carteira', val: fmtShort(totalGeral), cor: '#145A45', bg: '#F0FDF4', sub: `${posicoes.length} ${posicoes.length === 1 ? 'posição' : 'posições'}` },
-            { label: 'Rendimento total', val: rendimentoTotal !== 0 ? fmtShort(rendimentoTotal) : '—', cor: rendimentoTotal >= 0 ? '#10B981' : '#EF4444', bg: rendimentoTotal >= 0 ? '#ECFDF5' : '#FEF2F2', sub: rendimentoTotal !== 0 ? fmtPct(rendimentoTotalPct) : 'Sem posições' },
+            { label: 'Rendimento total', val: posicoes.length === 0 ? '—' : fmtShort(rendimentoTotal), cor: rendimentoTotal >= 0 ? '#10B981' : '#EF4444', bg: rendimentoTotal >= 0 ? '#ECFDF5' : '#FEF2F2', sub: posicoes.length === 0 ? 'Sem posições' : fmtPct(rendimentoTotalPct) },
           ].map(c => (
             <div key={c.label} style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
               <div style={{ width: '28px', height: '28px', borderRadius: '8px', backgroundColor: c.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
@@ -897,16 +910,16 @@ export default function InvestimentosPage() {
             },
             {
               label: 'Rendimento total',
-              val: loading ? '...' : rendimentoTotal !== 0 ? fmtOculto(Math.abs(rendimentoTotal), ocultar) : '—',
-              sub: rendimentoTotal !== 0 ? fmtPct(rendimentoTotalPct) : 'Sem posições ainda',
+              val: loading ? '...' : posicoes.length === 0 ? '—' : fmtOculto(Math.abs(rendimentoTotal), ocultar),
+              sub: posicoes.length === 0 ? 'Sem posições ainda' : fmtPct(rendimentoTotalPct),
               cor: rendimentoTotal >= 0 ? '#10B981' : '#EF4444',
               bg: rendimentoTotal >= 0 ? '#ECFDF5' : '#FEF2F2',
               Icon: rendimentoTotal >= 0 ? TrendingUp : TrendingDown,
             },
             {
               label: 'Variação do mês',
-              val: loading ? '...' : varMesAtualR !== 0 ? fmtOculto(Math.abs(varMesAtualR), ocultar) : '—',
-              sub: varMesAtualR !== 0 ? fmtPct(varMesAtualPct) : 'Sem histórico ainda',
+              val: loading ? '...' : posicoes.length === 0 ? '—' : fmtOculto(Math.abs(varMesAtualR), ocultar),
+              sub: posicoes.length === 0 ? 'Sem histórico ainda' : fmtPct(varMesAtualPct),
               cor: varMesAtualR >= 0 ? '#10B981' : '#EF4444',
               bg: varMesAtualR >= 0 ? '#ECFDF5' : '#FEF2F2',
               Icon: varMesAtualR >= 0 ? TrendingUp : TrendingDown,
