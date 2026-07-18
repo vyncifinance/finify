@@ -112,6 +112,9 @@ export default function InvestimentosPage() {
   const [ticker, setTicker]                         = useState('')
   const [quantidade, setQuantidade]                 = useState('')
   const [precoUnitario, setPrecoUnitario]            = useState('')
+  const [sugestoesTicker, setSugestoesTicker]         = useState<any[]>([])
+  const [buscandoTicker, setBuscandoTicker]           = useState(false)
+  const [dropdownTickerAberto, setDropdownTickerAberto] = useState(false)
   const [salvandoPosicao, setSalvandoPosicao]       = useState(false)
   const [deletandoPosicao, setDeletandoPosicao]     = useState(false)
   const [confirmDeletePosicao, setConfirmDeletePosicao] = useState(false)
@@ -138,6 +141,28 @@ export default function InvestimentosPage() {
 
   useEffect(() => { buscarTaxaCDIDiaria().then(setTaxaCDIDiaria) }, [])
   useEffect(() => { buscarTaxaIPCADiaria().then(setTaxaIPCADiaria) }, [])
+
+  // Autocompletar de ticker: espera 350ms sem digitar antes de buscar, pra não disparar
+  // uma chamada a cada letra.
+  useEffect(() => {
+    if (!(tipoPosicao === 'acao' || tipoPosicao === 'fii') || ticker.trim().length < 2) {
+      setSugestoesTicker([])
+      return
+    }
+    setBuscandoTicker(true)
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/tickers?search=${encodeURIComponent(ticker.trim())}&tipo=${tipoPosicao}`)
+        const data = await res.json()
+        setSugestoesTicker(data.resultados || [])
+      } catch {
+        setSugestoesTicker([])
+      }
+      setBuscandoTicker(false)
+    }, 350)
+    return () => clearTimeout(timer)
+  }, [ticker, tipoPosicao])
+
   useEffect(() => {
     INDEXADORES.filter(idx => idx.ticker).forEach(idx => {
       fetch(`/api/indice-taxa?ticker=${encodeURIComponent(idx.ticker!)}`)
@@ -416,15 +441,7 @@ export default function InvestimentosPage() {
     setConfirmandoSugestaoIdx(null)
   }
 
-  async function ignorarSugestaoProvento(sugestao: any, idx: number) {
-    if (!posicaoSugestoes) return
-    const processadosAtuais: any[] = posicaoSugestoes.proventos_processados || []
-    const novosProcessados = [...processadosAtuais, { data: sugestao.data, valorPorAcao: sugestao.valorPorAcao }]
-    await supabase.from('posicoes_investimento').update({ proventos_processados: novosProcessados }).eq('id', posicaoSugestoes.id)
-    setPosicaoSugestoes((prev: any) => ({ ...prev, proventos_processados: novosProcessados }))
-    setPosicoes(prev => prev.map(p => p.id === posicaoSugestoes.id ? { ...p, proventos_processados: novosProcessados } : p))
-    setSugestoesProventos(prev => prev.filter((_, i) => i !== idx))
-  }
+
 
   // Valor de uma posição numa data de referência (padrão: hoje). Renda Fixa CDI soma cada
   // aporte separadamente — cada um rende juros compostos só pelo tempo que ele de fato está
@@ -718,11 +735,34 @@ export default function InvestimentosPage() {
         {(tipoPosicao === 'acao' || tipoPosicao === 'fii') ? (
           <>
             <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Ticker (código na bolsa)</p>
-            <input type="text" value={ticker} onChange={e => setTicker(e.target.value.toUpperCase())}
-              placeholder="Ex: PETR4, HGLG11"
-              style={{ width: '100%', height: '46px', padding: '0 14px', borderRadius: '12px', border: '1.5px solid #E5E7EB', fontSize: '14px', fontWeight: 600, color: '#0F172A', outline: 'none', boxSizing: 'border-box', marginBottom: '4px', backgroundColor: '#FAFAFA', textTransform: 'uppercase' }}
-            />
-            <p style={{ fontSize: '11px', color: '#94A3B8', marginBottom: '16px' }}>O ticker também é usado como nome da posição na lista.</p>
+            <div style={{ position: 'relative' }}>
+              <input type="text" value={ticker}
+                onChange={e => { setTicker(e.target.value.toUpperCase()); setDropdownTickerAberto(true) }}
+                onFocus={() => setDropdownTickerAberto(true)}
+                onBlur={() => setTimeout(() => setDropdownTickerAberto(false), 150)}
+                placeholder="Digite pra buscar: PETR4, HGLG11..."
+                style={{ width: '100%', height: '46px', padding: '0 14px', borderRadius: '12px', border: '1.5px solid #E5E7EB', fontSize: '14px', fontWeight: 600, color: '#0F172A', outline: 'none', boxSizing: 'border-box', backgroundColor: '#FAFAFA', textTransform: 'uppercase' }}
+              />
+              {dropdownTickerAberto && ticker.trim().length >= 2 && (
+                <div style={{ position: 'absolute', top: '50px', left: 0, right: 0, backgroundColor: '#fff', border: '1px solid #E5E7EB', borderRadius: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.08)', zIndex: 10, maxHeight: '220px', overflowY: 'auto' }}>
+                  {buscandoTicker ? (
+                    <p style={{ padding: '12px 14px', fontSize: '12.5px', color: '#94A3B8', margin: 0 }}>Buscando...</p>
+                  ) : sugestoesTicker.length === 0 ? (
+                    <p style={{ padding: '12px 14px', fontSize: '12.5px', color: '#94A3B8', margin: 0 }}>Nenhum ativo encontrado com esse código.</p>
+                  ) : (
+                    sugestoesTicker.map((s: any) => (
+                      <button key={s.ticker} type="button"
+                        onMouseDown={() => { setTicker(s.ticker); setDropdownTickerAberto(false) }}
+                        style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: '10px 14px', background: 'none', border: 'none', borderBottom: '1px solid #F1F5F9', cursor: 'pointer', textAlign: 'left' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A' }}>{s.ticker}</span>
+                        {s.nome && <span style={{ fontSize: '11px', color: '#94A3B8' }}>{s.nome}</span>}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+            <p style={{ fontSize: '11px', color: '#94A3B8', marginTop: '4px', marginBottom: '16px' }}>O ticker também é usado como nome da posição na lista.</p>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '4px' }}>
               <div>
@@ -1192,12 +1232,12 @@ export default function InvestimentosPage() {
 
             <div style={{ padding: '12px 20px 20px', overflowY: 'auto', flex: 1 }}>
               <p style={{ fontSize: '11.5px', color: '#94A3B8', marginBottom: '12px' }}>
-                Buscado direto na brapi.dev. Confirme os que quiser somar ao seu total — nada é adicionado automaticamente sem sua confirmação.
+                Lista de proventos pagos, buscada direto na brapi.dev. Fica aqui pra você conferir quando quiser — só soma no seu total se você clicar "Adicionar".
               </p>
               {buscandoSugestoes ? (
                 <p style={{ fontSize: '12.5px', color: '#94A3B8', textAlign: 'center', padding: '24px 0' }}>Buscando...</p>
               ) : sugestoesProventos.length === 0 ? (
-                <p style={{ fontSize: '12.5px', color: '#94A3B8', textAlign: 'center', padding: '24px 0' }}>Nenhum provento novo encontrado desde que você tem essa posição.</p>
+                <p style={{ fontSize: '12.5px', color: '#94A3B8', textAlign: 'center', padding: '24px 0' }}>Nenhum provento encontrado desde que você tem essa posição.</p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {sugestoesProventos.map((s, idx) => {
@@ -1209,9 +1249,6 @@ export default function InvestimentosPage() {
                           <p style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A', margin: 0 }}>{fmt(valorTotal)}</p>
                           <p style={{ fontSize: '10.5px', color: '#94A3B8', margin: 0 }}>{fmt(s.valorPorAcao)}/ação × {posicaoSugestoes.quantidade}</p>
                         </div>
-                        <button onClick={() => ignorarSugestaoProvento(s, idx)} style={{ width: '28px', height: '28px', borderRadius: '8px', border: 'none', backgroundColor: '#F1F5F9', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <X size={12} color="#64748B" strokeWidth={2} />
-                        </button>
                         <button onClick={() => confirmarSugestaoProvento(s, idx)} disabled={confirmandoSugestaoIdx === idx} style={{
                           padding: '0 12px', height: '28px', borderRadius: '8px', border: 'none',
                           backgroundColor: '#145A45', color: '#fff', fontSize: '11px', fontWeight: 600,
