@@ -114,6 +114,15 @@ export default function MovimentosPage() {
   const [dizimar, setDizimar]             = useState(true)
   const [posicoesRF, setPosicoesRF]       = useState<any[]>([])
   const [posicaoAporteId, setPosicaoAporteId] = useState('')
+  const [contas, setContas]               = useState<any[]>([])
+  const [contaSelecionadaId, setContaSelecionadaId] = useState('')
+  const [novoCartaoOpen, setNovoCartaoOpen] = useState(false)
+  const [novoCartaoNome, setNovoCartaoNome] = useState('')
+  const [novoCartaoFechamento, setNovoCartaoFechamento] = useState('')
+  const [novoCartaoVencimento, setNovoCartaoVencimento] = useState('')
+  const [salvandoCartao, setSalvandoCartao] = useState(false)
+  const [pagandoFatura, setPagandoFatura] = useState<string | null>(null)
+  const [faturasPendentes, setFaturasPendentes] = useState<Record<string, number>>({})
   const [observacao, setObservacao]       = useState('')
   const [parcelado, setParcelado]         = useState(false)
   const [numParcelas, setNumParcelas]     = useState('2')
@@ -173,6 +182,13 @@ export default function MovimentosPage() {
         .select('id, nome').eq('familia_id', fid).eq('tipo', 'renda_fixa_cdi')
         .order('created_at', { ascending: false })
       setPosicoesRF(posicoesData || [])
+
+      const { data: contasData } = await supabase.from('contas')
+        .select('*').eq('familia_id', fid).order('created_at', { ascending: true })
+      setContas(contasData || [])
+      const contaCorrente = (contasData || []).find((c: any) => c.tipo === 'corrente')
+      if (contaCorrente) setContaSelecionadaId(contaCorrente.id)
+      await carregarFaturasPendentes(fid, contasData || [])
 
       // Restaura o último contexto usado nesse dispositivo (se ainda existir)
       let contexto: { tipo: 'pessoal' | 'empresa'; empresaId?: string; nome: string } = { tipo: 'pessoal', nome: nomeFam }
@@ -247,6 +263,8 @@ export default function MovimentosPage() {
     setMembroForm(membroAtual); setDizimar(false)
     setObservacao(''); setParcelado(false); setNumParcelas('2'); setDiaParcela('1')
     setPosicaoAporteId('')
+    const contaCorrente = contas.find(c => c.tipo === 'corrente')
+    setContaSelecionadaId(contaCorrente?.id || '')
     setConfirmDelete(false)
     setModalOpen(true)
   }
@@ -259,6 +277,8 @@ export default function MovimentosPage() {
     setObservacao(l.descricao || '')
     setParcelado(false); setNumParcelas('2'); setDiaParcela('1')
     setPosicaoAporteId(l.posicao_investimento_id || '')
+    const contaCorrente = contas.find(c => c.tipo === 'corrente')
+    setContaSelecionadaId(l.conta_id || contaCorrente?.id || '')
     setConfirmDelete(false)
     setModalOpen(true)
   }
@@ -294,6 +314,72 @@ export default function MovimentosPage() {
     await supabase.from('aportes_posicao').delete().eq('lancamento_id', lancamentoId)
   }
 
+  async function carregarFaturasPendentes(fid: string, listaContas: any[]) {
+    const cartoes = listaContas.filter((c: any) => c.tipo === 'cartao_credito')
+    if (cartoes.length === 0) { setFaturasPendentes({}); return }
+    const { data } = await supabase.from('lancamentos').select('conta_id, valor')
+      .eq('familia_id', fid).eq('tipo', 'despesa').eq('fatura_paga', false)
+      .in('conta_id', cartoes.map((c: any) => c.id))
+    const totais: Record<string, number> = {}
+    ;(data || []).forEach((l: any) => {
+      totais[l.conta_id] = (totais[l.conta_id] || 0) + Number(l.valor)
+    })
+    setFaturasPendentes(totais)
+  }
+
+  async function handleCriarCartao() {
+    if (!novoCartaoNome.trim()) return
+    setSalvandoCartao(true)
+    const { data: novaConta, error } = await supabase.from('contas').insert({
+      familia_id: familiaIdRef.current, nome: novoCartaoNome.trim(), tipo: 'cartao_credito',
+      dia_fechamento: novoCartaoFechamento ? parseInt(novoCartaoFechamento) : null,
+      dia_vencimento: novoCartaoVencimento ? parseInt(novoCartaoVencimento) : null,
+    }).select().single()
+    if (!error && novaConta) {
+      setContas(prev => [...prev, novaConta])
+      setContaSelecionadaId(novaConta.id)
+      setNovoCartaoOpen(false)
+      setNovoCartaoNome(''); setNovoCartaoFechamento(''); setNovoCartaoVencimento('')
+    }
+    setSalvandoCartao(false)
+  }
+
+  // Paga a fatura de um cartão: soma tudo que ainda não foi pago nele e cria UM lançamento
+  // único saindo da conta corrente — igual acontece de verdade no extrato do banco. As compras
+  // individuais do cartão continuam existindo (pra categoria), só passam a contar como "pagas".
+  async function handlePagarFatura(cartaoId: string) {
+    setPagandoFatura(cartaoId)
+    const fid = familiaIdRef.current
+    const contaCorrente = contas.find(c => c.tipo === 'corrente')
+    if (!contaCorrente) { setPagandoFatura(null); return }
+
+    const { data: pendentes } = await supabase.from('lancamentos').select('id, valor')
+      .eq('familia_id', fid).eq('conta_id', cartaoId).eq('tipo', 'despesa').eq('fatura_paga', false)
+
+    const total = (pendentes || []).reduce((s: number, l: any) => s + Number(l.valor), 0)
+    if (total <= 0) { setPagandoFatura(null); return }
+
+    const cartao = contas.find(c => c.id === cartaoId)
+    const agora = new Date()
+    const hora  = `${String(agora.getHours()).padStart(2,'0')}:${String(agora.getMinutes()).padStart(2,'0')}`
+
+    const { error } = await supabase.from('lancamentos').insert({
+      familia_id: fid, user_id: userId, tipo: 'despesa', valor: total,
+      categoria: 'Cartão de Crédito', membro: membroAtual,
+      data: dataLocalISO(agora), hora, dizimar: false,
+      conta_id: contaCorrente.id, fatura_paga: true,
+      descricao: `Pagamento de fatura — ${cartao?.nome || 'Cartão'}`,
+    })
+
+    if (!error) {
+      const ids = (pendentes || []).map((l: any) => l.id)
+      await supabase.from('lancamentos').update({ fatura_paga: true }).in('id', ids)
+      await carregarLancamentos(fid)
+      await carregarFaturasPendentes(fid, contas)
+    }
+    setPagandoFatura(null)
+  }
+
   async function ajustarValorAtualMeta(metaId: string | null | undefined, delta: number) {
     if (!metaId || delta === 0) return
     const { data: meta } = await supabase.from('metas').select('valor_atual').eq('id', metaId).maybeSingle()
@@ -314,12 +400,19 @@ export default function MovimentosPage() {
     const ehInvestimentoAgora = ehCategoriaInvestimento(categoria) && tipo === 'despesa'
     const posicaoParaAporte = ehInvestimentoAgora && posicaoAporteId ? posicaoAporteId : null
 
+    // Compra em cartão de crédito só sai da conta corrente quando a fatura é paga —
+    // até lá, fatura_paga fica false e o lançamento não conta no Saldo em conta.
+    const contaEscolhida = contas.find(c => c.id === contaSelecionadaId)
+    const faturaPagaValor = tipo === 'despesa' ? (contaEscolhida?.tipo !== 'cartao_credito') : true
+
     if (editando) {
       const { error } = await supabase.from('lancamentos').update({
         tipo, valor: valorNum, categoria, membro: membroForm, data: dataLanc,
         dizimar: tipo === 'receita' ? dizimar : false,
         descricao: observacao || null,
         posicao_investimento_id: posicaoParaAporte,
+        conta_id: contaSelecionadaId || null,
+        fatura_paga: faturaPagaValor,
       }).eq('id', editando.id)
 
       if (!error) {
@@ -330,7 +423,7 @@ export default function MovimentosPage() {
         if (editando.meta_id) await ajustarValorAtualMeta(editando.meta_id, valorNum - Number(editando.valor))
       }
       setSalvando(false)
-      if (!error) { setModalOpen(false); await carregarLancamentos(fid) }
+      if (!error) { setModalOpen(false); await carregarLancamentos(fid); await carregarFaturasPendentes(fid, contas) }
     } else if (parcelado && tipo === 'despesa') {
       // Lançamento parcelado — cria N lançamentos. Aporte automático em posição não se aplica
       // aqui (compra parcelada não é, na prática, um aporte de investimento recorrente).
@@ -347,12 +440,14 @@ export default function MovimentosPage() {
           valor: Math.round(valorParcela * 100) / 100,
           categoria, membro: membroForm, data: dataStr, hora,
           dizimar: false, empresa_id: empresaId,
+          conta_id: contaSelecionadaId || null,
+          fatura_paga: faturaPagaValor,
           descricao: `${observacao ? observacao + ' ' : ''}Parcela ${i + 1}/${n}`,
         })
       }
       const { error } = await supabase.from('lancamentos').insert(inserts)
       setSalvando(false)
-      if (!error) { setModalOpen(false); await carregarLancamentos(fid) }
+      if (!error) { setModalOpen(false); await carregarLancamentos(fid); await carregarFaturasPendentes(fid, contas) }
     } else {
       const { data: novoLancamento, error } = await supabase.from('lancamentos').insert({
         familia_id: fid, user_id: userId, tipo, valor: valorNum,
@@ -361,13 +456,15 @@ export default function MovimentosPage() {
         empresa_id: empresaId,
         descricao: observacao || null,
         posicao_investimento_id: posicaoParaAporte,
+        conta_id: contaSelecionadaId || null,
+        fatura_paga: faturaPagaValor,
       }).select().single()
 
       if (!error && novoLancamento && posicaoParaAporte) {
         await aplicarAporteEmPosicao(posicaoParaAporte, novoLancamento.id, valorNum, dataLanc)
       }
       setSalvando(false)
-      if (!error) { setModalOpen(false); await carregarLancamentos(fid) }
+      if (!error) { setModalOpen(false); await carregarLancamentos(fid); await carregarFaturasPendentes(fid, contas) }
     }
   }
 
@@ -386,6 +483,7 @@ export default function MovimentosPage() {
     if (!error) {
       setLancamentos(prev => prev.filter((l: any) => l.id !== editando.id))
       setModalOpen(false)
+      await carregarFaturasPendentes(familiaIdRef.current, contas)
     }
   }
 
@@ -494,6 +592,7 @@ export default function MovimentosPage() {
         await recarregarDespesasFixas(fid)
       }
       await carregarLancamentos(fid)
+      await carregarFaturasPendentes(fid, contas)
     } else {
       console.error('Erro ao registrar pagamento:', error)
       setDfErro(error.message || 'Não foi possível registrar o pagamento. Tente novamente.')
@@ -640,7 +739,42 @@ export default function MovimentosPage() {
     </div>
   )
 
-  // Conteúdo do modal de despesa fixa
+  // Seção "Faturas de Cartão" — compartilhada entre mobile e desktop, só aparece se houver cartões
+  const faturasCartaoSection = (isMob: boolean) => {
+    const cartoes = contas.filter((c: any) => c.tipo === 'cartao_credito')
+    if (cartoes.length === 0) return null
+    return (
+      <div style={{ marginBottom: isMob ? '16px' : '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+          <CreditCard size={isMob ? 14 : 16} color="#64748B" strokeWidth={1.75} />
+          <span style={{ fontSize: isMob ? '13px' : '15px', fontWeight: 700, color: '#0B3B2E', letterSpacing: '-0.2px' }}>Faturas de Cartão</span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {cartoes.map((c: any) => {
+            const pendente = faturasPendentes[c.id] || 0
+            return (
+              <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isMob ? '12px 14px' : '14px 18px', backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '14px' }}>
+                <div>
+                  <p style={{ fontSize: isMob ? '13px' : '14px', fontWeight: 600, color: '#0F172A', margin: 0 }}>{c.nome}</p>
+                  <p style={{ fontSize: '11.5px', color: '#94A3B8', margin: '2px 0 0' }}>
+                    {pendente > 0 ? `${fmt(pendente)} na fatura atual` : 'Sem pendências'}
+                  </p>
+                </div>
+                {pendente > 0 && (
+                  <button onClick={() => handlePagarFatura(c.id)} disabled={pagandoFatura === c.id}
+                    style={{ padding: '8px 14px', borderRadius: '10px', border: 'none', backgroundColor: '#0E3B2E', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: pagandoFatura === c.id ? 'not-allowed' : 'pointer' }}>
+                    {pagandoFatura === c.id ? 'Pagando...' : 'Pagar fatura'}
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
+
   const dfModalContent = (isMob: boolean) => (
     <>
       {isMob && <div style={{ width: '40px', height: '4px', borderRadius: '2px', backgroundColor: '#E2E8F0', margin: '12px auto 4px', flexShrink: 0 }} />}
@@ -925,6 +1059,30 @@ export default function MovimentosPage() {
           })}
         </div>
 
+        {/* Conta — só aparece pra despesa */}
+        {tipo === 'despesa' && (
+          <div style={{ marginBottom: '10px' }}>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Conta</p>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {contas.map((c: any) => (
+                <button key={c.id} onClick={() => setContaSelecionadaId(c.id)}
+                  style={{ padding: '8px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 500, cursor: 'pointer', border: `1px solid ${contaSelecionadaId === c.id ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: contaSelecionadaId === c.id ? '#F0FDF4' : '#fff', color: contaSelecionadaId === c.id ? '#0E3B2E' : '#64748B' }}>
+                  {c.nome}
+                </button>
+              ))}
+              <button onClick={() => setNovoCartaoOpen(true)}
+                style={{ padding: '8px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 500, cursor: 'pointer', border: '1px dashed #CBD5E1', backgroundColor: '#fff', color: '#64748B' }}>
+                + Novo cartão
+              </button>
+            </div>
+            {contaSelecionadaId && contas.find((c: any) => c.id === contaSelecionadaId)?.tipo === 'cartao_credito' && (
+              <p style={{ fontSize: '11px', color: '#94A3B8', marginTop: '6px' }}>
+                Fica pendente até você pagar a fatura desse cartão — não conta no Saldo em conta ainda.
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Aplicar em posição — só aparece pra despesa categoria Investimento(s) */}
         {tipo === 'despesa' && ehCategoriaInvestimento(categoria) && (
           <div style={{ marginBottom: '10px' }}>
@@ -1123,6 +1281,7 @@ export default function MovimentosPage() {
 
         <div style={{ padding: '0 16px' }}>
           {despesasFixasSection(true)}
+          {faturasCartaoSection(true)}
         </div>
 
         <div style={{ padding: '0 16px 10px' }}>
@@ -1302,6 +1461,7 @@ export default function MovimentosPage() {
         </div>
 
         {despesasFixasSection(false)}
+        {faturasCartaoSection(false)}
 
         <div className="flex items-center gap-3 mb-5 flex-wrap">
           <div className="flex items-center gap-1 p-1 rounded-xl" style={{ backgroundColor: '#F1F5F9' }}>
@@ -1470,6 +1630,44 @@ export default function MovimentosPage() {
           style={{ position: 'fixed', inset: 0, zIndex: 55, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
           <div style={{ width: '420px', backgroundColor: '#fff', borderRadius: '20px', display: 'flex', flexDirection: 'column', margin: 'auto' }}>
             {pagarModalContent(false)}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Novo Cartão */}
+      {novoCartaoOpen && (
+        <div onClick={e => { if (e.target === e.currentTarget) setNovoCartaoOpen(false) }}
+          style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
+          <div style={{ width: isMobile ? '100%' : '380px', backgroundColor: '#fff', borderRadius: isMobile ? '28px 28px 0 0' : '20px', padding: '24px' }}>
+            {isMobile && <div style={{ width: '40px', height: '4px', borderRadius: '2px', backgroundColor: '#E2E8F0', margin: '-8px auto 16px' }} />}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', margin: 0 }}>Novo cartão de crédito</h2>
+              <button onClick={() => setNovoCartaoOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}>
+                <X size={20} strokeWidth={2} />
+              </button>
+            </div>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Nome</p>
+            <input type="text" value={novoCartaoNome} onChange={e => setNovoCartaoNome(e.target.value)}
+              placeholder="Ex: Nubank, Inter..."
+              style={{ width: '100%', height: '44px', padding: '0 14px', borderRadius: '12px', border: '1px solid #E2E8F0', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box', marginBottom: '12px' }} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+              <div>
+                <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Dia de fechamento</p>
+                <input type="number" min="1" max="31" value={novoCartaoFechamento} onChange={e => setNovoCartaoFechamento(e.target.value)}
+                  placeholder="Ex: 20"
+                  style={{ width: '100%', height: '44px', padding: '0 14px', borderRadius: '12px', border: '1px solid #E2E8F0', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Dia de vencimento</p>
+                <input type="number" min="1" max="31" value={novoCartaoVencimento} onChange={e => setNovoCartaoVencimento(e.target.value)}
+                  placeholder="Ex: 27"
+                  style={{ width: '100%', height: '44px', padding: '0 14px', borderRadius: '12px', border: '1px solid #E2E8F0', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box' }} />
+              </div>
+            </div>
+            <button onClick={handleCriarCartao} disabled={salvandoCartao || !novoCartaoNome.trim()}
+              style={{ width: '100%', height: '46px', borderRadius: '12px', border: 'none', backgroundColor: '#0E3B2E', color: '#fff', fontSize: '14px', fontWeight: 600, cursor: salvandoCartao || !novoCartaoNome.trim() ? 'not-allowed' : 'pointer', opacity: salvandoCartao || !novoCartaoNome.trim() ? 0.6 : 1 }}>
+              {salvandoCartao ? 'Salvando...' : 'Criar cartão'}
+            </button>
           </div>
         </div>
       )}

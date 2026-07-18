@@ -126,6 +126,13 @@ export default function InvestimentosPage() {
   const [valorProvento, setValorProvento]         = useState('')
   const [salvandoProvento, setSalvandoProvento]   = useState(false)
 
+  // Proventos automáticos (sugestão via brapi.dev, com confirmação manual)
+  const [sugestoesOpen, setSugestoesOpen]         = useState(false)
+  const [posicaoSugestoes, setPosicaoSugestoes]   = useState<any>(null)
+  const [sugestoesProventos, setSugestoesProventos] = useState<any[]>([])
+  const [buscandoSugestoes, setBuscandoSugestoes] = useState(false)
+  const [confirmandoSugestaoIdx, setConfirmandoSugestaoIdx] = useState<number | null>(null)
+
   const ocultar  = useOcultarValores()
   const supabase = createClient()
 
@@ -365,6 +372,60 @@ export default function InvestimentosPage() {
     setSalvandoProvento(false)
   }
 
+  async function buscarSugestoesProventos(p: any) {
+    if (!p.ticker) return
+    setPosicaoSugestoes(p)
+    setSugestoesOpen(true)
+    setBuscandoSugestoes(true)
+    setSugestoesProventos([])
+    try {
+      const res = await fetch(`/api/proventos?ticker=${encodeURIComponent(p.ticker)}`)
+      const data = await res.json()
+      const jaProcessados: any[] = p.proventos_processados || []
+      const dataAplicacao = p.data_aplicacao
+      const novos = (data.proventos || []).filter((prov: any) =>
+        prov.data >= dataAplicacao && // só proventos pagos depois que você já tinha o ativo
+        !jaProcessados.some((jp: any) => jp.data === prov.data && Math.abs(jp.valorPorAcao - prov.valorPorAcao) < 0.001)
+      )
+      setSugestoesProventos(novos)
+    } catch {
+      setSugestoesProventos([])
+    }
+    setBuscandoSugestoes(false)
+  }
+
+  async function confirmarSugestaoProvento(sugestao: any, idx: number) {
+    if (!posicaoSugestoes) return
+    setConfirmandoSugestaoIdx(idx)
+    const valorTotal = sugestao.valorPorAcao * Number(posicaoSugestoes.quantidade || 0)
+    const novoTotalProventos = Number(posicaoSugestoes.proventos_recebidos || 0) + valorTotal
+    const processadosAtuais: any[] = posicaoSugestoes.proventos_processados || []
+    const novosProcessados = [...processadosAtuais, { data: sugestao.data, valorPorAcao: sugestao.valorPorAcao }]
+
+    const { error } = await supabase.from('posicoes_investimento').update({
+      proventos_recebidos: novoTotalProventos,
+      proventos_processados: novosProcessados,
+    }).eq('id', posicaoSugestoes.id)
+
+    if (!error) {
+      const posicaoAtualizada = { ...posicaoSugestoes, proventos_recebidos: novoTotalProventos, proventos_processados: novosProcessados }
+      setPosicaoSugestoes(posicaoAtualizada)
+      setPosicoes(prev => prev.map(p => p.id === posicaoSugestoes.id ? posicaoAtualizada : p))
+      setSugestoesProventos(prev => prev.filter((_, i) => i !== idx))
+    }
+    setConfirmandoSugestaoIdx(null)
+  }
+
+  async function ignorarSugestaoProvento(sugestao: any, idx: number) {
+    if (!posicaoSugestoes) return
+    const processadosAtuais: any[] = posicaoSugestoes.proventos_processados || []
+    const novosProcessados = [...processadosAtuais, { data: sugestao.data, valorPorAcao: sugestao.valorPorAcao }]
+    await supabase.from('posicoes_investimento').update({ proventos_processados: novosProcessados }).eq('id', posicaoSugestoes.id)
+    setPosicaoSugestoes((prev: any) => ({ ...prev, proventos_processados: novosProcessados }))
+    setPosicoes(prev => prev.map(p => p.id === posicaoSugestoes.id ? { ...p, proventos_processados: novosProcessados } : p))
+    setSugestoesProventos(prev => prev.filter((_, i) => i !== idx))
+  }
+
   // Valor de uma posição numa data de referência (padrão: hoje). Renda Fixa CDI soma cada
   // aporte separadamente — cada um rende juros compostos só pelo tempo que ele de fato está
   // investido, não desde a data do primeiro aporte. Ação/FII com ticker+quantidade usam a
@@ -542,6 +603,15 @@ export default function InvestimentosPage() {
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
                     <Plus size={13} color="#BA7517" strokeWidth={2} />
+                  </button>
+                )}
+                {ehVariavel(p.tipo) && p.ticker && (
+                  <button onClick={() => buscarSugestoesProventos(p)} title="Buscar proventos automaticamente" style={{
+                    width: '28px', height: '28px', borderRadius: '8px', flexShrink: 0,
+                    backgroundColor: '#EFF6FF', border: 'none', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <Calendar size={13} color="#3B82F6" strokeWidth={2} />
                   </button>
                 )}
                 {p.tipo === 'renda_fixa_cdi' && (
@@ -1100,6 +1170,61 @@ export default function InvestimentosPage() {
             }}>
               {salvandoProvento ? 'Salvando...' : 'Registrar provento'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Sugestões de Proventos (automático via brapi.dev) */}
+      {sugestoesOpen && posicaoSugestoes && (
+        <div onClick={e => { if (e.target === e.currentTarget) setSugestoesOpen(false) }}
+          style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
+          <div style={{ width: isMobile ? '100%' : '440px', backgroundColor: '#fff', borderRadius: isMobile ? '28px 28px 0 0' : '20px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+            {isMobile && <div style={{ width: '40px', height: '4px', borderRadius: '2px', backgroundColor: '#E2E8F0', margin: '12px auto 4px', flexShrink: 0 }} />}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '1px solid #F1F5F9', flexShrink: 0 }}>
+              <div>
+                <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', margin: 0 }}>Proventos encontrados</h2>
+                <p style={{ fontSize: '12px', color: '#64748B', margin: '2px 0 0' }}>{posicaoSugestoes.nome} · {posicaoSugestoes.ticker}</p>
+              </div>
+              <button onClick={() => setSugestoesOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}>
+                <X size={20} strokeWidth={2} />
+              </button>
+            </div>
+
+            <div style={{ padding: '12px 20px 20px', overflowY: 'auto', flex: 1 }}>
+              <p style={{ fontSize: '11.5px', color: '#94A3B8', marginBottom: '12px' }}>
+                Buscado direto na brapi.dev. Confirme os que quiser somar ao seu total — nada é adicionado automaticamente sem sua confirmação.
+              </p>
+              {buscandoSugestoes ? (
+                <p style={{ fontSize: '12.5px', color: '#94A3B8', textAlign: 'center', padding: '24px 0' }}>Buscando...</p>
+              ) : sugestoesProventos.length === 0 ? (
+                <p style={{ fontSize: '12.5px', color: '#94A3B8', textAlign: 'center', padding: '24px 0' }}>Nenhum provento novo encontrado desde que você tem essa posição.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {sugestoesProventos.map((s, idx) => {
+                    const valorTotal = s.valorPorAcao * Number(posicaoSugestoes.quantidade || 0)
+                    return (
+                      <div key={`${s.data}-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '10px', backgroundColor: '#F8FAFC', border: '1px solid #F1F5F9' }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: '11px', color: '#94A3B8', margin: 0 }}>{new Date(s.data + 'T12:00:00').toLocaleDateString('pt-BR')} · {s.label}</p>
+                          <p style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A', margin: 0 }}>{fmt(valorTotal)}</p>
+                          <p style={{ fontSize: '10.5px', color: '#94A3B8', margin: 0 }}>{fmt(s.valorPorAcao)}/ação × {posicaoSugestoes.quantidade}</p>
+                        </div>
+                        <button onClick={() => ignorarSugestaoProvento(s, idx)} style={{ width: '28px', height: '28px', borderRadius: '8px', border: 'none', backgroundColor: '#F1F5F9', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <X size={12} color="#64748B" strokeWidth={2} />
+                        </button>
+                        <button onClick={() => confirmarSugestaoProvento(s, idx)} disabled={confirmandoSugestaoIdx === idx} style={{
+                          padding: '0 12px', height: '28px', borderRadius: '8px', border: 'none',
+                          backgroundColor: '#145A45', color: '#fff', fontSize: '11px', fontWeight: 600,
+                          cursor: confirmandoSugestaoIdx === idx ? 'not-allowed' : 'pointer', flexShrink: 0,
+                        }}>
+                          {confirmandoSugestaoIdx === idx ? '...' : 'Adicionar'}
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
