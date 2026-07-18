@@ -103,6 +103,7 @@ export default function LinhaDoTempoPage() {
       .select('tipo, valor')
       .eq('familia_id', fid).is('empresa_id', null)
       .gte('data', dataReferencia).lte('data', hoje)
+      .eq('fatura_paga', true) // compra em cartão só conta quando a fatura é paga de verdade
     const fluxo = (lancDesde || []).reduce((s: number, l: any) => s + (l.tipo === 'receita' ? Number(l.valor) : -Number(l.valor)), 0)
     setSaldoEmConta(saldoBase + fluxo)
     setCarregandoSaldoConta(false)
