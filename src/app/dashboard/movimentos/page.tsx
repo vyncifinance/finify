@@ -112,6 +112,8 @@ export default function MovimentosPage() {
   const [membroForm, setMembroForm]       = useState('')
   const [dataLanc, setDataLanc]           = useState(dataLocalISO(new Date()))
   const [dizimar, setDizimar]             = useState(true)
+  const [posicoesRF, setPosicoesRF]       = useState<any[]>([])
+  const [posicaoAporteId, setPosicaoAporteId] = useState('')
   const [observacao, setObservacao]       = useState('')
   const [parcelado, setParcelado]         = useState(false)
   const [numParcelas, setNumParcelas]     = useState('2')
@@ -166,6 +168,11 @@ export default function MovimentosPage() {
         .select('*').eq('familia_id', fid).order('created_at', { ascending: true })
       const listaEmpresas = empresasData || []
       setEmpresas(listaEmpresas)
+
+      const { data: posicoesData } = await supabase.from('posicoes_investimento')
+        .select('id, nome').eq('familia_id', fid).eq('tipo', 'renda_fixa_cdi')
+        .order('created_at', { ascending: false })
+      setPosicoesRF(posicoesData || [])
 
       // Restaura o último contexto usado nesse dispositivo (se ainda existir)
       let contexto: { tipo: 'pessoal' | 'empresa'; empresaId?: string; nome: string } = { tipo: 'pessoal', nome: nomeFam }
@@ -239,6 +246,7 @@ export default function MovimentosPage() {
     setDataLanc(dataLocalISO(new Date()))
     setMembroForm(membroAtual); setDizimar(false)
     setObservacao(''); setParcelado(false); setNumParcelas('2'); setDiaParcela('1')
+    setPosicaoAporteId('')
     setConfirmDelete(false)
     setModalOpen(true)
   }
@@ -250,6 +258,7 @@ export default function MovimentosPage() {
     setMembroForm(l.membro); setDizimar(l.dizimar !== false)
     setObservacao(l.descricao || '')
     setParcelado(false); setNumParcelas('2'); setDiaParcela('1')
+    setPosicaoAporteId(l.posicao_investimento_id || '')
     setConfirmDelete(false)
     setModalOpen(true)
   }
@@ -270,31 +279,19 @@ export default function MovimentosPage() {
     return cat === 'Investimento' || cat === 'Investimentos'
   }
 
-  // Sincroniza aportes/estornos de investimento com o saldo da carteira (tabela investimentos).
-  // Só atua no contexto pessoal — Investimentos, assim como Reserva de Emergência e Metas, não existe para empresas.
-  async function ajustarSaldoInvestimento(fid: string, dataStr: string, delta: number, empresaId: string | null) {
-    if (!fid || delta === 0 || empresaId) return
-    const mesRef = `${dataStr.slice(0, 7)}-01`
+  // Aplica um aporte numa posição específica de Renda Fixa, vinculado ao lançamento que o originou.
+  // Substitui a sincronização antiga (que apontava pra tabela investimentos, já descontinuada).
+  async function aplicarAporteEmPosicao(posicaoId: string, lancamentoId: string, valor: number, data: string) {
+    if (!posicaoId) return
+    await supabase.from('aportes_posicao').insert({
+      posicao_id: posicaoId, lancamento_id: lancamentoId, valor, data_aporte: data,
+    })
+  }
 
-    const { data: registroMes } = await supabase.from('investimentos')
-      .select('id, saldo').eq('familia_id', fid).eq('mes', mesRef).maybeSingle()
-
-    if (registroMes) {
-      const novoSaldo = Number(registroMes.saldo) + delta
-      await supabase.from('investimentos').update({ saldo: novoSaldo }).eq('id', registroMes.id)
-      return
-    }
-
-    if (delta > 0) {
-      const { data: anteriores } = await supabase.from('investimentos')
-        .select('saldo').eq('familia_id', fid).lt('mes', mesRef)
-        .order('mes', { ascending: false }).limit(1)
-      const base = anteriores && anteriores[0] ? Number(anteriores[0].saldo) : 0
-      await supabase.from('investimentos').insert({
-        familia_id: fid, user_id: userId, mes: mesRef, saldo: base + delta,
-        observacao: 'Aporte automático via Movimentos',
-      })
-    }
+  // Remove qualquer aporte já vinculado a esse lançamento (usado antes de recriar, na edição,
+  // ou sozinho, na exclusão).
+  async function removerAporteDoLancamento(lancamentoId: string) {
+    await supabase.from('aportes_posicao').delete().eq('lancamento_id', lancamentoId)
   }
 
   async function ajustarValorAtualMeta(metaId: string | null | undefined, delta: number) {
@@ -314,26 +311,29 @@ export default function MovimentosPage() {
     const agora = new Date()
     const hora  = `${String(agora.getHours()).padStart(2,'0')}:${String(agora.getMinutes()).padStart(2,'0')}`
     const empresaId = contextoAtivo.tipo === 'empresa' ? contextoAtivo.empresaId : null
+    const ehInvestimentoAgora = ehCategoriaInvestimento(categoria) && tipo === 'despesa'
+    const posicaoParaAporte = ehInvestimentoAgora && posicaoAporteId ? posicaoAporteId : null
 
     if (editando) {
-      const eraInvestimento   = ehCategoriaInvestimento(editando.categoria) && editando.tipo === 'despesa' && !editando.meta_id
-      const eInvestimentoNovo = ehCategoriaInvestimento(categoria) && tipo === 'despesa' && !editando.meta_id
-
       const { error } = await supabase.from('lancamentos').update({
         tipo, valor: valorNum, categoria, membro: membroForm, data: dataLanc,
         dizimar: tipo === 'receita' ? dizimar : false,
         descricao: observacao || null,
+        posicao_investimento_id: posicaoParaAporte,
       }).eq('id', editando.id)
 
       if (!error) {
-        if (eraInvestimento) await ajustarSaldoInvestimento(fid, editando.data, -Number(editando.valor), editando.empresa_id || null)
-        if (eInvestimentoNovo) await ajustarSaldoInvestimento(fid, dataLanc, valorNum, empresaId)
+        // Sempre remove o aporte antigo vinculado (se existia) e recria do zero — mais simples
+        // e seguro que tentar "diferenciar" o que mudou (valor, data ou a posição escolhida).
+        await removerAporteDoLancamento(editando.id)
+        if (posicaoParaAporte) await aplicarAporteEmPosicao(posicaoParaAporte, editando.id, valorNum, dataLanc)
         if (editando.meta_id) await ajustarValorAtualMeta(editando.meta_id, valorNum - Number(editando.valor))
       }
       setSalvando(false)
       if (!error) { setModalOpen(false); await carregarLancamentos(fid) }
     } else if (parcelado && tipo === 'despesa') {
-      // Lançamento parcelado — cria N lançamentos
+      // Lançamento parcelado — cria N lançamentos. Aporte automático em posição não se aplica
+      // aqui (compra parcelada não é, na prática, um aporte de investimento recorrente).
       const n = parseInt(numParcelas) || 2
       const dia = parseInt(diaParcela) || 1
       const valorParcela = valorNum / n
@@ -351,21 +351,20 @@ export default function MovimentosPage() {
         })
       }
       const { error } = await supabase.from('lancamentos').insert(inserts)
-      if (!error && ehCategoriaInvestimento(categoria)) {
-        for (const item of inserts) await ajustarSaldoInvestimento(fid, item.data, item.valor, empresaId)
-      }
       setSalvando(false)
       if (!error) { setModalOpen(false); await carregarLancamentos(fid) }
     } else {
-      const { error } = await supabase.from('lancamentos').insert({
+      const { data: novoLancamento, error } = await supabase.from('lancamentos').insert({
         familia_id: fid, user_id: userId, tipo, valor: valorNum,
         categoria, membro: membroForm, data: dataLanc, hora,
         dizimar: tipo === 'receita' ? dizimar : false,
         empresa_id: empresaId,
         descricao: observacao || null,
-      })
-      if (!error && tipo === 'despesa' && ehCategoriaInvestimento(categoria)) {
-        await ajustarSaldoInvestimento(fid, dataLanc, valorNum, empresaId)
+        posicao_investimento_id: posicaoParaAporte,
+      }).select().single()
+
+      if (!error && novoLancamento && posicaoParaAporte) {
+        await aplicarAporteEmPosicao(posicaoParaAporte, novoLancamento.id, valorNum, dataLanc)
       }
       setSalvando(false)
       if (!error) { setModalOpen(false); await carregarLancamentos(fid) }
@@ -377,8 +376,8 @@ export default function MovimentosPage() {
     if (!confirmDelete) { setConfirmDelete(true); return }
     setDeletando(true)
     const { error } = await supabase.from('lancamentos').delete().eq('id', editando.id)
-    if (!error && editando.tipo === 'despesa' && ehCategoriaInvestimento(editando.categoria) && !editando.meta_id) {
-      await ajustarSaldoInvestimento(familiaIdRef.current, editando.data, -Number(editando.valor), editando.empresa_id || null)
+    if (!error && editando.posicao_investimento_id) {
+      await removerAporteDoLancamento(editando.id)
     }
     if (!error && editando.meta_id) {
       await ajustarValorAtualMeta(editando.meta_id, -Number(editando.valor))
@@ -486,9 +485,9 @@ export default function MovimentosPage() {
       empresa_id: df.empresa_id || null,
     })
     if (!error) {
-      if (!ehReceita && ehCategoriaInvestimento(df.categoria)) {
-        await ajustarSaldoInvestimento(fid, dataStr, valor, df.empresa_id || null)
-      }
+      // Despesas fixas ainda não têm seletor de posição no cadastro — se quiser aplicar um
+      // pagamento recorrente numa posição, edite o lançamento gerado aqui embaixo (em Movimentos)
+      // e escolha a posição por lá.
       // Para valores variáveis, o valor confirmado vira a nova referência do próximo mês
       if (df.valor_variavel && valor !== Number(df.valor)) {
         await supabase.from('despesas_fixas').update({ valor }).eq('id', df.id)
@@ -514,8 +513,8 @@ export default function MovimentosPage() {
     if (!df.lancamento) return
     const { error } = await supabase.from('lancamentos').delete().eq('id', df.lancamento.id)
     if (!error) {
-      if (df.lancamento.tipo === 'despesa' && ehCategoriaInvestimento(df.lancamento.categoria)) {
-        await ajustarSaldoInvestimento(familiaIdRef.current, df.lancamento.data, -Number(df.lancamento.valor), df.lancamento.empresa_id || null)
+      if (df.lancamento.posicao_investimento_id) {
+        await removerAporteDoLancamento(df.lancamento.id)
       }
       await carregarLancamentos(familiaIdRef.current)
     }
@@ -925,6 +924,31 @@ export default function MovimentosPage() {
             )
           })}
         </div>
+
+        {/* Aplicar em posição — só aparece pra despesa categoria Investimento(s) */}
+        {tipo === 'despesa' && ehCategoriaInvestimento(categoria) && (
+          <div style={{ marginBottom: '10px' }}>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Aplicar em qual posição?</p>
+            {posicoesRF.length === 0 ? (
+              <p style={{ fontSize: '12px', color: '#94A3B8', backgroundColor: '#F8FAFC', border: '1px solid #F1F5F9', borderRadius: '12px', padding: '10px 12px' }}>
+                Nenhuma posição de Renda Fixa cadastrada ainda — esse lançamento não vai render em nenhuma posição. Cadastre uma em Investimentos primeiro, se quiser aplicar.
+              </p>
+            ) : (
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                <button onClick={() => setPosicaoAporteId('')}
+                  style={{ padding: '8px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 500, cursor: 'pointer', border: `1px solid ${posicaoAporteId === '' ? '#94A3B8' : '#E2E8F0'}`, backgroundColor: posicaoAporteId === '' ? '#F1F5F9' : '#fff', color: '#64748B' }}>
+                  Nenhuma
+                </button>
+                {posicoesRF.map((p: any) => (
+                  <button key={p.id} onClick={() => setPosicaoAporteId(p.id)}
+                    style={{ padding: '8px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 500, cursor: 'pointer', border: `1px solid ${posicaoAporteId === p.id ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: posicaoAporteId === p.id ? '#F0FDF4' : '#fff', color: posicaoAporteId === p.id ? '#0E3B2E' : '#64748B' }}>
+                    {p.nome}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Data + Dízimo */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', alignItems: 'center' }}>
