@@ -74,9 +74,22 @@ export default function PerfilPage() {
       setFamiliaNome((profile.familias as any)?.nome || '')
       setCodigoConvite((profile.familias as any)?.codigo_convite || '')
       setDizimista((profile.familias as any)?.dizimista !== false)
-      const saldoInicialAtual = (profile.familias as any)?.saldo_inicial
-      setSaldoInicial(saldoInicialAtual ? Number(saldoInicialAtual).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '')
-      setSaldoInicialData((profile.familias as any)?.saldo_inicial_data || '')
+      const saldoInicialAtual = Number((profile.familias as any)?.saldo_inicial || 0)
+      const dataRefAtual = (profile.familias as any)?.saldo_inicial_data || ''
+      setSaldoInicialData(dataRefAtual)
+      if (dataRefAtual) {
+        const hoje = dataLocalISO(new Date())
+        const { data: lancDesde } = await supabase.from('lancamentos')
+          .select('tipo, valor')
+          .eq('familia_id', profile.familia_id).is('empresa_id', null)
+          .gte('data', dataRefAtual).lte('data', hoje)
+          .eq('fatura_paga', true)
+        const fluxoJaLancado = (lancDesde || []).reduce((s: number, l: any) => s + (l.tipo === 'receita' ? Number(l.valor) : -Number(l.valor)), 0)
+        const saldoAtualCalculado = saldoInicialAtual + fluxoJaLancado
+        setSaldoInicial(saldoAtualCalculado.toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
+      } else {
+        setSaldoInicial('')
+      }
       const res = await fetch('/api/membros')
       const json = await res.json()
       if (json.membros) setMembros(json.membros)
@@ -160,12 +173,34 @@ export default function PerfilPage() {
     setSalvandoDizimista(false)
   }
 
+  // toISOString() converte pra UTC — no Brasil (UTC-3), isso podia empurrar "hoje" pro dia seguinte.
+  function dataLocalISO(d: Date): string {
+    const ano = d.getFullYear()
+    const mes = String(d.getMonth() + 1).padStart(2, '0')
+    const dia = String(d.getDate()).padStart(2, '0')
+    return `${ano}-${mes}-${dia}`
+  }
+
   async function handleSalvarSaldoInicial() {
     if (!saldoInicialData) return
     setSalvandoSaldoInicial(true); setSaldoInicialSalvo(false)
-    const valorNum = saldoInicial ? parseFloat(saldoInicial.replace(/\./g, '').replace(',', '.')) : 0
+    const valorInformado = saldoInicial ? parseFloat(saldoInicial.replace(/\./g, '').replace(',', '.')) : 0
+
+    // O campo pede "quanto você tem HOJE" — não "quanto tinha antes de tudo". Pra isso bater
+    // certinho depois (Dashboard soma saldo_inicial + tudo lançado desde a data), a gente
+    // desconta por trás dos panos o que já foi lançado entre a data de referência e hoje,
+    // gravando só a diferença. Assim o número final sempre bate com o que você digitou aqui.
+    const hoje = dataLocalISO(new Date())
+    const { data: lancDesde } = await supabase.from('lancamentos')
+      .select('tipo, valor')
+      .eq('familia_id', familiaId).is('empresa_id', null)
+      .gte('data', saldoInicialData).lte('data', hoje)
+      .eq('fatura_paga', true)
+    const fluxoJaLancado = (lancDesde || []).reduce((s: number, l: any) => s + (l.tipo === 'receita' ? Number(l.valor) : -Number(l.valor)), 0)
+    const valorParaGravar = valorInformado - fluxoJaLancado
+
     const { error } = await supabase.from('familias')
-      .update({ saldo_inicial: valorNum, saldo_inicial_data: saldoInicialData })
+      .update({ saldo_inicial: valorParaGravar, saldo_inicial_data: saldoInicialData })
       .eq('id', familiaId)
     setSalvandoSaldoInicial(false)
     if (!error) { setSaldoInicialSalvo(true); setTimeout(() => setSaldoInicialSalvo(false), 2000) }
@@ -319,12 +354,12 @@ export default function PerfilPage() {
           <div className="rounded-2xl border p-4" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0' }}>
             <div className="flex items-center gap-2 mb-1">
               <Wallet size={16} color="#0F172A" strokeWidth={1.75} />
-              <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>Saldo inicial</p>
+              <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>Saldo em conta</p>
             </div>
             <p className="text-xs mb-3" style={{ color: '#94A3B8' }}>
-              Quanto vocês já tinham na conta antes de começar a lançar no Finify. Use a data de referência exata desse valor — nunca "hoje" se já existirem lançamentos anteriores.
+              Digite quanto você tem HOJE na conta — o Finify ajusta sozinho pra bater certo com o que você já lançou. "Data" é só de referência: normalmente deixe em hoje.
             </p>
-            <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Valor (R$)</label>
+            <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Quanto você tem hoje (R$)</label>
             <input type="text" inputMode="numeric" value={saldoInicial} onChange={e => maskSaldoInicial(e.target.value)}
               placeholder="0,00"
               className="w-full px-4 h-11 rounded-xl border text-sm outline-none mb-3"
@@ -506,14 +541,14 @@ export default function PerfilPage() {
               <div className="rounded-[20px] border p-6" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
                 <div className="flex items-center gap-2 mb-1">
                   <Wallet size={18} color="#0F172A" strokeWidth={1.75} />
-                  <h2 className="font-semibold" style={{ color: '#0F172A' }}>Saldo inicial</h2>
+                  <h2 className="font-semibold" style={{ color: '#0F172A' }}>Saldo em conta</h2>
                 </div>
                 <p className="text-sm mb-5" style={{ color: '#64748B' }}>
-                  Quanto vocês já tinham na conta antes de começar a lançar no Finify. Use a data de referência exata desse valor — nunca "hoje" se já existirem lançamentos anteriores a essa data no sistema, senão duplica valores já contados.
+                  Digite quanto você tem <strong>hoje</strong> na conta — o Finify calcula sozinho o ajuste por trás, descontando o que você já lançou desde a data de referência, pra sempre bater certo com o valor real do seu banco.
                 </p>
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Valor (R$)</label>
+                    <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Quanto você tem hoje (R$)</label>
                     <input type="text" inputMode="numeric" value={saldoInicial} onChange={e => maskSaldoInicial(e.target.value)}
                       placeholder="0,00"
                       className="w-full px-4 h-12 rounded-xl border text-sm outline-none" style={{ borderColor: '#E2E8F0', color: '#0F172A' }} />
