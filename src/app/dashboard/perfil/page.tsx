@@ -31,10 +31,10 @@ export default function PerfilPage() {
   const [membros, setMembros]             = useState<any[]>([])
   const [dizimista, setDizimista]         = useState(true)
   const [salvandoDizimista, setSalvandoDizimista] = useState(false)
-  const [saldoInicial, setSaldoInicial]           = useState('')
-  const [saldoInicialData, setSaldoInicialData]   = useState('')
-  const [salvandoSaldoInicial, setSalvandoSaldoInicial] = useState(false)
-  const [saldoInicialSalvo, setSaldoInicialSalvo] = useState(false)
+  const [valorAjuste, setValorAjuste]             = useState('')
+  const [dataAjuste, setDataAjuste]               = useState(() => dataLocalISO(new Date()))
+  const [salvandoAjuste, setSalvandoAjuste]       = useState(false)
+  const [ajusteSalvo, setAjusteSalvo]             = useState(false)
   const [salvandoNome, setSalvandoNome]   = useState(false)
   const [nomeSalvo, setNomeSalvo]         = useState(false)
   const [novaSenha, setNovaSenha]         = useState('')
@@ -66,7 +66,7 @@ export default function PerfilPage() {
     setUserId(session.user.id)
     setEmail(session.user.email || '')
     const { data: profile } = await supabase
-      .from('profiles').select('nome, familia_id, familias(nome, codigo_convite, dizimista, saldo_inicial, saldo_inicial_data)')
+      .from('profiles').select('nome, familia_id, familias(nome, codigo_convite, dizimista)')
       .eq('id', session.user.id).single()
     if (profile) {
       setNome(profile.nome || '')
@@ -74,22 +74,6 @@ export default function PerfilPage() {
       setFamiliaNome((profile.familias as any)?.nome || '')
       setCodigoConvite((profile.familias as any)?.codigo_convite || '')
       setDizimista((profile.familias as any)?.dizimista !== false)
-      const saldoInicialAtual = Number((profile.familias as any)?.saldo_inicial || 0)
-      const dataRefAtual = (profile.familias as any)?.saldo_inicial_data || ''
-      setSaldoInicialData(dataRefAtual)
-      if (dataRefAtual) {
-        const hoje = dataLocalISO(new Date())
-        const { data: lancDesde } = await supabase.from('lancamentos')
-          .select('tipo, valor')
-          .eq('familia_id', profile.familia_id).is('empresa_id', null)
-          .gte('data', dataRefAtual).lte('data', hoje)
-          .eq('fatura_paga', true)
-        const fluxoJaLancado = (lancDesde || []).reduce((s: number, l: any) => s + (l.tipo === 'receita' ? Number(l.valor) : -Number(l.valor)), 0)
-        const saldoAtualCalculado = saldoInicialAtual + fluxoJaLancado
-        setSaldoInicial(saldoAtualCalculado.toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
-      } else {
-        setSaldoInicial('')
-      }
       const res = await fetch('/api/membros')
       const json = await res.json()
       if (json.membros) setMembros(json.membros)
@@ -181,35 +165,33 @@ export default function PerfilPage() {
     return `${ano}-${mes}-${dia}`
   }
 
-  async function handleSalvarSaldoInicial() {
-    if (!saldoInicialData) return
-    setSalvandoSaldoInicial(true); setSaldoInicialSalvo(false)
-    const valorInformado = saldoInicial ? parseFloat(saldoInicial.replace(/\./g, '').replace(',', '.')) : 0
+  // Ajustar saldo agora é só um lançamento de receita normal — sem fórmula especial, sem campo
+  // separado. Entra em Receitas/Despesas/Economia igual qualquer outro dinheiro que você recebeu
+  // (herança, presente, ajuste de conferência, o que for).
+  async function handleRegistrarAjuste() {
+    if (!valorAjuste || !dataAjuste) return
+    setSalvandoAjuste(true); setAjusteSalvo(false)
+    const valorNum = parseFloat(valorAjuste.replace(/\./g, '').replace(',', '.'))
+    const agora = new Date()
+    const hora = `${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}`
 
-    // O campo pede "quanto você tem HOJE" — não "quanto tinha antes de tudo". Pra isso bater
-    // certinho depois (Dashboard soma saldo_inicial + tudo lançado desde a data), a gente
-    // desconta por trás dos panos o que já foi lançado entre a data de referência e hoje,
-    // gravando só a diferença. Assim o número final sempre bate com o que você digitou aqui.
-    const hoje = dataLocalISO(new Date())
-    const { data: lancDesde } = await supabase.from('lancamentos')
-      .select('tipo, valor')
-      .eq('familia_id', familiaId).is('empresa_id', null)
-      .gte('data', saldoInicialData).lte('data', hoje)
-      .eq('fatura_paga', true)
-    const fluxoJaLancado = (lancDesde || []).reduce((s: number, l: any) => s + (l.tipo === 'receita' ? Number(l.valor) : -Number(l.valor)), 0)
-    const valorParaGravar = valorInformado - fluxoJaLancado
-
-    const { error } = await supabase.from('familias')
-      .update({ saldo_inicial: valorParaGravar, saldo_inicial_data: saldoInicialData })
-      .eq('id', familiaId)
-    setSalvandoSaldoInicial(false)
-    if (!error) { setSaldoInicialSalvo(true); setTimeout(() => setSaldoInicialSalvo(false), 2000) }
+    const { error } = await supabase.from('lancamentos').insert({
+      familia_id: familiaId, user_id: userId, tipo: 'receita', valor: valorNum,
+      categoria: 'Ajuste de Saldo', membro: nome, data: dataAjuste, hora,
+      dizimar: false, fatura_paga: true,
+      descricao: 'Ajuste de saldo',
+    })
+    setSalvandoAjuste(false)
+    if (!error) {
+      setValorAjuste('')
+      setAjusteSalvo(true); setTimeout(() => setAjusteSalvo(false), 2000)
+    }
   }
 
-  function maskSaldoInicial(raw: string) {
+  function maskValorAjuste(raw: string) {
     const digits = raw.replace(/\D/g, '')
     const num = parseInt(digits || '0', 10)
-    setSaldoInicial(digits === '' ? '' : (num / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
+    setValorAjuste(digits === '' ? '' : (num / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
   }
 
   async function handleCopiarCodigo() {
@@ -350,29 +332,29 @@ export default function PerfilPage() {
             </div>
           </div>
 
-          {/* Saldo inicial mobile */}
+          {/* Ajustar saldo mobile */}
           <div className="rounded-2xl border p-4" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0' }}>
             <div className="flex items-center gap-2 mb-1">
               <Wallet size={16} color="#0F172A" strokeWidth={1.75} />
-              <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>Saldo em conta</p>
+              <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>Ajustar saldo</p>
             </div>
             <p className="text-xs mb-3" style={{ color: '#94A3B8' }}>
-              Digite quanto você tem HOJE na conta — o Finify ajusta sozinho pra bater certo com o que você já lançou. "Data" é só de referência: normalmente deixe em hoje.
+              Recebeu um presente, uma herança, ou precisa corrigir seu saldo? Isso lança uma receita normal — soma em Receitas e Economia, igual qualquer outro dinheiro que entrou.
             </p>
-            <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Quanto você tem hoje (R$)</label>
-            <input type="text" inputMode="numeric" value={saldoInicial} onChange={e => maskSaldoInicial(e.target.value)}
+            <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Valor (R$)</label>
+            <input type="text" inputMode="numeric" value={valorAjuste} onChange={e => maskValorAjuste(e.target.value)}
               placeholder="0,00"
               className="w-full px-4 h-11 rounded-xl border text-sm outline-none mb-3"
               style={{ borderColor: '#E2E8F0', color: '#0F172A' }} />
-            <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Data de referência</label>
-            <input type="date" value={saldoInicialData} onChange={e => setSaldoInicialData(e.target.value)}
+            <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Data</label>
+            <input type="date" value={dataAjuste} onChange={e => setDataAjuste(e.target.value)}
               className="w-full px-4 h-11 rounded-xl border text-sm outline-none mb-3"
               style={{ borderColor: '#E2E8F0', color: '#0F172A' }} />
-            <button onClick={handleSalvarSaldoInicial} disabled={salvandoSaldoInicial || !saldoInicialData}
+            <button onClick={handleRegistrarAjuste} disabled={salvandoAjuste || !valorAjuste}
               className="w-full flex items-center justify-center gap-1.5 h-11 rounded-xl text-sm font-semibold text-white"
-              style={{ backgroundColor: '#145A45', opacity: (salvandoSaldoInicial || !saldoInicialData) ? 0.6 : 1 }}>
-              {saldoInicialSalvo ? <Check size={15} /> : <Save size={15} />}
-              {salvandoSaldoInicial ? 'Salvando...' : saldoInicialSalvo ? 'Salvo' : 'Salvar'}
+              style={{ backgroundColor: '#145A45', opacity: (salvandoAjuste || !valorAjuste) ? 0.6 : 1 }}>
+              {ajusteSalvo ? <Check size={15} /> : <Save size={15} />}
+              {salvandoAjuste ? 'Salvando...' : ajusteSalvo ? 'Registrado' : 'Registrar receita'}
             </button>
           </div>
 
@@ -541,29 +523,29 @@ export default function PerfilPage() {
               <div className="rounded-[20px] border p-6" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
                 <div className="flex items-center gap-2 mb-1">
                   <Wallet size={18} color="#0F172A" strokeWidth={1.75} />
-                  <h2 className="font-semibold" style={{ color: '#0F172A' }}>Saldo em conta</h2>
+                  <h2 className="font-semibold" style={{ color: '#0F172A' }}>Ajustar saldo</h2>
                 </div>
                 <p className="text-sm mb-5" style={{ color: '#64748B' }}>
-                  Digite quanto você tem <strong>hoje</strong> na conta — o Finify calcula sozinho o ajuste por trás, descontando o que você já lançou desde a data de referência, pra sempre bater certo com o valor real do seu banco.
+                  Recebeu um presente, uma herança, ou precisa corrigir seu saldo? Isso lança uma receita normal — soma em Receitas e Economia, igual qualquer outro dinheiro que entrou. Sem fórmula especial, sem campo separado.
                 </p>
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Quanto você tem hoje (R$)</label>
-                    <input type="text" inputMode="numeric" value={saldoInicial} onChange={e => maskSaldoInicial(e.target.value)}
+                    <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Valor (R$)</label>
+                    <input type="text" inputMode="numeric" value={valorAjuste} onChange={e => maskValorAjuste(e.target.value)}
                       placeholder="0,00"
                       className="w-full px-4 h-12 rounded-xl border text-sm outline-none" style={{ borderColor: '#E2E8F0', color: '#0F172A' }} />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Data de referência</label>
-                    <input type="date" value={saldoInicialData} onChange={e => setSaldoInicialData(e.target.value)}
+                    <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Data</label>
+                    <input type="date" value={dataAjuste} onChange={e => setDataAjuste(e.target.value)}
                       className="w-full px-4 h-12 rounded-xl border text-sm outline-none" style={{ borderColor: '#E2E8F0', color: '#0F172A' }} />
                   </div>
                 </div>
-                <button onClick={handleSalvarSaldoInicial} disabled={salvandoSaldoInicial || !saldoInicialData}
+                <button onClick={handleRegistrarAjuste} disabled={salvandoAjuste || !valorAjuste}
                   className="flex items-center gap-2 px-5 h-12 rounded-xl text-sm font-semibold text-white transition-opacity"
-                  style={{ backgroundColor: '#145A45', opacity: (salvandoSaldoInicial || !saldoInicialData) ? 0.6 : 1 }}>
-                  {saldoInicialSalvo ? <Check size={16} /> : <Save size={16} />}
-                  {salvandoSaldoInicial ? 'Salvando...' : saldoInicialSalvo ? 'Salvo' : 'Salvar'}
+                  style={{ backgroundColor: '#145A45', opacity: (salvandoAjuste || !valorAjuste) ? 0.6 : 1 }}>
+                  {ajusteSalvo ? <Check size={16} /> : <Save size={16} />}
+                  {salvandoAjuste ? 'Salvando...' : ajusteSalvo ? 'Registrado' : 'Registrar receita'}
                 </button>
               </div>
 

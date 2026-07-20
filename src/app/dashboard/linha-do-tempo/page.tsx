@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase'
 import {
   Info, Bell, ChevronLeft, ChevronRight, ChevronDown, Settings2,
   Star, Car, Home, Trophy, Shield, Target, TrendingUp, Sparkles,
-  ArrowDownLeft, ArrowUpRight, PiggyBank, Wallet, ArrowRight, CheckCircle2, Landmark,
+  ArrowDownLeft, ArrowUpRight, PiggyBank, Wallet, ArrowRight, CheckCircle2,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -65,9 +65,6 @@ function diasUteisEntre(inicio: Date, fim: Date): number {
 export default function LinhaDoTempoPage() {
   const [loading, setLoading] = useState(true)
   const [familiaId, setFamiliaId] = useState('')
-  const [saldoInicialData, setSaldoInicialData] = useState<string | null>(null)
-  const [saldoEmConta, setSaldoEmConta] = useState<number | null>(null)
-  const [carregandoSaldoConta, setCarregandoSaldoConta] = useState(false)
   const [nome, setNome] = useState('')
   const [totalRec, setTotalRec] = useState(0)
   const [totalDes, setTotalDes] = useState(0)
@@ -94,36 +91,19 @@ export default function LinhaDoTempoPage() {
     return () => clearInterval(interval)
   }, [])
 
-  // Saldo em conta = saldo inicial + tudo lançado desde a data de referência até hoje (inclusive) —
+
   // mesma lógica do Dashboard, nunca conta parcela com data futura ainda não vencida.
-  async function carregarSaldoEmConta(fid: string, saldoBase: number, dataReferencia: string) {
-    setCarregandoSaldoConta(true)
-    const hoje = dataLocalISO(new Date())
-    const { data: lancDesde } = await supabase.from('lancamentos')
-      .select('tipo, valor')
-      .eq('familia_id', fid).is('empresa_id', null)
-      .gte('data', dataReferencia).lte('data', hoje)
-      .eq('fatura_paga', true) // compra em cartão só conta quando a fatura é paga de verdade
-    const fluxo = (lancDesde || []).reduce((s: number, l: any) => s + (l.tipo === 'receita' ? Number(l.valor) : -Number(l.valor)), 0)
-    setSaldoEmConta(saldoBase + fluxo)
-    setCarregandoSaldoConta(false)
-  }
 
   async function carregar() {
     setLoading(true)
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.user) return
     const { data: profile } = await supabase
-      .from('profiles').select('nome, familia_id, familias(saldo_inicial, saldo_inicial_data)')
+      .from('profiles').select('nome, familia_id')
       .eq('id', session.user.id).single()
     if (!profile?.familia_id) { setLoading(false); return }
     setNome(profile.nome || '')
     setFamiliaId(profile.familia_id)
-
-    const saldoInicialVal  = Number((profile.familias as any)?.saldo_inicial || 0)
-    const saldoInicialDataVal = (profile.familias as any)?.saldo_inicial_data || null
-    setSaldoInicialData(saldoInicialDataVal)
-    if (saldoInicialDataVal) carregarSaldoEmConta(profile.familia_id, saldoInicialVal, saldoInicialDataVal)
 
     const inicioMes = dataLocalISO(new Date(anoAtual, new Date().getMonth(), 1))
     const fimMes    = dataLocalISO(new Date(anoAtual, new Date().getMonth() + 1, 0))
@@ -235,7 +215,6 @@ export default function LinhaDoTempoPage() {
     { label: 'Despesas',     val: totalDes, cor: '#DC2626', bg: '#FEF2F2', Icon: ArrowUpRight },
     { label: 'Economia',     val: totalRec - totalDes, cor: '#BA7517', bg: '#FAEEDA', Icon: PiggyBank },
     { label: 'Carteira de investimentos', val: totalInvEstimado, cor: '#145A45', bg: '#D1FAE5', Icon: Wallet },
-    ...(saldoInicialData ? [{ label: 'Saldo em conta', val: saldoEmConta ?? 0, cor: '#0EA5E9', bg: '#E0F2FE', Icon: Landmark }] : []),
   ]
 
   return (
