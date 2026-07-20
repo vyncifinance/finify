@@ -219,7 +219,7 @@ export default function LinhaDoTempoPage() {
 
   return (
     <div style={{ backgroundColor: '#F7F9FB', minHeight: '100vh' }}>
-      <div style={{ maxWidth: '1180px', margin: '0 auto', padding: '20px 24px 32px' }}>
+      <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '20px 24px 32px' }}>
 
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
