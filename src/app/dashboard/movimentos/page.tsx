@@ -665,7 +665,8 @@ export default function MovimentosPage() {
   // Bate com o saldo real do banco: aportes em investimento/meta saíram fisicamente da conta,
   // então contam como despesa aqui (diferente da Reserva de Emergência no Dashboard, que
   // olha só despesa de consumo).
-  const totalDes = lancamentos.filter(l => l.tipo === 'despesa').reduce((s, l) => s + Number(l.valor), 0)
+  // Compra em cartão de crédito (fatura_paga === false) só conta como despesa quando a fatura é paga.
+  const totalDes = lancamentos.filter(l => l.tipo === 'despesa' && l.fatura_paga !== false).reduce((s, l) => s + Number(l.valor), 0)
   const resultado = totalRec - totalDes
   const saldoProjetado = resultado + totalReceitasFixasPendentes - totalDespesasFixasPendentes
   const mesLabel  = `${MESES[mesRef.getMonth()]} ${mesRef.getFullYear()}`
@@ -1341,7 +1342,7 @@ export default function MovimentosPage() {
             </div>
           ) : diasOrdenados.map(dia => {
             const itens    = grupos[dia]
-            const totalDia = itens.reduce((s, l) => s + (l.tipo === 'receita' ? Number(l.valor) : -Number(l.valor)), 0)
+            const totalDia = itens.filter((l: any) => l.tipo === 'receita' || l.fatura_paga !== false).reduce((s, l) => s + (l.tipo === 'receita' ? Number(l.valor) : -Number(l.valor)), 0)
             return (
               <div key={dia} style={{ marginBottom: '16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', padding: '0 4px' }}>
@@ -1531,7 +1532,7 @@ export default function MovimentosPage() {
             </div>
           ) : diasOrdenados.map(dia => {
             const itens    = grupos[dia]
-            const totalDia = itens.reduce((s, l) => s + (l.tipo === 'receita' ? Number(l.valor) : -Number(l.valor)), 0)
+            const totalDia = itens.filter((l: any) => l.tipo === 'receita' || l.fatura_paga !== false).reduce((s, l) => s + (l.tipo === 'receita' ? Number(l.valor) : -Number(l.valor)), 0)
             return (
               <div key={dia}>
                 <div className="flex items-center justify-between px-6 py-3" style={{ backgroundColor: '#F8FAFC' }}>

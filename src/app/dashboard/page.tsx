@@ -188,19 +188,21 @@ export default function DashboardPage() {
     const { data: lanc } = await queryLanc.order('data', { ascending: false }).order('hora', { ascending: false })
 
     if (lanc) {
+      // Compra em cartão de crédito (fatura_paga === false) só conta como despesa/saída de caixa
+      // quando a fatura é paga — até lá é dívida pendente, não sai do "Saldo em conta".
       const r = lanc.filter((l: any) => l.tipo === 'receita').reduce((s: number, l: any) => s + Number(l.valor), 0)
-      const dBruto = lanc.filter((l: any) => l.tipo === 'despesa').reduce((s: number, l: any) => s + Number(l.valor), 0)
+      const dBruto = lanc.filter((l: any) => l.tipo === 'despesa' && l.fatura_paga !== false).reduce((s: number, l: any) => s + Number(l.valor), 0)
       setTotalRec(r); setTotalDes(dBruto); setTotalEco(r - dBruto)
       setLancamentos(lanc.slice(0, 5))
 
       if (!ehEmpresa) {
         const base = lanc.filter((l: any) => l.tipo === 'receita' && l.dizimar !== false).reduce((s: number, l: any) => s + Number(l.valor), 0)
-        const pago = lanc.filter((l: any) => l.tipo === 'despesa' && l.categoria === 'Dízimo').reduce((s: number, l: any) => s + Number(l.valor), 0)
+        const pago = lanc.filter((l: any) => l.tipo === 'despesa' && l.categoria === 'Dízimo' && l.fatura_paga !== false).reduce((s: number, l: any) => s + Number(l.valor), 0)
         setBaseDizimo(base); setValorDizimo(base * 0.1); setDizimoPago(pago)
       }
 
       const porCat: any = {}
-      lanc.filter((l: any) => l.tipo === 'despesa').forEach((l: any) => {
+      lanc.filter((l: any) => l.tipo === 'despesa' && l.fatura_paga !== false).forEach((l: any) => {
         porCat[l.categoria] = (porCat[l.categoria] || 0) + Number(l.valor)
       })
       const cores = ['#C0453D','#4A7FA5','#D68C4A','#3D8C7D','#6B4C7A','#E0A76B','#345E7A','#6BAF9C','#8B4A42','#2C6B60','#6FA3C4','#B56B3E']
@@ -237,13 +239,13 @@ export default function DashboardPage() {
       const d2 = new Date(agora.getFullYear(), agora.getMonth() - i, 1)
       const i2 = new Date(d2.getFullYear(), d2.getMonth(), 1).toISOString().split('T')[0]
       const f2 = new Date(d2.getFullYear(), d2.getMonth() + 1, 0).toISOString().split('T')[0]
-      let queryMes = supabase.from('lancamentos').select('tipo, valor, categoria')
+      let queryMes = supabase.from('lancamentos').select('tipo, valor, categoria, fatura_paga')
         .eq('familia_id', fid).gte('data', i2).lte('data', f2)
       queryMes = ehEmpresa ? queryMes.eq('empresa_id', ctx.empresaId) : queryMes.is('empresa_id', null)
       const { data: mes } = await queryMes
       const r2 = (mes || []).filter((l: any) => l.tipo === 'receita').reduce((s: number, l: any) => s + Number(l.valor), 0)
-      const d2Bruto = (mes || []).filter((l: any) => l.tipo === 'despesa').reduce((s: number, l: any) => s + Number(l.valor), 0)
-      const d3 = (mes || []).filter((l: any) => l.tipo === 'despesa' && !ehCategoriaAlocacao(l.categoria)).reduce((s: number, l: any) => s + Number(l.valor), 0)
+      const d2Bruto = (mes || []).filter((l: any) => l.tipo === 'despesa' && l.fatura_paga !== false).reduce((s: number, l: any) => s + Number(l.valor), 0)
+      const d3 = (mes || []).filter((l: any) => l.tipo === 'despesa' && l.fatura_paga !== false && !ehCategoriaAlocacao(l.categoria)).reduce((s: number, l: any) => s + Number(l.valor), 0)
       evo.push({ mes: MESES[d2.getMonth()].substring(0, 3), valor: r2 - d2Bruto })
       despesasPorMes.push(d3)
     }

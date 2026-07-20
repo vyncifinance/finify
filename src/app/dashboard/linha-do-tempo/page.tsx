@@ -113,8 +113,9 @@ export default function LinhaDoTempoPage() {
       .gte('data', inicioMes).lte('data', fimMes)
 
     if (lanc) {
+      // Compra em cartão de crédito (fatura_paga === false) só conta como despesa quando a fatura é paga.
       const r = lanc.filter((l: any) => l.tipo === 'receita').reduce((s: number, l: any) => s + Number(l.valor), 0)
-      const d = lanc.filter((l: any) => l.tipo === 'despesa').reduce((s: number, l: any) => s + Number(l.valor), 0)
+      const d = lanc.filter((l: any) => l.tipo === 'despesa' && l.fatura_paga !== false).reduce((s: number, l: any) => s + Number(l.valor), 0)
       setTotalRec(r); setTotalDes(d)
     }
 
@@ -146,10 +147,10 @@ export default function LinhaDoTempoPage() {
       const ref = new Date(anoAtual, new Date().getMonth() - i, 1)
       const ini = ref.toISOString().split('T')[0]
       const fim = new Date(ref.getFullYear(), ref.getMonth() + 1, 0).toISOString().split('T')[0]
-      const { data: lm } = await supabase.from('lancamentos').select('tipo, valor, categoria')
+      const { data: lm } = await supabase.from('lancamentos').select('tipo, valor, categoria, fatura_paga')
         .eq('familia_id', profile.familia_id).is('empresa_id', null)
         .gte('data', ini).lte('data', fim)
-      const saldoMes = (lm || []).reduce((s: number, l: any) => s + (l.tipo === 'receita' ? Number(l.valor) : -Number(l.valor)), 0)
+      const saldoMes = (lm || []).filter((l: any) => l.tipo === 'receita' || l.fatura_paga !== false).reduce((s: number, l: any) => s + (l.tipo === 'receita' ? Number(l.valor) : -Number(l.valor)), 0)
       acumulado += saldoMes
       evo.push({ mes: MESES[ref.getMonth()].slice(0, 3), valor: Math.max(acumulado, 0) })
     }
