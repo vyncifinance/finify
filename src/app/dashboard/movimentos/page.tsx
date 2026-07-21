@@ -81,6 +81,8 @@ export default function MovimentosPage() {
   const [filtro, setFiltro]             = useState<'todos'|'receita'|'despesa'>('todos')
   const [filtroMembro, setFiltroMembro] = useState('todos')
   const [filtroCategoria, setFiltroCategoria] = useState('todos')
+  const [diaOverride, setDiaOverride] = useState<Record<string, boolean>>({})
+  const [limiteDias, setLimiteDias] = useState(15)
   const [busca, setBusca]               = useState('')
   const [membros, setMembros]           = useState<string[]>([])
   const [membrosFamilia, setMembrosFamilia] = useState<string[]>([])
@@ -145,6 +147,10 @@ export default function MovimentosPage() {
   useEffect(() => {
     if (familiaIdRef.current) carregarLancamentos(familiaIdRef.current)
   }, [mesRef])
+  useEffect(() => {
+    setLimiteDias(15)
+    setDiaOverride({})
+  }, [mesRef, filtro, filtroMembro, filtroCategoria, busca])
   useEffect(() => {
     const handler = () => {
       if (!document.hidden && familiaIdRef.current) carregarLancamentos(familiaIdRef.current)
@@ -658,6 +664,18 @@ export default function MovimentosPage() {
     grupos[l.data].push(l)
   })
   const diasOrdenados = Object.keys(grupos).sort((a, b) => b.localeCompare(a))
+
+  // Só o dia mais recente vem aberto por padrão — os outros ficam recolhidos numa faixa
+  // fina (data + total), só expandindo quando clicado. Evita lista gigante de cara.
+  function diaEstaExpandido(dia: string, idx: number) {
+    if (dia in diaOverride) return diaOverride[dia]
+    return idx === 0
+  }
+  function toggleDia(dia: string, idx: number) {
+    setDiaOverride(prev => ({ ...prev, [dia]: !diaEstaExpandido(dia, idx) }))
+  }
+  const diasVisiveis = diasOrdenados.slice(0, limiteDias)
+  const temMaisDias   = diasOrdenados.length > limiteDias
 
   const totalRec = lancamentos.filter(l => l.tipo === 'receita').reduce((s, l) => s + Number(l.valor), 0)
   // Aportes em investimento/meta não contam como despesa de consumo — mesma regra já aplicada
@@ -1342,46 +1360,61 @@ export default function MovimentosPage() {
               <Wallet size={32} color="#E2E8F0" strokeWidth={1} />
               <p style={{ fontSize: '14px', color: '#94A3B8' }}>Nenhum lançamento neste período.</p>
             </div>
-          ) : diasOrdenados.map(dia => {
+          ) : diasVisiveis.map((dia, idx) => {
             const itens    = grupos[dia]
             const totalDia = itens.filter((l: any) => l.tipo === 'receita' || l.fatura_paga !== false).reduce((s, l) => s + (l.tipo === 'receita' ? Number(l.valor) : -Number(l.valor)), 0)
+            const expandido = diaEstaExpandido(dia, idx)
             return (
-              <div key={dia} style={{ marginBottom: '16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', padding: '0 4px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{formatDiaLabel(dia)}</span>
-                  <span style={{ fontSize: '11px', fontWeight: 600, color: totalDia >= 0 ? '#10B981' : '#EF4444' }}>
-                    {totalDia >= 0 ? '+' : '-'} {fmt(Math.abs(totalDia))}
+              <div key={dia} style={{ marginBottom: '10px' }}>
+                <button onClick={() => toggleDia(dia, idx)}
+                  style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', marginBottom: expandido ? '8px' : '0', padding: expandido ? '0 4px' : '10px 12px', background: expandido ? 'none' : '#F8FAFC', border: expandido ? 'none' : '1px solid #E2E8F0', borderRadius: '12px', cursor: 'pointer' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: expandido ? '11px' : '12px', fontWeight: 600, color: expandido ? '#94A3B8' : '#64748B', textTransform: expandido ? 'uppercase' : 'none', letterSpacing: expandido ? '0.05em' : 'normal' }}>
+                    {formatDiaLabel(dia)}{!expandido && ` · ${itens.length} lançamento${itens.length > 1 ? 's' : ''}`}
                   </span>
-                </div>
-                <div style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', overflow: 'hidden' }}>
-                  {itens.map((l: any, i: number) => {
-                    const Icon = ICONES_CAT[l.categoria] || (l.tipo === 'receita' ? ArrowDownLeft : ArrowUpRight)
-                    return (
-                      <button key={l.id} onClick={() => abrirModalEditar(l)}
-                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderTop: i > 0 ? '1px solid #F1F5F9' : 'none', backgroundColor: 'transparent', border: i > 0 ? '1px solid #F1F5F9' : 'none', borderLeft: 'none', borderRight: 'none', borderBottom: 'none', cursor: 'pointer', textAlign: 'left' }}>
-                        <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: l.tipo === 'receita' ? '#ECFDF5' : '#FEF2F2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <Icon size={16} color={l.tipo === 'receita' ? '#10B981' : '#EF4444'} strokeWidth={1.75} />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ fontSize: '14px', fontWeight: 500, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{l.categoria}</p>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <p style={{ fontSize: '12px', color: '#94A3B8', margin: 0 }}>{l.membro?.split(' ')[0]} · {l.hora}</p>
-                            {l.descricao && <AlignLeft size={10} color="#94A3B8" strokeWidth={1.75} />}
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 600, color: totalDia >= 0 ? '#10B981' : '#EF4444' }}>
+                      {totalDia >= 0 ? '+' : '-'} {fmt(Math.abs(totalDia))}
+                    </span>
+                    <ChevronDown size={14} color="#94A3B8" style={{ transform: expandido ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                  </span>
+                </button>
+                {expandido && (
+                  <div style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', overflow: 'hidden' }}>
+                    {itens.map((l: any, i: number) => {
+                      const Icon = ICONES_CAT[l.categoria] || (l.tipo === 'receita' ? ArrowDownLeft : ArrowUpRight)
+                      return (
+                        <button key={l.id} onClick={() => abrirModalEditar(l)}
+                          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderTop: i > 0 ? '1px solid #F1F5F9' : 'none', backgroundColor: 'transparent', border: i > 0 ? '1px solid #F1F5F9' : 'none', borderLeft: 'none', borderRight: 'none', borderBottom: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                          <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: l.tipo === 'receita' ? '#ECFDF5' : '#FEF2F2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <Icon size={16} color={l.tipo === 'receita' ? '#10B981' : '#EF4444'} strokeWidth={1.75} />
                           </div>
-                        </div>
-                        <p style={{ fontSize: '14px', fontWeight: 600, color: l.tipo === 'receita' ? '#10B981' : '#EF4444', flexShrink: 0, margin: 0 }}>
-                          {l.tipo === 'receita' ? '+' : '-'} {fmt(Number(l.valor))}
-                        </p>
-                        <div style={{ width: '28px', height: '28px', borderRadius: '8px', backgroundColor: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <Pencil size={12} color="#64748B" strokeWidth={1.75} />
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ fontSize: '14px', fontWeight: 500, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{l.categoria}</p>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <p style={{ fontSize: '12px', color: '#94A3B8', margin: 0 }}>{l.membro?.split(' ')[0]} · {l.hora}</p>
+                              {l.descricao && <AlignLeft size={10} color="#94A3B8" strokeWidth={1.75} />}
+                            </div>
+                          </div>
+                          <p style={{ fontSize: '14px', fontWeight: 600, color: l.tipo === 'receita' ? '#10B981' : '#EF4444', flexShrink: 0, margin: 0 }}>
+                            {l.tipo === 'receita' ? '+' : '-'} {fmt(Number(l.valor))}
+                          </p>
+                          <div style={{ width: '28px', height: '28px', borderRadius: '8px', backgroundColor: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <Pencil size={12} color="#64748B" strokeWidth={1.75} />
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             )
           })}
+          {temMaisDias && (
+            <button onClick={() => setLimiteDias(prev => prev + 15)}
+              style={{ width: '100%', height: '44px', borderRadius: '12px', border: '1px solid #E2E8F0', backgroundColor: '#fff', color: '#0E3B2E', fontSize: '13px', fontWeight: 600, cursor: 'pointer', marginBottom: '8px' }}>
+              Carregar mais
+            </button>
+          )}
         </div>
 
         <button onClick={abrirModalNovo}
@@ -1544,18 +1577,26 @@ export default function MovimentosPage() {
               <p className="text-sm" style={{ color: '#94A3B8' }}>Nenhum lançamento neste período.</p>
               <button onClick={abrirModalNovo} className="text-sm font-semibold hover:underline" style={{ color: '#0F766E', background: 'none', border: 'none', cursor: 'pointer' }}>Registrar primeiro lançamento →</button>
             </div>
-          ) : diasOrdenados.map(dia => {
+          ) : diasVisiveis.map((dia, idx) => {
             const itens    = grupos[dia]
             const totalDia = itens.filter((l: any) => l.tipo === 'receita' || l.fatura_paga !== false).reduce((s, l) => s + (l.tipo === 'receita' ? Number(l.valor) : -Number(l.valor)), 0)
+            const expandido = diaEstaExpandido(dia, idx)
             return (
               <div key={dia}>
-                <div className="flex items-center justify-between px-6 py-3" style={{ backgroundColor: '#F8FAFC' }}>
-                  <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#64748B' }}>{formatDiaLabel(dia)}</span>
-                  <span className="text-xs font-semibold" style={{ color: totalDia >= 0 ? '#10B981' : '#EF4444' }}>
-                    {totalDia >= 0 ? '+' : '-'} {fmt(Math.abs(totalDia))}
+                <button onClick={() => toggleDia(dia, idx)}
+                  className="w-full flex items-center justify-between px-6 py-3"
+                  style={{ backgroundColor: '#F8FAFC', border: 'none', cursor: 'pointer' }}>
+                  <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide" style={{ color: '#64748B' }}>
+                    {formatDiaLabel(dia)}{!expandido && ` · ${itens.length} lançamento${itens.length > 1 ? 's' : ''}`}
                   </span>
-                </div>
-                {itens.map((l: any) => {
+                  <span className="flex items-center gap-2">
+                    <span className="text-xs font-semibold" style={{ color: totalDia >= 0 ? '#10B981' : '#EF4444' }}>
+                      {totalDia >= 0 ? '+' : '-'} {fmt(Math.abs(totalDia))}
+                    </span>
+                    <ChevronDown size={14} color="#94A3B8" style={{ transform: expandido ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                  </span>
+                </button>
+                {expandido && itens.map((l: any) => {
                   const Icon = ICONES_CAT[l.categoria] || (l.tipo === 'receita' ? ArrowDownLeft : ArrowUpRight)
                   return (
                     <button key={l.id} onClick={() => abrirModalEditar(l)}
@@ -1586,6 +1627,13 @@ export default function MovimentosPage() {
               </div>
             )
           })}
+          {temMaisDias && (
+            <button onClick={() => setLimiteDias(prev => prev + 15)}
+              className="w-full py-3 text-sm font-semibold hover:bg-gray-50"
+              style={{ color: '#0E3B2E', background: 'none', border: 'none', borderTop: '1px solid #F1F5F9', cursor: 'pointer' }}>
+              Carregar mais
+            </button>
+          )}
         </div>
       </div>
 
