@@ -1205,6 +1205,8 @@ export default function MovimentosPage() {
         .df-input:focus { border-color: #2FB36A !important; background-color: #fff !important; box-shadow: 0 0 0 3px rgba(47,179,106,0.12); outline: none; }
         .df-cta { transition: all 0.15s ease; }
         .df-cta:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(11,59,46,0.35); }
+        .mov-cta:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(11,59,46,0.4) !important; }
+        .mov-row:hover { background-color: #FAFBFC !important; }
       `}</style>
 
       {/* ── MOBILE ── */}
@@ -1389,7 +1391,7 @@ export default function MovimentosPage() {
       </div>
 
       {/* ── DESKTOP ── */}
-      <div className="hidden lg:block p-8 max-w-[1440px] mx-auto" style={{ backgroundColor: '#F8FAFC' }}>
+      <div className="hidden lg:block p-8 max-w-[1440px] mx-auto" style={{ backgroundColor: '#F7F9FB' }}>
         <div className="flex items-center justify-between mb-6">
           <div style={{ position: 'relative' }}>
             <button onClick={() => setContextoAbertoHeader(!contextoAbertoHeader)}
@@ -1428,9 +1430,13 @@ export default function MovimentosPage() {
               </div>
             )}
           </div>
-          <button onClick={abrirModalNovo}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white hover:opacity-90"
-            style={{ backgroundColor: '#0F766E', boxShadow: '0 4px 12px rgba(15,118,110,0.3)', border: 'none', cursor: 'pointer' }}>
+          <button onClick={abrirModalNovo} className="mov-cta"
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 22px', borderRadius: '14px',
+              fontSize: '14px', fontWeight: 600, color: '#fff', border: 'none', cursor: 'pointer',
+              background: 'linear-gradient(135deg, #07271F 0%, #145A45 100%)',
+              boxShadow: '0 4px 16px rgba(11,59,46,0.3)', transition: 'all 0.15s ease',
+            }}>
             <Plus size={16} strokeWidth={2.5} /> Novo lançamento
           </button>
         </div>
@@ -1451,12 +1457,17 @@ export default function MovimentosPage() {
             { label: 'Despesas', val: totalDes, cor: '#EF4444', bg: '#FEF2F2', Icon: ArrowUpRight },
             { label: 'Resultado do mês', val: resultado, cor: '#F59E0B', bg: '#FFFBEB', Icon: Wallet },
           ].map(c => (
-            <div key={c.label} className="rounded-[20px] p-6 border" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+            <div key={c.label} className="rounded-[20px] p-6" style={{
+              backgroundColor: '#fff', border: '1px solid rgba(15,23,42,0.06)',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 12px 40px rgba(0,0,0,0.07)', transition: 'all 0.2s ease',
+            }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px) scale(1.01)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 16px 48px rgba(15,23,42,0.08)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'none'; (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 6px rgba(0,0,0,0.04), 0 12px 40px rgba(0,0,0,0.07)' }}>
               <div className="w-11 h-11 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: c.bg }}>
                 <c.Icon size={19} color={c.cor} strokeWidth={1.75} />
               </div>
               <p className="text-sm font-medium mb-1" style={{ color: '#64748B' }}>{c.label}</p>
-              <p className="text-2xl font-semibold" style={{ color: c.cor, letterSpacing: '-0.5px' }}>{loading ? '...' : fmt(c.val)}</p>
+              <p className="text-[30px] font-bold" style={{ color: c.cor, letterSpacing: '-0.5px' }}>{loading ? '...' : fmt(c.val)}</p>
             </div>
           ))}
         </div>
@@ -1521,7 +1532,10 @@ export default function MovimentosPage() {
           </div>
         )}
 
-        <div className="rounded-[20px] border overflow-hidden" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+        <div className="rounded-[20px] overflow-hidden" style={{
+          backgroundColor: '#fff', border: '1px solid rgba(15,23,42,0.06)',
+          boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 12px 40px rgba(0,0,0,0.07)',
+        }}>
           {loading ? (
             <p className="text-sm text-center py-16" style={{ color: '#94A3B8' }}>Carregando...</p>
           ) : diasOrdenados.length === 0 ? (
@@ -1545,7 +1559,7 @@ export default function MovimentosPage() {
                   const Icon = ICONES_CAT[l.categoria] || (l.tipo === 'receita' ? ArrowDownLeft : ArrowUpRight)
                   return (
                     <button key={l.id} onClick={() => abrirModalEditar(l)}
-                      className="w-full flex items-center gap-3 px-6 py-3.5 border-t text-left hover:bg-gray-50"
+                      className="w-full flex items-center gap-3 px-6 py-3.5 border-t text-left mov-row"
                       style={{ borderColor: '#F1F5F9', background: 'none', cursor: 'pointer' }}>
                       <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
                         style={{ backgroundColor: l.tipo === 'receita' ? '#ECFDF5' : '#FEF2F2' }}>
