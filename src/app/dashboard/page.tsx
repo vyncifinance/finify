@@ -780,160 +780,146 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Hero — Resumo Executivo */}
+          {/* Linha única: Hero + KPIs + Gráfico, tudo no topo (Opção 2) */}
           <div style={{
-            borderRadius: '16px', padding: '16px', marginBottom: '10px', position: 'relative', overflow: 'hidden',
-            background: 'linear-gradient(135deg, #05281F 0%, #0C342A 55%, #0E3B2F 100%)',
-            boxShadow: '0 20px 60px -16px rgba(6,38,31,0.45)',
+            display: 'grid', gap: '10px', marginBottom: '10px', alignItems: 'stretch',
+            gridTemplateColumns: dizimoAtivo ? '1.3fr 0.9fr 0.9fr 0.9fr 0.9fr 1.6fr' : '1.3fr 0.9fr 0.9fr 0.9fr 1.6fr',
           }}>
-            <div style={{ position: 'absolute', top: '-100px', right: '-60px', width: '360px', height: '360px', borderRadius: '50%', background: 'rgba(110,231,183,0.08)', filter: 'blur(50px)' }} />
-            <div style={{ position: 'absolute', bottom: '-120px', left: '20%', width: '320px', height: '320px', borderRadius: '50%', background: 'rgba(47,143,104,0.12)', filter: 'blur(60px)' }} />
-
-            <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: '16px', alignItems: 'center' }}>
-              {/* Esquerda: número + indicadores do mês */}
-              <div>
+            {/* Hero — compacto, só o essencial */}
+            <div style={{
+              borderRadius: '16px', padding: '18px', position: 'relative', overflow: 'hidden',
+              background: 'linear-gradient(135deg, #05281F 0%, #0C342A 55%, #0E3B2F 100%)',
+              boxShadow: '0 20px 60px -16px rgba(6,38,31,0.45)',
+              display: 'flex', flexDirection: 'column', justifyContent: 'center',
+            }}>
+              <div style={{ position: 'absolute', top: '-80px', right: '-60px', width: '220px', height: '220px', borderRadius: '50%', background: 'rgba(110,231,183,0.08)', filter: 'blur(50px)' }} />
+              <div style={{ position: 'relative' }}>
                 <div style={{
-                  width: '42px', height: '42px', borderRadius: '50%', marginBottom: '12px',
+                  width: '38px', height: '38px', borderRadius: '50%', marginBottom: '12px',
                   background: 'linear-gradient(135deg, #2FB36A 0%, #145A45 100%)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   boxShadow: '0 6px 16px rgba(47,179,106,0.35)',
                 }}>
-                  <TrendingUp size={19} color="#fff" strokeWidth={2} />
+                  <TrendingUp size={17} color="#fff" strokeWidth={2} />
                 </div>
-                <p style={{ fontSize: '13px', fontWeight: 600, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>
+                <p style={{ fontSize: '11.5px', fontWeight: 600, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>
                   Resultado do mês
                 </p>
-                <p style={{ fontSize: '22px', fontWeight: 700, color: '#fff', letterSpacing: '-1.5px', lineHeight: 1, marginBottom: '14px' }}>
+                <p style={{ fontSize: '22px', fontWeight: 700, color: '#fff', letterSpacing: '-1.2px', lineHeight: 1, marginBottom: '12px' }}>
                   {loading ? '...' : fmtOculto(resultadoExibir, ocultar)}
                 </p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-start' }}>
                   {!semDados && (
                     <div style={{
-                      display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 12px', borderRadius: '999px',
+                      display: 'flex', alignItems: 'center', gap: '5px', padding: '4px 10px', borderRadius: '999px',
                       backgroundColor: crescimentoPct >= 0 ? 'rgba(110,231,183,0.15)' : 'rgba(239,68,68,0.15)',
                       border: `1px solid ${crescimentoPct >= 0 ? 'rgba(110,231,183,0.3)' : 'rgba(239,68,68,0.3)'}`,
                     }}>
-                      <ArrowUp size={11} color={crescimentoPct >= 0 ? '#6EE7B7' : '#FCA5A5'} strokeWidth={2.5} style={{ transform: crescimentoPct < 0 ? 'rotate(180deg)' : 'none' }} />
-                      <span style={{ fontSize: '12.5px', fontWeight: 600, color: crescimentoPct >= 0 ? '#6EE7B7' : '#FCA5A5' }}>
+                      <ArrowUp size={10} color={crescimentoPct >= 0 ? '#6EE7B7' : '#FCA5A5'} strokeWidth={2.5} style={{ transform: crescimentoPct < 0 ? 'rotate(180deg)' : 'none' }} />
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: crescimentoPct >= 0 ? '#6EE7B7' : '#FCA5A5' }}>
                         {Math.abs(crescimentoPct).toFixed(1)}% vs. mês anterior
                       </span>
                     </div>
                   )}
-                  <div style={{ padding: '5px 12px', borderRadius: '999px', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                    <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>
+                  <div style={{ padding: '4px 10px', borderRadius: '999px', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                    <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)' }}>
                       {contextoAtivo.tipo === 'empresa' ? contextoAtivo.nome : (familia ? `Família ${familia}` : '')} · {mesAtual}
                     </span>
                   </div>
                 </div>
-
-                {/* Receitas x Despesas do mês */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span style={{ fontSize: '12.5px', color: 'rgba(255,255,255,0.55)', width: '76px', flexShrink: 0 }}>Recebeu</span>
-                    <div style={{ flex: 1, height: '6px', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: '100%', backgroundColor: '#6EE7B7', borderRadius: '4px' }} />
-                    </div>
-                    <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#fff', minWidth: '78px', textAlign: 'right' }}>{fmtOculto(totalRec, ocultar)}</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span style={{ fontSize: '12.5px', color: 'rgba(255,255,255,0.55)', width: '76px', flexShrink: 0 }}>Gastou</span>
-                    <div style={{ flex: 1, height: '6px', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${pctGasto}%`, backgroundColor: '#FCA5A5', borderRadius: '4px' }} />
-                    </div>
-                    <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#fff', minWidth: '78px', textAlign: 'right' }}>{fmtOculto(totalDes, ocultar)}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Direita: mini gráfico glass */}
-              <div style={{
-                borderRadius: '18px', padding: '22px',
-                backgroundColor: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(12px)',
-                border: '1px solid rgba(255,255,255,0.1)',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <p style={{ fontSize: '12.5px', fontWeight: 500, color: 'rgba(255,255,255,0.5)' }}>Resultado · 6 meses</p>
-                  <Sparkles size={14} color="rgba(255,255,255,0.3)" strokeWidth={1.75} />
-                </div>
-                <ResponsiveContainer width="100%" height={90}>
-                  <AreaChart data={evolucao}>
-                    <defs>
-                      <linearGradient id="heroGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#6EE7B7" stopOpacity={0.45} />
-                        <stop offset="100%" stopColor="#6EE7B7" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <Tooltip
-                      formatter={(v: any) => fmt(Number(v))}
-                      contentStyle={{ borderRadius: '12px', border: 'none', backgroundColor: '#0B3B2E', fontSize: '12px', color: '#fff', boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}
-                      labelStyle={{ color: 'rgba(255,255,255,0.6)' }}
-                      itemStyle={{ color: '#6EE7B7' }}
-                    />
-                    <Area type="monotone" dataKey="valor" stroke="#6EE7B7" strokeWidth={2.5} fill="url(#heroGrad)"
-                      dot={{ fill: '#0B3B2E', stroke: '#6EE7B7', strokeWidth: 2, r: 3 }}
-                      activeDot={{ r: 5, fill: '#6EE7B7', strokeWidth: 0 }}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
               </div>
             </div>
-          </div>
 
-          {/* KPI Cards — identidade própria */}
-          <div style={{ display: 'grid', gap: '8px', marginBottom: '10px', gridTemplateColumns: dizimoAtivo ? 'repeat(4, minmax(0, 1fr))' : 'repeat(3, minmax(0, 1fr))' }}>
+            {/* Receitas / Despesas / Economia */}
             {kpis.map(card => (
               <div key={card.label} style={{
-                borderRadius: '16px', padding: '18px', backgroundColor: '#fff',
+                borderRadius: '16px', padding: '16px', backgroundColor: '#fff',
                 border: `1px solid ${card.borderTint}`,
                 boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
+                display: 'flex', flexDirection: 'column', justifyContent: 'center',
                 transition: 'all 0.2s ease', cursor: 'default',
               }}
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px) scale(1.01)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 16px 48px rgba(15,23,42,0.08)' }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0) scale(1)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 12px 40px rgba(15,23,42,0.05)' }}
               >
-                <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: card.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px' }}>
-                  <card.Icon size={17} color={card.cor} strokeWidth={1.75} />
+                <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: card.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '12px' }}>
+                  <card.Icon size={15} color={card.cor} strokeWidth={1.75} />
                 </div>
-                <p style={{ fontSize: '13px', fontWeight: 500, color: '#64748B', marginBottom: '6px' }}>{card.label}</p>
-                <p style={{ fontSize: '15px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.3px', marginBottom: '2px' }}>
+                <p style={{ fontSize: '12px', fontWeight: 500, color: '#64748B', marginBottom: '5px' }}>{card.label}</p>
+                <p style={{ fontSize: '14px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.3px', marginBottom: '2px' }}>
                   {loading ? '...' : fmtOculto(card.val, ocultar)}
                 </p>
-                <span style={{ fontSize: '12.5px', fontWeight: 500, color: card.cor }}>Este mês</span>
+                <span style={{ fontSize: '11.5px', fontWeight: 500, color: card.cor }}>Este mês</span>
               </div>
             ))}
+
+            {/* Dízimo */}
             {dizimoAtivo && (
               <div style={{
-                borderRadius: '16px', padding: '18px', position: 'relative', backgroundColor: '#fff',
+                borderRadius: '16px', padding: '16px', position: 'relative', backgroundColor: '#fff',
                 border: `1px solid ${dizimoQuitado ? 'rgba(16,185,129,0.18)' : 'rgba(245,158,11,0.18)'}`,
                 boxShadow: '0 12px 40px rgba(15,23,42,0.05)', transition: 'all 0.2s ease',
+                display: 'flex', flexDirection: 'column', justifyContent: 'center',
               }}
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px) scale(1.01)' }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0) scale(1)' }}
               >
-                <div style={{ position: 'absolute', top: '18px', right: '18px' }}>
+                <div style={{ position: 'absolute', top: '14px', right: '14px' }}>
                   <span style={{
-                    fontSize: '11px', fontWeight: 600, padding: '4px 10px', borderRadius: '999px',
+                    fontSize: '10px', fontWeight: 600, padding: '3px 8px', borderRadius: '999px',
                     backgroundColor: dizimoQuitado ? '#ECFDF5' : '#FFFBEB',
                     color: dizimoQuitado ? '#2F8F68' : '#B7791F',
                   }}>
                     {dizimoQuitado ? 'Pago' : 'Pendente'}
                   </span>
                 </div>
-                <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px' }}>
-                  <Church size={17} color="#145A45" strokeWidth={1.75} />
+                <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '12px' }}>
+                  <Church size={15} color="#145A45" strokeWidth={1.75} />
                 </div>
-                <p style={{ fontSize: '13px', fontWeight: 500, color: '#64748B', marginBottom: '6px' }}>Dízimo do mês</p>
-                <p style={{ fontSize: '15px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.3px', marginBottom: '8px' }}>
+                <p style={{ fontSize: '12px', fontWeight: 500, color: '#64748B', marginBottom: '5px' }}>Dízimo do mês</p>
+                <p style={{ fontSize: '14px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-0.3px', marginBottom: '6px' }}>
                   {loading ? '...' : fmtOculto(valorDizimo, ocultar)}
                 </p>
-                <div style={{ height: '5px', borderRadius: '4px', overflow: 'hidden', backgroundColor: '#F1F5F9', marginBottom: '8px' }}>
+                <div style={{ height: '4px', borderRadius: '4px', overflow: 'hidden', backgroundColor: '#F1F5F9', marginBottom: '6px' }}>
                   <div style={{ height: '100%', width: `${dizimoPctPago}%`, backgroundColor: dizimoQuitado ? '#2F8F68' : '#F59E0B', borderRadius: '4px' }} />
                 </div>
-                <span style={{ fontSize: '12px', fontWeight: 500, color: dizimoQuitado ? '#2F8F68' : '#B7791F' }}>
+                <span style={{ fontSize: '11px', fontWeight: 500, color: dizimoQuitado ? '#2F8F68' : '#B7791F' }}>
                   {dizimoQuitado ? 'Completo!' : `Falta ${fmtOculto(dizimoRestante, ocultar)}`}
                 </span>
               </div>
             )}
+
+            {/* Gráfico 6 meses */}
+            <div style={{
+              borderRadius: '16px', padding: '16px', backgroundColor: '#fff',
+              border: '1px solid #ECEFF3', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
+              display: 'flex', flexDirection: 'column',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <p style={{ fontSize: '12px', fontWeight: 500, color: '#64748B' }}>Resultado · 6 meses</p>
+                <Sparkles size={13} color="#CBD5E1" strokeWidth={1.75} />
+              </div>
+              <ResponsiveContainer width="100%" height={90}>
+                <AreaChart data={evolucao}>
+                  <defs>
+                    <linearGradient id="heroGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#2FB36A" stopOpacity={0.28} />
+                      <stop offset="100%" stopColor="#2FB36A" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <Tooltip
+                    formatter={(v: any) => fmt(Number(v))}
+                    contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', backgroundColor: '#fff', fontSize: '12px', color: '#0F172A', boxShadow: '0 8px 24px rgba(0,0,0,0.08)' }}
+                    labelStyle={{ color: '#64748B' }}
+                    itemStyle={{ color: '#145A45' }}
+                  />
+                  <Area type="monotone" dataKey="valor" stroke="#145A45" strokeWidth={2.5} fill="url(#heroGrad)"
+                    dot={{ fill: '#fff', stroke: '#145A45', strokeWidth: 2, r: 3 }}
+                    activeDot={{ r: 5, fill: '#145A45', strokeWidth: 0 }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
           </div>
 
           {/* Metas + Saúde Financeira (pessoal) OU Despesas Fixas + Resultado Mensal (empresa) */}
