@@ -29,6 +29,7 @@ export default function CadastroPage() {
   const [confirmar, setConfirmar] = useState('')
   const [nomeFamilia, setNomeFamilia]     = useState('')
   const [codigoConvite, setCodigoConvite] = useState('')
+  const [saldoInicial, setSaldoInicial]   = useState('')
   const [loading, setLoading]     = useState(false)
   const [erro, setErro]           = useState('')
   const [showSenha, setShowSenha]         = useState(false)
@@ -85,6 +86,24 @@ export default function CadastroPage() {
       const { error: profileError } = await supabase
         .from('profiles').upsert({ id: authData.user.id, nome: nome.trim(), email, familia_id: familiaId })
       if (profileError) { setErro('Erro ao salvar perfil.'); return }
+
+      // Saldo inicial é opcional — se preenchido, vira uma receita normal, igual qualquer
+      // outro dinheiro que entrou (sem fórmula especial, sem campo separado).
+      if (saldoInicial.trim()) {
+        const valorNum = parseFloat(saldoInicial.replace(/\./g, '').replace(',', '.'))
+        if (!isNaN(valorNum) && valorNum > 0) {
+          const agora = new Date()
+          const hora  = `${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}`
+          const ano   = agora.getFullYear()
+          const mes   = String(agora.getMonth() + 1).padStart(2, '0')
+          const dia   = String(agora.getDate()).padStart(2, '0')
+          await supabase.from('lancamentos').insert({
+            familia_id: familiaId, user_id: authData.user.id, tipo: 'receita', valor: valorNum,
+            categoria: 'Ajuste de Saldo', membro: nome.trim(), data: `${ano}-${mes}-${dia}`, hora,
+            dizimar: false, fatura_paga: true, descricao: 'Saldo inicial no cadastro',
+          })
+        }
+      }
 
       router.push('/dashboard')
     } catch {
@@ -333,6 +352,23 @@ export default function CadastroPage() {
                     </p>
                   </div>
                 )}
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#5B6472', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '2px' }}>
+                    Já tem algum dinheiro guardado? (opcional)
+                  </label>
+                  <input type="text" inputMode="numeric" value={saldoInicial}
+                    onChange={e => {
+                      const digits = e.target.value.replace(/\D/g, '')
+                      const num = parseInt(digits || '0', 10)
+                      setSaldoInicial(digits === '' ? '' : (num / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
+                    }}
+                    placeholder="0,00"
+                    style={inputStyle} onFocus={onFocusInput} onBlur={onBlurInput} />
+                  <p style={{ fontSize: '9px', color: '#9CA3AF', marginTop: '2px' }}>
+                    Vira uma receita no seu primeiro dia — pode deixar em branco e lançar depois em Perfil.
+                  </p>
+                </div>
 
                 {erro && (
                   <div style={{ backgroundColor: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '10px', padding: '9px 13px', fontSize: '12.5px', color: '#DC2626' }}>
