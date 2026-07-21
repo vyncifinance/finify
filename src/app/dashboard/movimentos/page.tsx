@@ -6,7 +6,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import {
-  ArrowDownLeft, ArrowUpRight, ChevronLeft, ChevronRight, ChevronDown,
+  ArrowDownLeft, ArrowUpRight, ChevronLeft, ChevronRight, ChevronDown, Calendar,
   Plus, Wallet, X, UtensilsCrossed, Home, Car, Smile,
   Heart, BookOpen, ShoppingBag, Church, MoreHorizontal,
   Briefcase, TrendingUp, Laptop, DollarSign, Trash2, Pencil,
@@ -1366,18 +1366,35 @@ export default function MovimentosPage() {
             const expandido = diaEstaExpandido(dia, idx)
             return (
               <div key={dia} style={{ marginBottom: '10px' }}>
-                <button onClick={() => toggleDia(dia, idx)}
-                  style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', marginBottom: expandido ? '8px' : '0', padding: expandido ? '0 4px' : '10px 12px', background: expandido ? 'none' : '#F8FAFC', border: expandido ? 'none' : '1px solid #E2E8F0', borderRadius: '12px', cursor: 'pointer' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: expandido ? '11px' : '12px', fontWeight: 600, color: expandido ? '#94A3B8' : '#64748B', textTransform: expandido ? 'uppercase' : 'none', letterSpacing: expandido ? '0.05em' : 'normal' }}>
-                    {formatDiaLabel(dia)}{!expandido && ` · ${itens.length} lançamento${itens.length > 1 ? 's' : ''}`}
-                  </span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ fontSize: '11px', fontWeight: 600, color: totalDia >= 0 ? '#10B981' : '#EF4444' }}>
+                {expandido ? (
+                  <button onClick={() => toggleDia(dia, idx)}
+                    style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', padding: '0 4px', background: 'none', border: 'none', cursor: 'pointer' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      {formatDiaLabel(dia)}
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: totalDia >= 0 ? '#10B981' : '#EF4444' }}>
+                        {totalDia >= 0 ? '+' : '-'} {fmt(Math.abs(totalDia))}
+                      </span>
+                      <ChevronDown size={14} color="#94A3B8" style={{ transform: 'rotate(180deg)', transition: 'transform 0.15s' }} />
+                    </span>
+                  </button>
+                ) : (
+                  <button onClick={() => toggleDia(dia, idx)}
+                    style={{ display: 'flex', width: '100%', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#fff', border: '1px solid #E2E8F0', borderRadius: '14px', cursor: 'pointer' }}>
+                    <div style={{ width: '38px', height: '38px', borderRadius: '50%', backgroundColor: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Calendar size={16} color="#64748B" strokeWidth={1.75} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                      <p style={{ fontSize: '13.5px', fontWeight: 600, color: '#0F172A', margin: 0 }}>{formatDiaLabel(dia)}</p>
+                      <p style={{ fontSize: '12px', color: '#94A3B8', margin: '1px 0 0' }}>{itens.length} lançamento{itens.length > 1 ? 's' : ''}</p>
+                    </div>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: totalDia >= 0 ? '#10B981' : '#EF4444', flexShrink: 0 }}>
                       {totalDia >= 0 ? '+' : '-'} {fmt(Math.abs(totalDia))}
                     </span>
-                    <ChevronDown size={14} color="#94A3B8" style={{ transform: expandido ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
-                  </span>
-                </button>
+                    <ChevronDown size={16} color="#CBD5E1" strokeWidth={2} style={{ flexShrink: 0 }} />
+                  </button>
+                )}
                 {expandido && (
                   <div style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', overflow: 'hidden' }}>
                     {itens.map((l: any, i: number) => {
@@ -1582,20 +1599,38 @@ export default function MovimentosPage() {
             const totalDia = itens.filter((l: any) => l.tipo === 'receita' || l.fatura_paga !== false).reduce((s, l) => s + (l.tipo === 'receita' ? Number(l.valor) : -Number(l.valor)), 0)
             const expandido = diaEstaExpandido(dia, idx)
             return (
-              <div key={dia}>
-                <button onClick={() => toggleDia(dia, idx)}
-                  className="w-full flex items-center justify-between px-6 py-3"
-                  style={{ backgroundColor: '#F8FAFC', border: 'none', cursor: 'pointer' }}>
-                  <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide" style={{ color: '#64748B' }}>
-                    {formatDiaLabel(dia)}{!expandido && ` · ${itens.length} lançamento${itens.length > 1 ? 's' : ''}`}
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <span className="text-xs font-semibold" style={{ color: totalDia >= 0 ? '#10B981' : '#EF4444' }}>
+              <div key={dia} style={{ borderBottom: !expandido ? '1px solid #F1F5F9' : 'none' }}>
+                {expandido ? (
+                  <button onClick={() => toggleDia(dia, idx)}
+                    className="w-full flex items-center justify-between px-6 py-3"
+                    style={{ backgroundColor: '#F8FAFC', border: 'none', cursor: 'pointer' }}>
+                    <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#64748B' }}>
+                      {formatDiaLabel(dia)}
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <span className="text-xs font-semibold" style={{ color: totalDia >= 0 ? '#10B981' : '#EF4444' }}>
+                        {totalDia >= 0 ? '+' : '-'} {fmt(Math.abs(totalDia))}
+                      </span>
+                      <ChevronDown size={14} color="#94A3B8" style={{ transform: 'rotate(180deg)', transition: 'transform 0.15s' }} />
+                    </span>
+                  </button>
+                ) : (
+                  <button onClick={() => toggleDia(dia, idx)}
+                    className="w-full flex items-center gap-3 px-6 py-4 hover:bg-gray-50"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                    <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#F1F5F9' }}>
+                      <Calendar size={15} color="#64748B" strokeWidth={1.75} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>{formatDiaLabel(dia)}</p>
+                      <p className="text-xs" style={{ color: '#94A3B8' }}>{itens.length} lançamento{itens.length > 1 ? 's' : ''}</p>
+                    </div>
+                    <span className="text-sm font-semibold flex-shrink-0" style={{ color: totalDia >= 0 ? '#10B981' : '#EF4444' }}>
                       {totalDia >= 0 ? '+' : '-'} {fmt(Math.abs(totalDia))}
                     </span>
-                    <ChevronDown size={14} color="#94A3B8" style={{ transform: expandido ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
-                  </span>
-                </button>
+                    <ChevronDown size={16} color="#CBD5E1" strokeWidth={2} style={{ flexShrink: 0 }} />
+                  </button>
+                )}
                 {expandido && itens.map((l: any) => {
                   const Icon = ICONES_CAT[l.categoria] || (l.tipo === 'receita' ? ArrowDownLeft : ArrowUpRight)
                   return (
