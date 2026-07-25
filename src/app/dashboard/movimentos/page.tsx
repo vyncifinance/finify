@@ -124,6 +124,9 @@ export default function MovimentosPage() {
   const [novoCartaoVencimento, setNovoCartaoVencimento] = useState('')
   const [salvandoCartao, setSalvandoCartao] = useState(false)
   const [pagandoFatura, setPagandoFatura] = useState<string | null>(null)
+  const [cartaoDetalhado, setCartaoDetalhado] = useState<string | null>(null)
+  const [itensCartaoDetalhe, setItensCartaoDetalhe] = useState<any[]>([])
+  const [carregandoDetalheCartao, setCarregandoDetalheCartao] = useState(false)
   const [faturasPendentes, setFaturasPendentes] = useState<Record<string, number>>({})
   const [observacao, setObservacao]       = useState('')
   const [parcelado, setParcelado]         = useState(false)
@@ -355,6 +358,19 @@ export default function MovimentosPage() {
   // Paga a fatura de um cartão: soma tudo que ainda não foi pago nele e cria UM lançamento
   // único saindo da conta corrente — igual acontece de verdade no extrato do banco. As compras
   // individuais do cartão continuam existindo (pra categoria), só passam a contar como "pagas".
+  // Mostra todos os lançamentos daquele cartão (pagos e pendentes), não só o total —
+  // clica de novo pra fechar.
+  async function toggleDetalheCartao(cartaoId: string) {
+    if (cartaoDetalhado === cartaoId) { setCartaoDetalhado(null); return }
+    setCartaoDetalhado(cartaoId)
+    setCarregandoDetalheCartao(true)
+    const { data } = await supabase.from('lancamentos').select('*')
+      .eq('familia_id', familiaIdRef.current).eq('conta_id', cartaoId)
+      .order('data', { ascending: false }).limit(60)
+    setItensCartaoDetalhe(data || [])
+    setCarregandoDetalheCartao(false)
+  }
+
   async function handlePagarFatura(cartaoId: string) {
     setPagandoFatura(cartaoId)
     const fid = familiaIdRef.current
@@ -775,19 +791,55 @@ export default function MovimentosPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {cartoes.map((c: any) => {
             const pendente = faturasPendentes[c.id] || 0
+            const expandido = cartaoDetalhado === c.id
             return (
-              <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isMob ? '12px 14px' : '14px 18px', backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '14px' }}>
-                <div>
-                  <p style={{ fontSize: isMob ? '13px' : '14px', fontWeight: 600, color: '#0F172A', margin: 0 }}>{c.nome}</p>
-                  <p style={{ fontSize: '11.5px', color: '#94A3B8', margin: '2px 0 0' }}>
-                    {pendente > 0 ? `${fmt(pendente)} na fatura atual` : 'Sem pendências'}
-                  </p>
+              <div key={c.id} style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '14px', overflow: 'hidden' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isMob ? '12px 14px' : '14px 18px' }}>
+                  <div>
+                    <p style={{ fontSize: isMob ? '13px' : '14px', fontWeight: 600, color: '#0F172A', margin: 0 }}>{c.nome}</p>
+                    <p style={{ fontSize: '11.5px', color: '#94A3B8', margin: '2px 0 0' }}>
+                      {pendente > 0 ? `${fmt(pendente)} na fatura atual` : 'Sem pendências'}
+                      {' · '}
+                      <button onClick={() => toggleDetalheCartao(c.id)} style={{ background: 'none', border: 'none', color: '#0E3B2E', fontWeight: 600, cursor: 'pointer', padding: 0, fontSize: '11.5px' }}>
+                        {expandido ? 'Ocultar' : 'Detalhar'}
+                      </button>
+                    </p>
+                  </div>
+                  {pendente > 0 && (
+                    <button onClick={() => handlePagarFatura(c.id)} disabled={pagandoFatura === c.id}
+                      style={{ padding: '8px 14px', borderRadius: '10px', border: 'none', backgroundColor: '#0E3B2E', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: pagandoFatura === c.id ? 'not-allowed' : 'pointer', flexShrink: 0 }}>
+                      {pagandoFatura === c.id ? 'Pagando...' : 'Pagar fatura'}
+                    </button>
+                  )}
                 </div>
-                {pendente > 0 && (
-                  <button onClick={() => handlePagarFatura(c.id)} disabled={pagandoFatura === c.id}
-                    style={{ padding: '8px 14px', borderRadius: '10px', border: 'none', backgroundColor: '#0E3B2E', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: pagandoFatura === c.id ? 'not-allowed' : 'pointer' }}>
-                    {pagandoFatura === c.id ? 'Pagando...' : 'Pagar fatura'}
-                  </button>
+                {expandido && (
+                  <div style={{ borderTop: '1px solid #F1F5F9' }}>
+                    {carregandoDetalheCartao ? (
+                      <p style={{ padding: '16px', fontSize: '12.5px', color: '#94A3B8', textAlign: 'center' }}>Carregando...</p>
+                    ) : itensCartaoDetalhe.length === 0 ? (
+                      <p style={{ padding: '16px', fontSize: '12.5px', color: '#94A3B8', textAlign: 'center' }}>Nenhum lançamento nesse cartão ainda.</p>
+                    ) : (
+                      itensCartaoDetalhe.map((l: any, i: number) => (
+                        <button key={l.id} onClick={() => abrirModalEditar(l)}
+                          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderTop: i > 0 ? '1px solid #F1F5F9' : 'none', background: 'none', border: i > 0 ? '1px solid #F1F5F9' : 'none', borderLeft: 'none', borderRight: 'none', borderBottom: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ fontSize: '12.5px', fontWeight: 500, color: '#0F172A', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.descricao || l.categoria}</p>
+                            <p style={{ fontSize: '11px', color: '#94A3B8', margin: 0 }}>{new Date(l.data + 'T12:00:00').toLocaleDateString('pt-BR')}</p>
+                          </div>
+                          <span style={{
+                            fontSize: '10px', fontWeight: 600, padding: '2px 8px', borderRadius: '999px', flexShrink: 0,
+                            backgroundColor: l.fatura_paga ? '#ECFDF5' : '#FFFBEB',
+                            color: l.fatura_paga ? '#2F8F68' : '#B7791F',
+                          }}>
+                            {l.fatura_paga ? 'Pago' : 'Pendente'}
+                          </span>
+                          <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#EF4444', flexShrink: 0, minWidth: '70px', textAlign: 'right' }}>
+                            {fmt(Number(l.valor))}
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </div>
                 )}
               </div>
             )
