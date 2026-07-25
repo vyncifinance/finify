@@ -155,6 +155,9 @@ export default function MovimentosPage() {
     setDiaOverride({})
   }, [mesRef, filtro, filtroMembro, filtroCategoria, busca])
   useEffect(() => {
+    setCartaoDetalhado(null)
+  }, [mesRef])
+  useEffect(() => {
     const handler = () => {
       if (!document.hidden && familiaIdRef.current) carregarLancamentos(familiaIdRef.current)
     }
@@ -358,15 +361,17 @@ export default function MovimentosPage() {
   // Paga a fatura de um cartão: soma tudo que ainda não foi pago nele e cria UM lançamento
   // único saindo da conta corrente — igual acontece de verdade no extrato do banco. As compras
   // individuais do cartão continuam existindo (pra categoria), só passam a contar como "pagas".
-  // Mostra todos os lançamentos daquele cartão (pagos e pendentes), não só o total —
-  // clica de novo pra fechar.
+  // Mostra os lançamentos daquele cartão só do mês que está sendo visualizado — clica de novo pra fechar.
   async function toggleDetalheCartao(cartaoId: string) {
     if (cartaoDetalhado === cartaoId) { setCartaoDetalhado(null); return }
     setCartaoDetalhado(cartaoId)
     setCarregandoDetalheCartao(true)
+    const ini = dataLocalISO(new Date(mesRef.getFullYear(), mesRef.getMonth(), 1))
+    const fim = dataLocalISO(new Date(mesRef.getFullYear(), mesRef.getMonth() + 1, 0))
     const { data } = await supabase.from('lancamentos').select('*')
       .eq('familia_id', familiaIdRef.current).eq('conta_id', cartaoId)
-      .order('data', { ascending: false }).limit(60)
+      .gte('data', ini).lte('data', fim)
+      .order('data', { ascending: false })
     setItensCartaoDetalhe(data || [])
     setCarregandoDetalheCartao(false)
   }
@@ -814,6 +819,9 @@ export default function MovimentosPage() {
                 </div>
                 {expandido && (
                   <div style={{ borderTop: '1px solid #F1F5F9' }}>
+                    <p style={{ padding: '8px 14px 0', fontSize: '10.5px', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      {mesLabel}
+                    </p>
                     {carregandoDetalheCartao ? (
                       <p style={{ padding: '16px', fontSize: '12.5px', color: '#94A3B8', textAlign: 'center' }}>Carregando...</p>
                     ) : itensCartaoDetalhe.length === 0 ? (
