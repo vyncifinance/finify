@@ -323,9 +323,11 @@ export default function MovimentosPage() {
   async function carregarFaturasPendentes(fid: string, listaContas: any[]) {
     const cartoes = listaContas.filter((c: any) => c.tipo === 'cartao_credito')
     if (cartoes.length === 0) { setFaturasPendentes({}); return }
+    const hoje = dataLocalISO(new Date())
     const { data } = await supabase.from('lancamentos').select('conta_id, valor')
       .eq('familia_id', fid).eq('tipo', 'despesa').eq('fatura_paga', false)
       .in('conta_id', cartoes.map((c: any) => c.id))
+      .lte('data', hoje) // parcela futura ainda não "chegou" — não entra na fatura ainda
     const totais: Record<string, number> = {}
     ;(data || []).forEach((l: any) => {
       totais[l.conta_id] = (totais[l.conta_id] || 0) + Number(l.valor)
@@ -359,8 +361,10 @@ export default function MovimentosPage() {
     const contaCorrente = contas.find(c => c.tipo === 'corrente')
     if (!contaCorrente) { setPagandoFatura(null); return }
 
+    const hoje = dataLocalISO(new Date())
     const { data: pendentes } = await supabase.from('lancamentos').select('id, valor')
       .eq('familia_id', fid).eq('conta_id', cartaoId).eq('tipo', 'despesa').eq('fatura_paga', false)
+      .lte('data', hoje) // só quita o que já venceu — parcela futura fica pra sua propria fatura, no mes dela
 
     const total = (pendentes || []).reduce((s: number, l: any) => s + Number(l.valor), 0)
     if (total <= 0) { setPagandoFatura(null); return }
