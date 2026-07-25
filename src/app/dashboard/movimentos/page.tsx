@@ -123,6 +123,9 @@ export default function MovimentosPage() {
   const [novoCartaoFechamento, setNovoCartaoFechamento] = useState('')
   const [novoCartaoVencimento, setNovoCartaoVencimento] = useState('')
   const [salvandoCartao, setSalvandoCartao] = useState(false)
+  const [editandoCartaoId, setEditandoCartaoId] = useState<string | null>(null)
+  const [confirmDeleteCartao, setConfirmDeleteCartao] = useState(false)
+  const [deletandoCartao, setDeletandoCartao] = useState(false)
   const [pagandoFatura, setPagandoFatura] = useState<string | null>(null)
   const [cartaoDetalhado, setCartaoDetalhado] = useState<string | null>(null)
   const [itensCartaoDetalhe, setItensCartaoDetalhe] = useState<any[]>([])
@@ -344,18 +347,58 @@ export default function MovimentosPage() {
   async function handleCriarCartao() {
     if (!novoCartaoNome.trim()) return
     setSalvandoCartao(true)
-    const { data: novaConta, error } = await supabase.from('contas').insert({
-      familia_id: familiaIdRef.current, nome: novoCartaoNome.trim(), tipo: 'cartao_credito',
+    const payload = {
+      nome: novoCartaoNome.trim(),
       dia_fechamento: novoCartaoFechamento ? parseInt(novoCartaoFechamento) : null,
       dia_vencimento: novoCartaoVencimento ? parseInt(novoCartaoVencimento) : null,
-    }).select().single()
-    if (!error && novaConta) {
-      setContas(prev => [...prev, novaConta])
-      setContaSelecionadaId(novaConta.id)
-      setNovoCartaoOpen(false)
-      setNovoCartaoNome(''); setNovoCartaoFechamento(''); setNovoCartaoVencimento('')
+    }
+
+    if (editandoCartaoId) {
+      const { data: contaAtualizada, error } = await supabase.from('contas')
+        .update(payload).eq('id', editandoCartaoId).select().single()
+      if (!error && contaAtualizada) {
+        setContas(prev => prev.map(c => c.id === editandoCartaoId ? contaAtualizada : c))
+        fecharModalCartao()
+      }
+    } else {
+      const { data: novaConta, error } = await supabase.from('contas').insert({
+        familia_id: familiaIdRef.current, tipo: 'cartao_credito', ...payload,
+      }).select().single()
+      if (!error && novaConta) {
+        setContas(prev => [...prev, novaConta])
+        setContaSelecionadaId(novaConta.id)
+        fecharModalCartao()
+      }
     }
     setSalvandoCartao(false)
+  }
+
+  function fecharModalCartao() {
+    setNovoCartaoOpen(false)
+    setEditandoCartaoId(null)
+    setConfirmDeleteCartao(false)
+    setNovoCartaoNome(''); setNovoCartaoFechamento(''); setNovoCartaoVencimento('')
+  }
+
+  function abrirEditarCartao(c: any) {
+    setEditandoCartaoId(c.id)
+    setNovoCartaoNome(c.nome)
+    setNovoCartaoFechamento(c.dia_fechamento ? String(c.dia_fechamento) : '')
+    setNovoCartaoVencimento(c.dia_vencimento ? String(c.dia_vencimento) : '')
+    setConfirmDeleteCartao(false)
+    setNovoCartaoOpen(true)
+  }
+
+  async function handleDeletarCartao() {
+    if (!editandoCartaoId) return
+    if (!confirmDeleteCartao) { setConfirmDeleteCartao(true); return }
+    setDeletandoCartao(true)
+    const { error } = await supabase.from('contas').delete().eq('id', editandoCartaoId)
+    setDeletandoCartao(false)
+    if (!error) {
+      setContas(prev => prev.filter(c => c.id !== editandoCartaoId))
+      fecharModalCartao()
+    }
   }
 
   // Paga a fatura de um cartão: soma tudo que ainda não foi pago nele e cria UM lançamento
@@ -816,6 +859,10 @@ export default function MovimentosPage() {
                       {pagandoFatura === c.id ? 'Pagando...' : 'Pagar fatura'}
                     </button>
                   )}
+                  <button onClick={() => abrirEditarCartao(c)} title="Editar cartão"
+                    style={{ width: '32px', height: '32px', borderRadius: '9px', border: '1px solid #E2E8F0', backgroundColor: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, marginLeft: '8px' }}>
+                    <Pencil size={13} color="#64748B" strokeWidth={1.75} />
+                  </button>
                 </div>
                 {expandido && (
                   <div style={{ borderTop: '1px solid #F1F5F9' }}>
@@ -1153,7 +1200,7 @@ export default function MovimentosPage() {
                   {c.nome}
                 </button>
               ))}
-              <button onClick={() => setNovoCartaoOpen(true)}
+              <button onClick={() => { setEditandoCartaoId(null); setNovoCartaoNome(''); setNovoCartaoFechamento(''); setNovoCartaoVencimento(''); setNovoCartaoOpen(true) }}
                 style={{ padding: '8px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 500, cursor: 'pointer', border: '1px dashed #CBD5E1', backgroundColor: '#fff', color: '#64748B' }}>
                 + Novo cartão
               </button>
@@ -1798,13 +1845,13 @@ export default function MovimentosPage() {
 
       {/* Modal Novo Cartão */}
       {novoCartaoOpen && (
-        <div onClick={e => { if (e.target === e.currentTarget) setNovoCartaoOpen(false) }}
+        <div onClick={e => { if (e.target === e.currentTarget) fecharModalCartao() }}
           style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
           <div style={{ width: isMobile ? '100%' : '380px', backgroundColor: '#fff', borderRadius: isMobile ? '28px 28px 0 0' : '20px', padding: '24px' }}>
             {isMobile && <div style={{ width: '40px', height: '4px', borderRadius: '2px', backgroundColor: '#E2E8F0', margin: '-8px auto 16px' }} />}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', margin: 0 }}>Novo cartão de crédito</h2>
-              <button onClick={() => setNovoCartaoOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}>
+              <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', margin: 0 }}>{editandoCartaoId ? 'Editar cartão' : 'Novo cartão de crédito'}</h2>
+              <button onClick={fecharModalCartao} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}>
                 <X size={20} strokeWidth={2} />
               </button>
             </div>
@@ -1827,9 +1874,15 @@ export default function MovimentosPage() {
               </div>
             </div>
             <button onClick={handleCriarCartao} disabled={salvandoCartao || !novoCartaoNome.trim()}
-              style={{ width: '100%', height: '46px', borderRadius: '12px', border: 'none', backgroundColor: '#0E3B2E', color: '#fff', fontSize: '14px', fontWeight: 600, cursor: salvandoCartao || !novoCartaoNome.trim() ? 'not-allowed' : 'pointer', opacity: salvandoCartao || !novoCartaoNome.trim() ? 0.6 : 1 }}>
-              {salvandoCartao ? 'Salvando...' : 'Criar cartão'}
+              style={{ width: '100%', height: '46px', borderRadius: '12px', border: 'none', backgroundColor: '#0E3B2E', color: '#fff', fontSize: '14px', fontWeight: 600, cursor: salvandoCartao || !novoCartaoNome.trim() ? 'not-allowed' : 'pointer', opacity: salvandoCartao || !novoCartaoNome.trim() ? 0.6 : 1, marginBottom: editandoCartaoId ? '10px' : 0 }}>
+              {salvandoCartao ? 'Salvando...' : editandoCartaoId ? 'Salvar alterações' : 'Criar cartão'}
             </button>
+            {editandoCartaoId && (
+              <button onClick={handleDeletarCartao} disabled={deletandoCartao}
+                style={{ width: '100%', height: '44px', borderRadius: '12px', border: '1px solid #FCA5A5', backgroundColor: confirmDeleteCartao ? '#FEF2F2' : '#fff', color: '#DC2626', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+                {deletandoCartao ? 'Excluindo...' : confirmDeleteCartao ? 'Confirmar exclusão do cartão' : 'Excluir cartão'}
+              </button>
+            )}
           </div>
         </div>
       )}
