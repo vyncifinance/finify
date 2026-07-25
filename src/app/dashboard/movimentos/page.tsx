@@ -479,9 +479,21 @@ export default function MovimentosPage() {
     const contaEscolhida = contas.find(c => c.id === contaSelecionadaId)
     const faturaPagaValor = tipo === 'despesa' ? (contaEscolhida?.tipo !== 'cartao_credito') : true
 
+    // Mesma regra pra criar ou editar: compra em cartão de crédito depois do fechamento vai
+    // pra fatura do mês seguinte, com a data final seguindo o dia de vencimento do cartão.
+    let dataFinal = dataLanc
+    if (tipo === 'despesa' && contaEscolhida?.tipo === 'cartao_credito' && contaEscolhida.dia_vencimento) {
+      const dataCompra = new Date(dataLanc + 'T12:00:00')
+      let mesFatura = dataCompra.getMonth()
+      if (contaEscolhida.dia_fechamento && dataCompra.getDate() > contaEscolhida.dia_fechamento) {
+        mesFatura += 1
+      }
+      dataFinal = dataLocalISO(new Date(dataCompra.getFullYear(), mesFatura, contaEscolhida.dia_vencimento))
+    }
+
     if (editando) {
       const { error } = await supabase.from('lancamentos').update({
-        tipo, valor: valorNum, categoria, membro: membroForm, data: dataLanc,
+        tipo, valor: valorNum, categoria, membro: membroForm, data: dataFinal,
         dizimar: tipo === 'receita' ? dizimar : false,
         descricao: observacao || null,
         posicao_investimento_id: posicaoParaAporte,
@@ -493,7 +505,7 @@ export default function MovimentosPage() {
         // Sempre remove o aporte antigo vinculado (se existia) e recria do zero — mais simples
         // e seguro que tentar "diferenciar" o que mudou (valor, data ou a posição escolhida).
         await removerAporteDoLancamento(editando.id)
-        if (posicaoParaAporte) await aplicarAporteEmPosicao(posicaoParaAporte, editando.id, valorNum, dataLanc)
+        if (posicaoParaAporte) await aplicarAporteEmPosicao(posicaoParaAporte, editando.id, valorNum, dataFinal)
         if (editando.meta_id) await ajustarValorAtualMeta(editando.meta_id, valorNum - Number(editando.valor))
       }
       setSalvando(false)
@@ -539,18 +551,6 @@ export default function MovimentosPage() {
       setSalvando(false)
       if (!error) { setModalOpen(false); await carregarLancamentos(fid); await carregarFaturasPendentes(fid, contas) }
     } else {
-      // Mesma regra do parcelado: compra em cartão de crédito depois do fechamento vai
-      // pra fatura do mês seguinte, e a data final segue o dia de vencimento do cartão.
-      let dataFinal = dataLanc
-      if (tipo === 'despesa' && contaEscolhida?.tipo === 'cartao_credito' && contaEscolhida.dia_vencimento) {
-        const dataCompra = new Date(dataLanc + 'T12:00:00')
-        let mesFatura = dataCompra.getMonth()
-        if (contaEscolhida.dia_fechamento && dataCompra.getDate() > contaEscolhida.dia_fechamento) {
-          mesFatura += 1
-        }
-        dataFinal = dataLocalISO(new Date(dataCompra.getFullYear(), mesFatura, contaEscolhida.dia_vencimento))
-      }
-
       const { data: novoLancamento, error } = await supabase.from('lancamentos').insert({
         familia_id: fid, user_id: userId, tipo, valor: valorNum,
         categoria, membro: membroForm, data: dataFinal, hora,
