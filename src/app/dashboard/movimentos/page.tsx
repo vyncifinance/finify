@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase'
 import {
   ArrowDownLeft, ArrowUpRight, ChevronLeft, ChevronRight, ChevronDown, Calendar,
   Plus, Wallet, X, UtensilsCrossed, Home, Car, Smile,
-  Heart, BookOpen, ShoppingBag, Church, MoreHorizontal,
+  Heart, BookOpen, ShoppingBag, Church, MoreHorizontal, HandHeart,
   Briefcase, TrendingUp, Laptop, DollarSign, Trash2, Pencil,
   CreditCard, FileText, AlignLeft, Repeat, CheckCircle2,
   Pill, Gift, Sparkles, GraduationCap, Smartphone, Shirt, Wrench, ClipboardList, Filter, Search, PawPrint,
@@ -18,7 +18,7 @@ import {
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 
-const CATEGORIAS_DESPESA = ['Alimentação','Moradia','Transporte','Lazer','Saúde','Educação','Cartão de Crédito','Dízimo','Farmácia','Presente','Estética','Estudos','Eletrônicos','Vestuário','Consertos','Serviços','Pet','Investimentos','Outros']
+const CATEGORIAS_DESPESA = ['Alimentação','Moradia','Transporte','Lazer','Saúde','Educação','Cartão de Crédito','Dízimo','Doações','Farmácia','Presente','Estética','Estudos','Eletrônicos','Vestuário','Consertos','Serviços','Pet','Investimentos','Outros']
 const CATEGORIAS_RECEITA = ['Salário','Renda Extra','Freelance','Investimento','Outros']
 
 const CATEGORIAS_EMPRESA_DESPESA = ['Fornecedores','Impostos','Pró-labore','Folha de Pagamento','Marketing','Aluguel/Sede','Software/Ferramentas','Contabilidade','Outros']
@@ -26,7 +26,7 @@ const CATEGORIAS_EMPRESA_RECEITA = ['Faturamento','Prestação de Serviço','Out
 
 const ICONES_CAT: Record<string, any> = {
   'Alimentação': UtensilsCrossed, 'Moradia': Home, 'Transporte': Car, 'Lazer': Smile,
-  'Saúde': Heart, 'Educação': BookOpen, 'Compras': ShoppingBag, 'Dízimo': Church,
+  'Saúde': Heart, 'Educação': BookOpen, 'Compras': ShoppingBag, 'Dízimo': Church, 'Doações': HandHeart,
   'Cartão de Crédito': CreditCard, 'Outros': MoreHorizontal,
   'Farmácia': Pill, 'Presente': Gift, 'Estética': Sparkles, 'Estudos': GraduationCap,
   'Eletrônicos': Smartphone, 'Vestuário': Shirt, 'Consertos': Wrench, 'Serviços': ClipboardList,
