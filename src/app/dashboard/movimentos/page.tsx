@@ -539,9 +539,21 @@ export default function MovimentosPage() {
       setSalvando(false)
       if (!error) { setModalOpen(false); await carregarLancamentos(fid); await carregarFaturasPendentes(fid, contas) }
     } else {
+      // Mesma regra do parcelado: compra em cartão de crédito depois do fechamento vai
+      // pra fatura do mês seguinte, e a data final segue o dia de vencimento do cartão.
+      let dataFinal = dataLanc
+      if (tipo === 'despesa' && contaEscolhida?.tipo === 'cartao_credito' && contaEscolhida.dia_vencimento) {
+        const dataCompra = new Date(dataLanc + 'T12:00:00')
+        let mesFatura = dataCompra.getMonth()
+        if (contaEscolhida.dia_fechamento && dataCompra.getDate() > contaEscolhida.dia_fechamento) {
+          mesFatura += 1
+        }
+        dataFinal = dataLocalISO(new Date(dataCompra.getFullYear(), mesFatura, contaEscolhida.dia_vencimento))
+      }
+
       const { data: novoLancamento, error } = await supabase.from('lancamentos').insert({
         familia_id: fid, user_id: userId, tipo, valor: valorNum,
-        categoria, membro: membroForm, data: dataLanc, hora,
+        categoria, membro: membroForm, data: dataFinal, hora,
         dizimar: tipo === 'receita' ? dizimar : false,
         empresa_id: empresaId,
         descricao: observacao || null,
@@ -551,7 +563,7 @@ export default function MovimentosPage() {
       }).select().single()
 
       if (!error && novoLancamento && posicaoParaAporte) {
-        await aplicarAporteEmPosicao(posicaoParaAporte, novoLancamento.id, valorNum, dataLanc)
+        await aplicarAporteEmPosicao(posicaoParaAporte, novoLancamento.id, valorNum, dataFinal)
       }
       setSalvando(false)
       if (!error) { setModalOpen(false); await carregarLancamentos(fid); await carregarFaturasPendentes(fid, contas) }
@@ -1222,9 +1234,27 @@ export default function MovimentosPage() {
               </button>
             </div>
             {contaSelecionadaId && contas.find((c: any) => c.id === contaSelecionadaId)?.tipo === 'cartao_credito' && (
-              <p style={{ fontSize: '11px', color: '#94A3B8', marginTop: '6px' }}>
-                Fica pendente até você pagar a fatura desse cartão — não conta no Saldo em conta ainda.
-              </p>
+              <>
+                <p style={{ fontSize: '11px', color: '#94A3B8', marginTop: '6px' }}>
+                  Fica pendente até você pagar a fatura desse cartão — não conta no Saldo em conta ainda.
+                </p>
+                {!parcelado && (() => {
+                  const cartaoForm = contas.find((c: any) => c.id === contaSelecionadaId)
+                  if (!cartaoForm.dia_fechamento || !cartaoForm.dia_vencimento) return null
+                  const dataCompra = new Date(dataLanc + 'T12:00:00')
+                  const empurrou = dataCompra.getDate() > cartaoForm.dia_fechamento
+                  let mesFatura = dataCompra.getMonth()
+                  if (empurrou) mesFatura += 1
+                  const dataFatura = new Date(dataCompra.getFullYear(), mesFatura, cartaoForm.dia_vencimento)
+                  return (
+                    <p style={{ fontSize: '11px', color: '#1D4ED8', backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '8px', padding: '6px 10px', marginTop: '6px' }}>
+                      {empurrou
+                        ? `Compra depois do fechamento (dia ${cartaoForm.dia_fechamento}) — vai pra fatura de ${dataFatura.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}, vencendo dia ${cartaoForm.dia_vencimento}.`
+                        : `Entra na fatura deste mês, vencendo dia ${cartaoForm.dia_vencimento}.`}
+                    </p>
+                  )
+                })()}
+              </>
             )}
           </div>
         )}
