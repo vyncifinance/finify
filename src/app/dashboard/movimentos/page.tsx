@@ -502,12 +502,28 @@ export default function MovimentosPage() {
       // Lançamento parcelado — cria N lançamentos. Aporte automático em posição não se aplica
       // aqui (compra parcelada não é, na prática, um aporte de investimento recorrente).
       const n = parseInt(numParcelas) || 2
-      const dia = parseInt(diaParcela) || 1
       const valorParcela = valorNum / n
-      const dataBase = new Date(dataLanc + 'T12:00:00')
+      const dataCompra = new Date(dataLanc + 'T12:00:00')
+
+      // Regra de fechamento de fatura: se o cartão tem dia_fechamento configurado e a compra
+      // aconteceu DEPOIS desse dia, a fatura do mês corrente já fechou — a primeira parcela
+      // (e todas as seguintes) empurram um mês pra frente. Cada parcela cai no dia de
+      // vencimento do cartão, não numa data digitada à mão.
+      let mesBase = dataCompra.getMonth()
+      let anoBase = dataCompra.getFullYear()
+      let dia = 1
+      if (contaEscolhida?.tipo === 'cartao_credito') {
+        if (contaEscolhida.dia_fechamento && dataCompra.getDate() > contaEscolhida.dia_fechamento) {
+          mesBase += 1
+        }
+        dia = contaEscolhida.dia_vencimento || dataCompra.getDate()
+      } else {
+        dia = dataCompra.getDate()
+      }
+
       const inserts = []
       for (let i = 0; i < n; i++) {
-        const d = new Date(dataBase.getFullYear(), dataBase.getMonth() + i, dia)
+        const d = new Date(anoBase, mesBase + i, dia)
         const dataStr = dataLocalISO(d)
         inserts.push({
           familia_id: fid, user_id: userId, tipo: 'despesa',
@@ -1280,9 +1296,36 @@ export default function MovimentosPage() {
                 </div>
                 <div>
                   <p style={{ fontSize: '11px', fontWeight: 600, color: '#1D4ED8', marginBottom: '4px' }}>Dia de vencimento</p>
-                  <input type="number" min="1" max="31" value={diaParcela} onChange={e => setDiaParcela(e.target.value)}
-                    style={{ width: '100%', padding: '6px 10px', borderRadius: '8px', border: '1px solid #BFDBFE', fontSize: '16px', fontWeight: 700, color: '#1D4ED8', outline: 'none', backgroundColor: '#fff', boxSizing: 'border-box' }} />
+                  {(() => {
+                    const contaForm = contas.find(c => c.id === contaSelecionadaId)
+                    if (contaForm?.tipo === 'cartao_credito' && contaForm.dia_vencimento) {
+                      return (
+                        <div style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #BFDBFE', backgroundColor: '#fff', fontSize: '13px', fontWeight: 700, color: '#1D4ED8' }}>
+                          Dia {contaForm.dia_vencimento} <span style={{ fontWeight: 500, color: '#64748B', fontSize: '11px' }}>(do cartão)</span>
+                        </div>
+                      )
+                    }
+                    return (
+                      <input type="number" min="1" max="31" value={diaParcela} onChange={e => setDiaParcela(e.target.value)}
+                        style={{ width: '100%', padding: '6px 10px', borderRadius: '8px', border: '1px solid #BFDBFE', fontSize: '16px', fontWeight: 700, color: '#1D4ED8', outline: 'none', backgroundColor: '#fff', boxSizing: 'border-box' }} />
+                    )
+                  })()}
                 </div>
+                {(() => {
+                  const contaForm = contas.find(c => c.id === contaSelecionadaId)
+                  if (contaForm?.tipo === 'cartao_credito' && contaForm.dia_fechamento) {
+                    const diaCompra = new Date(dataLanc + 'T12:00:00').getDate()
+                    const empurrou = diaCompra > contaForm.dia_fechamento
+                    return (
+                      <div style={{ gridColumn: '1 / -1', fontSize: '11px', color: '#1D4ED8', backgroundColor: '#fff', padding: '6px 10px', borderRadius: '8px', border: '1px solid #BFDBFE' }}>
+                        {empurrou
+                          ? `Compra depois do fechamento (dia ${contaForm.dia_fechamento}) — a 1ª parcela cai na fatura do mês seguinte.`
+                          : `Compra antes do fechamento (dia ${contaForm.dia_fechamento}) — a 1ª parcela entra na fatura deste mês.`}
+                      </div>
+                    )
+                  }
+                  return null
+                })()}
                 {valor && (
                   <div style={{ gridColumn: '1 / -1', padding: '8px', backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #BFDBFE', textAlign: 'center' }}>
                     <p style={{ fontSize: '12px', color: '#64748B', margin: 0 }}>
