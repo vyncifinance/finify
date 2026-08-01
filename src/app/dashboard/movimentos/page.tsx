@@ -352,8 +352,8 @@ export default function MovimentosPage() {
       if (hoje.getDate() > cartao.dia_vencimento) {
         vencimentoAtual = new Date(hoje.getFullYear(), hoje.getMonth() + 1, cartao.dia_vencimento)
       }
-      const dataLancamento = new Date(l.data + 'T12:00:00')
-      if (dataLancamento <= vencimentoAtual) {
+      const vencimentoAtualStr = dataLocalISO(vencimentoAtual)
+      if (l.data <= vencimentoAtualStr) {
         totais[l.conta_id] = (totais[l.conta_id] || 0) + Number(l.valor)
       }
     })
@@ -454,7 +454,8 @@ export default function MovimentosPage() {
       if (hoje.getDate() > cartao.dia_vencimento) {
         vencimentoAtual = new Date(hoje.getFullYear(), hoje.getMonth() + 1, cartao.dia_vencimento)
       }
-      pendentes = pendentes.filter((l: any) => new Date(l.data + 'T12:00:00') <= vencimentoAtual)
+      const vencimentoAtualStr = dataLocalISO(vencimentoAtual)
+      pendentes = pendentes.filter((l: any) => l.data <= vencimentoAtualStr)
     }
 
     const total = pendentes.reduce((s: number, l: any) => s + Number(l.valor), 0)
