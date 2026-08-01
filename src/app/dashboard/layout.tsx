@@ -35,17 +35,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router   = useRouter()
   const supabase = createClient()
 
-  const [zoom, setZoom] = useState('0.86')
   const [ocultarValores, setOcultarValores] = useState(false)
-
-  useEffect(() => {
-    function calcZoom() {
-      setZoom(window.innerWidth < 1400 ? '0.86' : '0.94')
-    }
-    calcZoom()
-    window.addEventListener('resize', calcZoom)
-    return () => window.removeEventListener('resize', calcZoom)
-  }, [])
 
   useEffect(() => {
     const saved = localStorage.getItem('finify_ocultar_valores')
@@ -111,7 +101,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
 
       {/* ── DESKTOP ── */}
-      <div className="hidden lg:flex" style={{ backgroundColor: '#F7F9FB', zoom, height: `${100 / parseFloat(zoom)}vh`, overflow: 'hidden' }}>
+      <div className="hidden lg:flex" style={{ backgroundColor: '#F7F9FB', minHeight: '100vh' }}>
         <aside className="flex flex-col flex-shrink-0 transition-all duration-300"
           style={{
             width: collapsed ? '60px' : '185px',
@@ -227,8 +217,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Toggle collapse */}
-          <div className="absolute top-6 z-10 transition-all duration-300"
-            style={{ left: collapsed ? '70px' : '196px' }}>
+          <div className="fixed z-10 transition-all duration-300"
+            style={{ left: collapsed ? '46px' : '171px', top: '50%', transform: 'translateY(-50%)' }}>
             <button onClick={() => setCollapsed(!collapsed)}
               className="w-7 h-7 rounded-full flex items-center justify-center border transition-all"
               style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', color: '#64748B', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>

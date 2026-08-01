@@ -196,6 +196,19 @@ color: #58D68D (em fundo escuro) ou #2FB36A (em fundo claro);
 
 ---
 
+## Consistência entre Telas — REGRA CRÍTICA
+
+O Finify tem várias telas que leem a mesma tabela `lancamentos` e calculam os mesmos números de formas diferentes (Dashboard, Movimentos, Metas). Isso já causou bug real: a lógica de cartão de crédito (compra só vira despesa de verdade quando a fatura é paga, `fatura_paga = true`) foi implementada em Movimentos, mas o Dashboard continuou somando tudo cru — o card de "Despesas" do mês ficava maior do que devia, contando fatura de cartão ainda não paga.
+
+**Regra:** toda vez que uma lógica de cálculo financeiro for criada ou alterada numa tela — o que conta como receita, o que conta como despesa "efetivada", o que fica de fora do total, uma coluna nova tipo `conta_id`/`fatura_paga`/`empresa_id` que muda o filtro de uma query — essa mesma lógica precisa ser replicada em **todas as outras telas que leem `lancamentos`**, não só na tela onde a mudança foi pedida. Antes de considerar a tarefa concluída, checar explicitamente:
+- Dashboard (`totalDes`, `totalRec`, `totalEco`, cards de resumo, gráfico de evolução, categorias, últimos lançamentos)
+- Movimentos (lista principal, filtros, seções de cartão/despesas fixas)
+- Qualquer outra tela que some ou filtre lançamentos (Metas, relatórios, etc.)
+
+Se não der pra atualizar tudo de uma vez, pelo menos avisar explicitamente quais telas ficaram pendentes — nunca assumir silenciosamente que só a tela pedida precisava mudar.
+
+---
+
 ## Feature de Dízimo
 - Campo `dizimar: boolean` em `lancamentos` — default `true` para receitas
 - Campo `dizimista: boolean` em `familias` — habilita/desabilita a feature
@@ -307,88 +320,7 @@ O Finify é um produto financeiro premium. Cada elemento visual deve transmitir 
 
 ---
 
-## Padrão Visual "Dashboard Premium" (Dashboard, e referência para demais telas internas)
-
-Este é o padrão aplicado no redesign do Dashboard (desktop) e deve ser replicado nas demais telas internas (Movimentos, Metas, Investimentos, Perfil) ao fazer refinamentos visuais futuros.
-
-### Fundo da aplicação
-```css
-background-color: #F7F9FB;
-```
-
-### Cards padrão
-```css
-border-radius: 20px;
-background-color: #fff;
-border: 1px solid rgba(15,23,42,0.06);
-box-shadow: 0 12px 40px rgba(15,23,42,0.05);
-padding: 24-28px;
-```
-
-### Hero / card de destaque escuro
-```css
-background: linear-gradient(135deg, #06261F 0%, #0B3B2E 45%, #0D3F31 100%);
-border-radius: 20px;
-box-shadow: 0 20px 60px -16px rgba(6,38,31,0.45);
-```
-Glow interno com `position: absolute`, `border-radius: 50%`, `filter: blur(50-60px)`, opacidade baixa (`rgba(110,231,183,0.08)`).
-
-### Glassmorphism (mini cards dentro do hero escuro)
-```css
-background-color: rgba(255,255,255,0.05);
-backdrop-filter: blur(12px);
-border: 1px solid rgba(255,255,255,0.1);
-border-radius: 18px;
-```
-
-### Header de página
-- Título: `36px / 700 / letter-spacing -0.8px`
-- Subtítulo logo abaixo: `15px / #64748B`
-- Indicador de atualização: bolinha de `6px` (`#2F8F68`) + texto `12.5px / #94A3B8` ("Atualizado há X min" ou "agora")
-- Lado direito: pill com mês atual + botão de notificação circular + avatar com inicial (gradiente `#145A45 → #2FB36A`)
-
-### KPI cards com identidade própria
-Cada card de métrica deve ter cor de destaque única e sutil, nunca todos iguais:
-- Receitas/positivo: `#2F8F68` (verde)
-- Despesas/negativo: `#DC2626` (vermelho)
-- Economia/neutro: `#B7791F` (dourado)
-- Metas: `#8B5CF6` (roxo)
-- Dízimo: `#145A45` (verde escuro)
-
-Estrutura do card: ícone circular 44px no topo → label 13px cinza → valor 30px bold → indicador colorido pequeno embaixo (badge ou texto).
-
-### Hover / microinterações
-```css
-transition: all 0.2s ease;
-/* no hover: */
-transform: translateY(-2px) scale(1.01);
-box-shadow: 0 16px 48px rgba(15,23,42,0.08);
-```
-Aplicar em cards de KPI, cards de meta, linhas de lista (`background: #FAFBFC` no hover) e botões/links (leve mudança de opacidade ou scale, nunca cor brusca).
-
-### Score / indicador circular (RadialBarChart)
-Sempre acompanhar de uma classificação textual em badge:
-- `score >= 80` → "Excelente" (`#2F8F68`)
-- `score >= 60` → "Bom" (`#F59E0B`)
-- `score >= 35` → "Atenção" (`#F97316`)
-- `score < 35` → "Crítico" (`#EF4444`)
-
-### Gráficos (Recharts)
-- Linha mais grossa: `strokeWidth={2.5-3}`
-- Grid horizontal apenas, sem linhas verticais: `<CartesianGrid stroke="#F1F5F9" vertical={false} />`
-- Tooltip com `border-radius: 14px`, sombra suave, nunca borda dura
-- No hero escuro, tooltip com fundo escuro sólido (`#0B3B2E`) e texto branco/verde-claro
-
-### Tipografia (escala usada no Dashboard)
-- Título de página: `36px / 700`
-- Título de seção/card: `18px / 600`
-- Valores grandes (hero): `46px / 700`
-- Valores de KPI: `30px / 700`
-- Labels uppercase: `13px / 600 / letter-spacing 0.08em`
-- Texto de apoio: `13.5px / #64748B`
-
-### Regra de aplicação
-Ao portar esse padrão para outra tela: preservar 100% a lógica, states, chamadas Supabase e regras de negócio existentes — alterar **apenas** estilos inline/classes visuais. Nunca remover ou alterar funcionalidade ao aplicar refinamento visual.
+## Encoding — REGRA CRÍTICA
 Todos os arquivos `.tsx` devem ser salvos em UTF-8 real. PowerShell e VS Code às vezes corrompem acentos (`ç`, `ã`, `é`, `ó` viram sequências como `Ã§`, `Ã£`). Antes de considerar um arquivo pronto, revisar visualmente se há sequências `Ã` seguidas de caractere estranho — isso indica encoding quebrado e precisa ser corrigido antes do commit.
 
 ---
