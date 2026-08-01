@@ -88,6 +88,7 @@ export default function DashboardPage() {
   const [lancamentos, setLancamentos] = useState<any[]>([])
   const [evolucao, setEvolucao]       = useState<any[]>([])
   const [despesasFixas, setDespesasFixas] = useState<any[]>([])
+  const [contas, setContas]               = useState<any[]>([])
   const [mesesReservaConsiderados, setMesesReservaConsiderados] = useState(0)
   const [dizimista, setDizimista]     = useState(true)
   const [baseDizimo, setBaseDizimo]   = useState(0)
@@ -181,12 +182,22 @@ export default function DashboardPage() {
   async function carregarDados(fid: string, uid: string, contexto?: { tipo: 'pessoal' | 'empresa'; empresaId?: string }) {
     const ctx = contexto || contextoAtivo
     const ehEmpresa = ctx.tipo === 'empresa' && !!ctx.empresaId
+
+    const { data: contasData } = await supabase.from('contas').select('*').eq('familia_id', fid)
+    const listaContas = contasData || []
+    setContas(listaContas)
+    const idsCartoes = new Set(listaContas.filter((c: any) => c.tipo === 'cartao_credito').map((c: any) => c.id))
+    // Compra no cartão só "sai da conta" de verdade quando a fatura é paga — até lá, não conta
+    // como despesa efetivada no resumo do mês (mesma regra de Movimentos).
+    const naoEhCartaoPendente = (l: any) => !idsCartoes.has(l.conta_id)
+
     const ini = new Date(agora.getFullYear(), agora.getMonth(), 1).toISOString().split('T')[0]
     const fim = new Date(agora.getFullYear(), agora.getMonth() + 1, 0).toISOString().split('T')[0]
     let queryLanc = supabase.from('lancamentos').select('*')
       .eq('familia_id', fid).gte('data', ini).lte('data', fim)
     queryLanc = ehEmpresa ? queryLanc.eq('empresa_id', ctx.empresaId) : queryLanc.is('empresa_id', null)
-    const { data: lanc } = await queryLanc.order('data', { ascending: false }).order('hora', { ascending: false })
+    const { data: lancBruto } = await queryLanc.order('data', { ascending: false }).order('hora', { ascending: false })
+    const lanc = (lancBruto || []).filter(naoEhCartaoPendente)
 
     if (lanc) {
       const r = lanc.filter((l: any) => l.tipo === 'receita').reduce((s: number, l: any) => s + Number(l.valor), 0)
@@ -238,13 +249,14 @@ export default function DashboardPage() {
       const d2 = new Date(agora.getFullYear(), agora.getMonth() - i, 1)
       const i2 = new Date(d2.getFullYear(), d2.getMonth(), 1).toISOString().split('T')[0]
       const f2 = new Date(d2.getFullYear(), d2.getMonth() + 1, 0).toISOString().split('T')[0]
-      let queryMes = supabase.from('lancamentos').select('tipo, valor, categoria')
+      let queryMes = supabase.from('lancamentos').select('tipo, valor, categoria, conta_id')
         .eq('familia_id', fid).gte('data', i2).lte('data', f2)
       queryMes = ehEmpresa ? queryMes.eq('empresa_id', ctx.empresaId) : queryMes.is('empresa_id', null)
-      const { data: mes } = await queryMes
-      const r2 = (mes || []).filter((l: any) => l.tipo === 'receita').reduce((s: number, l: any) => s + Number(l.valor), 0)
-      const d2Bruto = (mes || []).filter((l: any) => l.tipo === 'despesa').reduce((s: number, l: any) => s + Number(l.valor), 0)
-      const d3 = (mes || []).filter((l: any) => l.tipo === 'despesa' && !ehCategoriaAlocacao(l.categoria)).reduce((s: number, l: any) => s + Number(l.valor), 0)
+      const { data: mesBruto } = await queryMes
+      const mes = (mesBruto || []).filter(naoEhCartaoPendente)
+      const r2 = mes.filter((l: any) => l.tipo === 'receita').reduce((s: number, l: any) => s + Number(l.valor), 0)
+      const d2Bruto = mes.filter((l: any) => l.tipo === 'despesa').reduce((s: number, l: any) => s + Number(l.valor), 0)
+      const d3 = mes.filter((l: any) => l.tipo === 'despesa' && !ehCategoriaAlocacao(l.categoria)).reduce((s: number, l: any) => s + Number(l.valor), 0)
       evo.push({ mes: MESES[d2.getMonth()].substring(0, 3), valor: r2 - d2Bruto })
       despesasPorMes.push(d3)
     }
