@@ -128,6 +128,7 @@ export default function MovimentosPage() {
   const [deletandoCartao, setDeletandoCartao] = useState(false)
   const [pagandoFatura, setPagandoFatura] = useState<string | null>(null)
   const [cartaoDetalhado, setCartaoDetalhado] = useState<string | null>(null)
+  const [despesasFixasAberto, setDespesasFixasAberto] = useState(true)
   const [itensCartaoDetalhe, setItensCartaoDetalhe] = useState<any[]>([])
   const [carregandoDetalheCartao, setCarregandoDetalheCartao] = useState(false)
   const [faturasPendentes, setFaturasPendentes] = useState<Record<string, number>>({})
@@ -332,14 +333,29 @@ export default function MovimentosPage() {
   async function carregarFaturasPendentes(fid: string, listaContas: any[]) {
     const cartoes = listaContas.filter((c: any) => c.tipo === 'cartao_credito')
     if (cartoes.length === 0) { setFaturasPendentes({}); return }
-    const hoje = dataLocalISO(new Date())
-    const { data } = await supabase.from('lancamentos').select('conta_id, valor')
+    const { data } = await supabase.from('lancamentos').select('conta_id, valor, data')
       .eq('familia_id', fid).eq('tipo', 'despesa').eq('fatura_paga', false)
       .in('conta_id', cartoes.map((c: any) => c.id))
-      .lte('data', hoje) // parcela futura ainda não "chegou" — não entra na fatura ainda
+    const hoje = new Date()
     const totais: Record<string, number> = {}
     ;(data || []).forEach((l: any) => {
-      totais[l.conta_id] = (totais[l.conta_id] || 0) + Number(l.valor)
+      const cartao = cartoes.find((c: any) => c.id === l.conta_id)
+      // Data do lançamento já vem fixada no dia de vencimento da fatura em que ele cai
+      // (não na data da compra). Então pra saber se é "fatura atual" (mesmo antes do
+      // vencimento) ou "fatura futura" (parcela ainda longe), comparamos com o vencimento
+      // mais próximo daqui pra frente — não com "hoje" diretamente.
+      if (!cartao?.dia_vencimento) {
+        totais[l.conta_id] = (totais[l.conta_id] || 0) + Number(l.valor)
+        return
+      }
+      let vencimentoAtual = new Date(hoje.getFullYear(), hoje.getMonth(), cartao.dia_vencimento)
+      if (hoje.getDate() > cartao.dia_vencimento) {
+        vencimentoAtual = new Date(hoje.getFullYear(), hoje.getMonth() + 1, cartao.dia_vencimento)
+      }
+      const dataLancamento = new Date(l.data + 'T12:00:00')
+      if (dataLancamento <= vencimentoAtual) {
+        totais[l.conta_id] = (totais[l.conta_id] || 0) + Number(l.valor)
+      }
     })
     setFaturasPendentes(totais)
   }
@@ -425,15 +441,25 @@ export default function MovimentosPage() {
     const contaCorrente = contas.find(c => c.tipo === 'corrente')
     if (!contaCorrente) { setPagandoFatura(null); return }
 
-    const hoje = dataLocalISO(new Date())
-    const { data: pendentes } = await supabase.from('lancamentos').select('id, valor')
+    const cartao = contas.find(c => c.id === cartaoId)
+    const { data: todosPendentes } = await supabase.from('lancamentos').select('id, valor, data')
       .eq('familia_id', fid).eq('conta_id', cartaoId).eq('tipo', 'despesa').eq('fatura_paga', false)
-      .lte('data', hoje) // só quita o que já venceu — parcela futura fica pra sua propria fatura, no mes dela
 
-    const total = (pendentes || []).reduce((s: number, l: any) => s + Number(l.valor), 0)
+    // Mesma lógica do card: só quita o que é da fatura atual (mesmo antes do vencimento
+    // chegar) — parcela de fatura realmente futura fica pra ser paga na hora dela.
+    const hoje = new Date()
+    let pendentes = todosPendentes || []
+    if (cartao?.dia_vencimento) {
+      let vencimentoAtual = new Date(hoje.getFullYear(), hoje.getMonth(), cartao.dia_vencimento)
+      if (hoje.getDate() > cartao.dia_vencimento) {
+        vencimentoAtual = new Date(hoje.getFullYear(), hoje.getMonth() + 1, cartao.dia_vencimento)
+      }
+      pendentes = pendentes.filter((l: any) => new Date(l.data + 'T12:00:00') <= vencimentoAtual)
+    }
+
+    const total = pendentes.reduce((s: number, l: any) => s + Number(l.valor), 0)
     if (total <= 0) { setPagandoFatura(null); return }
 
-    const cartao = contas.find(c => c.id === cartaoId)
     const agora = new Date()
     const hora  = `${String(agora.getHours()).padStart(2,'0')}:${String(agora.getMinutes()).padStart(2,'0')}`
 
@@ -740,7 +766,10 @@ export default function MovimentosPage() {
   const ehMesAtualProj = hojeProj.getFullYear() === mesRef.getFullYear() && hojeProj.getMonth() === mesRef.getMonth()
   const percorridoMes = ehMesAtualProj ? Math.round((Math.min(hojeProj.getDate(), diasNoMes) / diasNoMes) * 100) : 100
 
+  const idsCartoes = new Set(contas.filter((c: any) => c.tipo === 'cartao_credito').map((c: any) => c.id))
+
   const filtrados = lancamentos.filter(l => {
+    if (idsCartoes.has(l.conta_id)) return false // lançamentos de cartão só aparecem dentro do card da fatura, não duplicados aqui
     if (filtro !== 'todos' && l.tipo !== filtro) return false
     if (filtroMembro !== 'todos' && l.membro !== filtroMembro) return false
     if (filtroCategoria !== 'todos' && l.categoria !== filtroCategoria) return false
@@ -750,6 +779,7 @@ export default function MovimentosPage() {
 
   const categoriasPresentes = Array.from(new Set(
     lancamentos
+      .filter(l => !idsCartoes.has(l.conta_id))
       .filter(l => filtro === 'todos' || l.tipo === filtro)
       .map(l => l.categoria)
   )).sort()
@@ -792,7 +822,8 @@ export default function MovimentosPage() {
   const despesasFixasSection = (isMob: boolean) => (
     <div style={{ marginBottom: isMob ? '16px' : '24px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <button onClick={() => setDespesasFixasAberto(!despesasFixasAberto)}
+          style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
           <Repeat size={isMob ? 14 : 16} color="#64748B" strokeWidth={1.75} />
           <span style={{ fontSize: isMob ? '13px' : '15px', fontWeight: 700, color: '#0B3B2E', letterSpacing: '-0.2px' }}>Despesas Fixas</span>
           {totalDespesasFixasPendentes > 0 && (
@@ -800,14 +831,16 @@ export default function MovimentosPage() {
               {fmt(totalDespesasFixasPendentes)} a pagar
             </span>
           )}
-        </div>
+          <ChevronDown size={16} color="#94A3B8" strokeWidth={2} style={{ transform: despesasFixasAberto ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+        </button>
         <button onClick={abrirDfModalNovo} className="df-new-btn"
           style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 600, color: '#0B3B2E', background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: '10px', padding: '6px 12px', cursor: 'pointer' }}>
           <Plus size={14} strokeWidth={2.5} /> Nova
         </button>
       </div>
 
-      {fixasDespesas.length === 0 ? (
+      {despesasFixasAberto && (
+      fixasDespesas.length === 0 ? (
         <div style={{ backgroundColor: '#fff', border: '1px solid #ECEFF3', borderRadius: '20px', padding: '24px', textAlign: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 12px 40px rgba(0,0,0,0.07)' }}>
           <p style={{ fontSize: '13px', color: '#94A3B8', margin: 0 }}>Nenhuma despesa fixa cadastrada.</p>
         </div>
@@ -850,6 +883,7 @@ export default function MovimentosPage() {
             )
           })}
         </div>
+      )
       )}
     </div>
   )
