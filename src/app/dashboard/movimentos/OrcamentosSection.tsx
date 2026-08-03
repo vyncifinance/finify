@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   UtensilsCrossed, Home, Car, Smile, Heart, BookOpen, ShoppingBag,
-  Church, HandHeart, CreditCard, MoreHorizontal, AlertTriangle, Pencil, X,
+  Church, HandHeart, CreditCard, MoreHorizontal, AlertTriangle, Pencil, X, Trash2,
   Pill, Gift, Sparkles, GraduationCap, Smartphone, Shirt, Wrench, ClipboardList, PawPrint, TrendingUp,
 } from 'lucide-react'
 
@@ -50,6 +50,8 @@ export default function OrcamentosSection({
   const [modalOpen, setModalOpen]   = useState(false)
   const [edits, setEdits]           = useState<Record<string, string>>({})
   const [salvando, setSalvando]     = useState(false)
+  const [confirmarExclusaoId, setConfirmarExclusaoId] = useState<string | null>(null)
+  const [excluindoId, setExcluindoId] = useState<string | null>(null)
 
   const mes = mesRef.getMonth() + 1
   const ano = mesRef.getFullYear()
@@ -122,8 +124,24 @@ export default function OrcamentosSection({
         .from('orcamentos')
         .upsert(rows, { onConflict: 'familia_id,categoria,mes,ano' })
     }
+    // Categoria que já tinha limite e teve o valor apagado no modal — remove de vez
+    const idsParaExcluir = orcamentos
+      .filter(o => !edits[o.categoria] || edits[o.categoria].trim() === '')
+      .map(o => o.id)
+    if (idsParaExcluir.length > 0) {
+      await supabase.from('orcamentos').delete().in('id', idsParaExcluir)
+    }
     setSalvando(false)
     setModalOpen(false)
+    carregar()
+  }
+
+  async function excluirOrcamento(id: string) {
+    if (confirmarExclusaoId !== id) { setConfirmarExclusaoId(id); return }
+    setExcluindoId(id)
+    await supabase.from('orcamentos').delete().eq('id', id)
+    setExcluindoId(null)
+    setConfirmarExclusaoId(null)
     carregar()
   }
 
@@ -209,6 +227,7 @@ export default function OrcamentosSection({
             {linhas.map(l => {
               const Icon = ICONES_CAT[l.categoria] || MoreHorizontal
               const cor = corBarra(l)
+              const confirmando = confirmarExclusaoId === l.id
               return (
                 <div key={l.id}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
@@ -225,7 +244,25 @@ export default function OrcamentosSection({
                     <span style={{ fontSize: '12px', fontWeight: 600, color: cor }}>
                       {fmt(l.gasto)} <span style={{ color: '#94A3B8', fontWeight: 500 }}>de {fmt(l.limite)}</span>
                     </span>
+                    <button
+                      onClick={() => excluirOrcamento(l.id)}
+                      disabled={excluindoId === l.id}
+                      title={confirmando ? 'Confirmar exclusão' : 'Remover limite'}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        width: '22px', height: '22px', borderRadius: '6px', flexShrink: 0,
+                        border: 'none', cursor: 'pointer',
+                        backgroundColor: confirmando ? '#FEE2E2' : 'transparent',
+                      }}
+                    >
+                      <Trash2 size={13} strokeWidth={1.75} color={confirmando ? '#DC2626' : '#CBD5E1'} />
+                    </button>
                   </div>
+                  {confirmando && (
+                    <p style={{ fontSize: '10.5px', color: '#DC2626', margin: '0 0 6px', textAlign: 'right' }}>
+                      Toque na lixeira de novo para confirmar
+                    </p>
+                  )}
                   <div style={{ height: '6px', backgroundColor: '#F1F5F9', borderRadius: '3px', overflow: 'hidden' }}>
                     <div style={{ height: '6px', borderRadius: '3px', width: `${Math.min(l.pct, 100)}%`, backgroundColor: cor, transition: 'width 0.2s' }} />
                   </div>
@@ -298,6 +335,15 @@ export default function OrcamentosSection({
                         }}
                         style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', fontSize: '13px', fontWeight: 600, color: '#0F172A', padding: '9px 0', textAlign: 'right' }}
                       />
+                      {edits[c] && (
+                        <button
+                          onClick={() => setEdits(prev => ({ ...prev, [c]: '' }))}
+                          title="Limpar"
+                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', marginLeft: '4px', padding: 0 }}
+                        >
+                          <X size={13} strokeWidth={2} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 )
