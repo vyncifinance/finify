@@ -3,18 +3,23 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   UtensilsCrossed, Home, Car, Smile, Heart, BookOpen, ShoppingBag,
-  Church, CreditCard, MoreHorizontal, AlertTriangle, Pencil, X,
+  Church, HandHeart, CreditCard, MoreHorizontal, AlertTriangle, Pencil, X,
+  Pill, Gift, Sparkles, GraduationCap, Smartphone, Shirt, Wrench, ClipboardList, PawPrint, TrendingUp,
 } from 'lucide-react'
 
 const CATEGORIAS_DESPESA = [
-  'Alimentação', 'Moradia', 'Transporte', 'Lazer', 'Saúde',
-  'Educação', 'Compras', 'Cartão de Crédito', 'Dízimo', 'Outros',
+  'Alimentação', 'Moradia', 'Transporte', 'Lazer', 'Saúde', 'Educação',
+  'Cartão de Crédito', 'Dízimo', 'Doações', 'Farmácia', 'Presente', 'Estética',
+  'Estudos', 'Eletrônicos', 'Vestuário', 'Consertos', 'Serviços', 'Pet', 'Investimentos', 'Outros',
 ]
 
 const ICONES_CAT: Record<string, any> = {
   'Alimentação': UtensilsCrossed, 'Moradia': Home, 'Transporte': Car, 'Lazer': Smile,
-  'Saúde': Heart, 'Educação': BookOpen, 'Compras': ShoppingBag, 'Dízimo': Church,
+  'Saúde': Heart, 'Educação': BookOpen, 'Compras': ShoppingBag, 'Dízimo': Church, 'Doações': HandHeart,
   'Cartão de Crédito': CreditCard, 'Outros': MoreHorizontal,
+  'Farmácia': Pill, 'Presente': Gift, 'Estética': Sparkles, 'Estudos': GraduationCap,
+  'Eletrônicos': Smartphone, 'Vestuário': Shirt, 'Consertos': Wrench, 'Serviços': ClipboardList,
+  'Pet': PawPrint, 'Investimentos': TrendingUp,
 }
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
@@ -70,6 +75,7 @@ export default function OrcamentosSection({
     const m: Record<string, number> = {}
     lancamentos.forEach(l => {
       if (l.tipo !== 'despesa') return
+      if ((l as any).fatura_paga === false) return // compra no cartão, fatura ainda não paga — não conta como gasto efetivado
       m[l.categoria] = (m[l.categoria] || 0) + Number(l.valor)
     })
     return m

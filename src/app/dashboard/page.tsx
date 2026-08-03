@@ -7,7 +7,7 @@ import { useOcultarValores, fmtOculto, fmtShortOculto } from '@/hooks/useOcultar
 import { createClient } from '@/lib/supabase'
 import {
   ArrowDownLeft, ArrowUpRight, PiggyBank, Target,
-  ArrowRight, ArrowUp, CheckCircle2, AlertCircle, AlertTriangle, Bell,
+  ArrowRight, ArrowUp, CheckCircle2, AlertCircle, Bell,
   Home, BookOpen, Shield, TrendingUp, Send, Heart, Star, Church, HandHeart,
   ChevronRight, ChevronDown, Wallet, Building2, Sparkles, UtensilsCrossed, Car,
   Smile, ShoppingBag, CreditCard, MoreHorizontal, Briefcase,
@@ -88,7 +88,6 @@ export default function DashboardPage() {
   const [lancamentos, setLancamentos] = useState<any[]>([])
   const [evolucao, setEvolucao]       = useState<any[]>([])
   const [despesasFixas, setDespesasFixas] = useState<any[]>([])
-  const [orcamentosStatus, setOrcamentosStatus] = useState<any[]>([])
   const [contas, setContas]               = useState<any[]>([])
   const [mesesReservaConsiderados, setMesesReservaConsiderados] = useState(0)
   const [dizimista, setDizimista]     = useState(true)
@@ -306,29 +305,8 @@ export default function DashboardPage() {
       const { data: metasData } = await supabase.from('metas').select('*')
         .eq('familia_id', fid).order('automatica', { ascending: false }).order('created_at', { ascending: false }).limit(3)
       if (metasData) setMetas(metasData)
-
-      // Orçamento por categoria — mês atual, cruzado com os gastos reais já lançados
-      const gastoPorCategoria: Record<string, number> = {}
-      lanc.filter((l: any) => l.tipo === 'despesa').forEach((l: any) => {
-        gastoPorCategoria[l.categoria] = (gastoPorCategoria[l.categoria] || 0) + Number(l.valor)
-      })
-      const { data: orcamentosData } = await supabase.from('orcamentos')
-        .select('id, categoria, valor_limite')
-        .eq('familia_id', fid).eq('mes', agora.getMonth() + 1).eq('ano', agora.getFullYear())
-      const statusOrcamentos = (orcamentosData || [])
-        .map((o: any) => {
-          const gasto    = gastoPorCategoria[o.categoria] || 0
-          const limite   = Number(o.valor_limite)
-          const pct      = limite > 0 ? Math.round((gasto / limite) * 100) : 0
-          const excedido = gasto > limite
-          const alerta   = !excedido && pct >= 80
-          return { ...o, gasto, limite, pct, excedido, alerta }
-        })
-        .sort((a: any, b: any) => b.pct - a.pct)
-      setOrcamentosStatus(statusOrcamentos)
     } else {
       setMetas([])
-      setOrcamentosStatus([])
     }
 
     // Despesas fixas do mês — filtradas pelo contexto ativo, pagas e pendentes, com pendentes/atrasadas priorizadas no topo
@@ -573,49 +551,6 @@ export default function DashboardPage() {
                           Baseado em {mesesReservaConsiderados} {mesesReservaConsiderados === 1 ? 'mês' : 'meses'} de dados — fica mais precisa com o tempo
                         </p>
                       )}
-                    </div>
-                  )
-                })}
-              </div>
-
-              <div className="rounded-2xl border" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0' }}>
-                <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: '#F1F5F9' }}>
-                  <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>Orçamento por Categoria</p>
-                  <a href="/dashboard/movimentos" className="flex items-center gap-1 text-xs font-semibold" style={{ color: '#145A45' }}>
-                    Gerenciar <ChevronRight size={13} strokeWidth={2} />
-                  </a>
-                </div>
-                {orcamentosStatus.some((o: any) => o.excedido) && (
-                  <div className="flex items-start gap-2 mx-4 mt-4 p-3 rounded-xl" style={{ backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}>
-                    <AlertTriangle size={14} color="#EF4444" strokeWidth={2} className="flex-shrink-0 mt-0.5" />
-                    <p className="text-xs" style={{ color: '#B91C1C', lineHeight: 1.4 }}>
-                      Limite ultrapassado em {orcamentosStatus.filter((o: any) => o.excedido).map((o: any) => o.categoria).join(', ')}.
-                    </p>
-                  </div>
-                )}
-                {orcamentosStatus.length === 0 ? (
-                  <div className="p-6 text-center">
-                    <p className="text-sm" style={{ color: '#94A3B8' }}>Nenhum limite definido este mês.</p>
-                    <a href="/dashboard/movimentos" className="text-xs font-semibold mt-2 block" style={{ color: '#145A45' }}>Definir orçamentos →</a>
-                  </div>
-                ) : orcamentosStatus.map((o: any) => {
-                  const Icon = ICONES_CAT[o.categoria] || MoreHorizontal
-                  const cor  = o.excedido ? '#EF4444' : o.alerta ? '#F59E0B' : '#2F8F68'
-                  return (
-                    <div key={o.id} className="p-4 border-t" style={{ borderColor: '#F1F5F9' }}>
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: cor + '18' }}>
-                          <Icon size={14} color={cor} strokeWidth={1.75} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate" style={{ color: '#0F172A' }}>{o.categoria}</p>
-                          <p className="text-xs" style={{ color: '#94A3B8' }}>{fmtOculto(o.gasto, ocultar)} de {fmtOculto(o.limite, ocultar)}</p>
-                        </div>
-                        <span className="text-sm font-bold" style={{ color: cor }}>{o.pct}%</span>
-                      </div>
-                      <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: '#F1F5F9' }}>
-                        <div className="h-full rounded-full" style={{ width: `${Math.min(o.pct, 100)}%`, backgroundColor: cor }} />
-                      </div>
                     </div>
                   )
                 })}
@@ -1110,70 +1045,6 @@ export default function DashboardPage() {
                           {df.pago && <CheckCircle2 size={11} strokeWidth={2} />}
                           {df.pago ? 'Pago' : df.atrasada ? 'Atrasada' : 'A pagar'}
                         </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Orçamento por Categoria */}
-            <div style={{
-              borderRadius: '20px', padding: '24px', backgroundColor: '#fff',
-              border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: orcamentosStatus.length === 0 ? '0' : '14px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div style={{ width: '30px', height: '30px', borderRadius: '9px', backgroundColor: 'rgba(20,90,69,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Wallet size={15} color="#145A45" strokeWidth={1.75} />
-                  </div>
-                  <div>
-                    <h2 style={{ fontSize: '14px', fontWeight: 600, color: '#0B1F18', marginBottom: '2px', letterSpacing: '-0.2px' }}>Orçamento por Categoria</h2>
-                    <p style={{ fontSize: '12px', color: '#64748B' }}>Limites do mês</p>
-                  </div>
-                </div>
-                <a href="/dashboard/movimentos" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px', fontWeight: 600, color: '#145A45', textDecoration: 'none', flexShrink: 0 }}>
-                  Gerenciar <ArrowRight size={13} strokeWidth={2} />
-                </a>
-              </div>
-
-              {orcamentosStatus.some((o: any) => o.excedido) && (
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '12px', padding: '10px 12px', margin: '14px 0' }}>
-                  <AlertTriangle size={14} color="#EF4444" strokeWidth={2} style={{ flexShrink: 0, marginTop: '1px' }} />
-                  <p style={{ fontSize: '12px', color: '#B91C1C', margin: 0, lineHeight: 1.4 }}>
-                    Limite ultrapassado em {orcamentosStatus.filter((o: any) => o.excedido).map((o: any) => o.categoria).join(', ')}.
-                  </p>
-                </div>
-              )}
-
-              {orcamentosStatus.length === 0 ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingTop: '18px', marginTop: '18px', borderTop: '1px solid #F1F5F9' }}>
-                  <Wallet size={18} color="#E2E8F0" strokeWidth={1.5} />
-                  <p style={{ fontSize: '12.5px', color: '#94A3B8', flex: 1 }}>Nenhum limite definido este mês.</p>
-                  <a href="/dashboard/movimentos" style={{ fontSize: '13px', fontWeight: 600, color: '#145A45', textDecoration: 'none', whiteSpace: 'nowrap' }}>Definir agora →</a>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {orcamentosStatus.map((o: any) => {
-                    const Icon = ICONES_CAT[o.categoria] || MoreHorizontal
-                    const cor  = o.excedido ? '#EF4444' : o.alerta ? '#F59E0B' : '#2F8F68'
-                    return (
-                      <div key={o.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', borderRadius: '12px', padding: '10px', border: '1px solid rgba(15,23,42,0.05)' }}>
-                        <div style={{ width: '36px', height: '36px', borderRadius: '10px', flexShrink: 0, backgroundColor: cor + '18', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Icon size={15} color={cor} strokeWidth={1.75} />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
-                            <span style={{ fontSize: '13px', fontWeight: 600, color: '#0B1F18', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.categoria}</span>
-                            <span style={{ fontSize: '13px', fontWeight: 700, color: cor, flexShrink: 0, marginLeft: '8px' }}>{o.pct}%</span>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <div style={{ flex: 1, height: '5px', borderRadius: '4px', overflow: 'hidden', backgroundColor: '#F1F5F9', marginRight: '10px' }}>
-                              <div style={{ height: '100%', width: `${Math.min(o.pct, 100)}%`, backgroundColor: cor, borderRadius: '4px' }} />
-                            </div>
-                            <span style={{ fontSize: '11.5px', fontWeight: 600, color: '#64748B', flexShrink: 0 }}>{fmtOculto(o.gasto, ocultar)}</span>
-                          </div>
-                        </div>
                       </div>
                     )
                   })}

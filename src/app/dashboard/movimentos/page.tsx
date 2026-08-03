@@ -6,36 +6,57 @@ import { useEffect, useState, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import {
-  ArrowDownLeft, ArrowUpRight, ChevronLeft, ChevronRight,
+  ArrowDownLeft, ArrowUpRight, ChevronLeft, ChevronRight, ChevronDown, Calendar,
   Plus, Wallet, X, UtensilsCrossed, Home, Car, Smile,
-  Heart, BookOpen, ShoppingBag, Church, MoreHorizontal,
+  Heart, BookOpen, ShoppingBag, Church, MoreHorizontal, HandHeart,
   Briefcase, TrendingUp, Laptop, DollarSign, Trash2, Pencil,
-  CreditCard, FileText, AlignLeft
+  CreditCard, FileText, AlignLeft, Repeat, CheckCircle2,
+  Pill, Gift, Sparkles, GraduationCap, Smartphone, Shirt, Wrench, ClipboardList, Filter, Search, PawPrint,
+  Building2, Truck, Landmark, Megaphone, Calculator, Users, Check
 } from 'lucide-react'
 import OrcamentosSection from './OrcamentosSection'
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 
-const CATEGORIAS_DESPESA = ['Alimentação','Moradia','Transporte','Lazer','Saúde','Educação','Compras','Cartão de Crédito','Dízimo','Outros']
+const CATEGORIAS_DESPESA = ['Alimentação','Moradia','Transporte','Lazer','Saúde','Educação','Cartão de Crédito','Dízimo','Doações','Farmácia','Presente','Estética','Estudos','Eletrônicos','Vestuário','Consertos','Serviços','Pet','Investimentos','Outros']
 const CATEGORIAS_RECEITA = ['Salário','Renda Extra','Freelance','Investimento','Outros']
+
+const CATEGORIAS_EMPRESA_DESPESA = ['Fornecedores','Impostos','Pró-labore','Folha de Pagamento','Marketing','Aluguel/Sede','Software/Ferramentas','Contabilidade','Outros']
+const CATEGORIAS_EMPRESA_RECEITA = ['Faturamento','Prestação de Serviço','Outras Receitas']
 
 const ICONES_CAT: Record<string, any> = {
   'Alimentação': UtensilsCrossed, 'Moradia': Home, 'Transporte': Car, 'Lazer': Smile,
-  'Saúde': Heart, 'Educação': BookOpen, 'Compras': ShoppingBag, 'Dízimo': Church,
+  'Saúde': Heart, 'Educação': BookOpen, 'Compras': ShoppingBag, 'Dízimo': Church, 'Doações': HandHeart,
   'Cartão de Crédito': CreditCard, 'Outros': MoreHorizontal,
+  'Farmácia': Pill, 'Presente': Gift, 'Estética': Sparkles, 'Estudos': GraduationCap,
+  'Eletrônicos': Smartphone, 'Vestuário': Shirt, 'Consertos': Wrench, 'Serviços': ClipboardList,
+  'Pet': PawPrint,
+  'Investimentos': TrendingUp,
   'Salário': Briefcase, 'Renda Extra': DollarSign, 'Freelance': Laptop, 'Investimento': TrendingUp,
+  'Fornecedores': Truck, 'Impostos': Landmark, 'Pró-labore': Wallet, 'Folha de Pagamento': Users,
+  'Marketing': Megaphone, 'Aluguel/Sede': Building2, 'Software/Ferramentas': Laptop, 'Contabilidade': Calculator,
+  'Faturamento': TrendingUp, 'Prestação de Serviço': Briefcase, 'Outras Receitas': DollarSign,
 }
 
 function fmt(val: number) {
-  return `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+  return `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
+// toISOString() converte pra UTC — no Brasil (UTC-3), lançar à noite fazia a data
+// "pular" pro dia seguinte. Isso usa os componentes de data locais, sem conversão.
+function dataLocalISO(d: Date): string {
+  const ano = d.getFullYear()
+  const mes = String(d.getMonth() + 1).padStart(2, '0')
+  const dia = String(d.getDate()).padStart(2, '0')
+  return `${ano}-${mes}-${dia}`
 }
 
 function formatDiaLabel(dataStr: string) {
   const hoje  = new Date()
   const ontem = new Date(); ontem.setDate(hoje.getDate() - 1)
   const data  = new Date(dataStr + 'T12:00:00')
-  const f = (d: Date) => d.toISOString().split('T')[0]
+  const f = (d: Date) => dataLocalISO(d)
   if (f(data) === f(hoje))  return 'Hoje'
   if (f(data) === f(ontem)) return 'Ontem'
   const dias = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado']
@@ -50,14 +71,41 @@ export default function MovimentosPage() {
   const [loading, setLoading]           = useState(true)
   const [familiaId, setFamiliaId]       = useState('')
   const [familiaNome, setFamiliaNome]   = useState('')
+  const [empresas, setEmpresas]         = useState<any[]>([])
+  const [contextoAtivo, setContextoAtivo] = useState<{ tipo: 'pessoal' | 'empresa'; empresaId?: string; nome: string }>({ tipo: 'pessoal', nome: '' })
+  const [contextoAberto, setContextoAberto] = useState(false)
+  const [contextoAbertoHeader, setContextoAbertoHeader] = useState(false)
   const [userId, setUserId]             = useState('')
   const [membroAtual, setMembroAtual]   = useState('')
   const [mesRef, setMesRef]             = useState(new Date())
   const [lancamentos, setLancamentos]   = useState<any[]>([])
   const [filtro, setFiltro]             = useState<'todos'|'receita'|'despesa'>('todos')
   const [filtroMembro, setFiltroMembro] = useState('todos')
+  const [filtroCategoria, setFiltroCategoria] = useState('todos')
+  const [diaOverride, setDiaOverride] = useState<Record<string, boolean>>({})
+  const [limiteDias, setLimiteDias] = useState(15)
+  const [busca, setBusca]               = useState('')
   const [membros, setMembros]           = useState<string[]>([])
   const [membrosFamilia, setMembrosFamilia] = useState<string[]>([])
+
+  const [despesasFixas, setDespesasFixas] = useState<any[]>([])
+  const [dfModalOpen, setDfModalOpen]     = useState(false)
+  const [dfEditando, setDfEditando]       = useState<any>(null)
+  const [dfNome, setDfNome]               = useState('')
+  const [dfValor, setDfValor]             = useState('')
+  const [dfCategoria, setDfCategoria]     = useState('Moradia')
+  const [dfDia, setDfDia]                 = useState('5')
+  const [dfVariavel, setDfVariavel]       = useState(false)
+  const [dfTipo, setDfTipo]               = useState<'despesa'|'receita'>('despesa')
+  const [dfSalvando, setDfSalvando]       = useState(false)
+  const [dfDeletando, setDfDeletando]     = useState(false)
+  const [dfConfirmDelete, setDfConfirmDelete] = useState(false)
+  const [dfErro, setDfErro] = useState('')
+
+  const [pagarModalOpen, setPagarModalOpen] = useState(false)
+  const [dfPagando, setDfPagando]           = useState<any>(null)
+  const [valorPagar, setValorPagar]         = useState('')
+  const [pagando, setPagando]               = useState(false)
 
   const [modalOpen, setModalOpen]         = useState(false)
   const [editando, setEditando]           = useState<any>(null)
@@ -65,8 +113,26 @@ export default function MovimentosPage() {
   const [valor, setValor]                 = useState('')
   const [categoria, setCategoria]         = useState('Alimentação')
   const [membroForm, setMembroForm]       = useState('')
-  const [dataLanc, setDataLanc]           = useState(new Date().toISOString().split('T')[0])
+  const [dataLanc, setDataLanc]           = useState(dataLocalISO(new Date()))
   const [dizimar, setDizimar]             = useState(true)
+  const [posicoesRF, setPosicoesRF]       = useState<any[]>([])
+  const [posicaoAporteId, setPosicaoAporteId] = useState('')
+  const [contas, setContas]               = useState<any[]>([])
+  const [contaSelecionadaId, setContaSelecionadaId] = useState('')
+  const [novoCartaoOpen, setNovoCartaoOpen] = useState(false)
+  const [novoCartaoNome, setNovoCartaoNome] = useState('')
+  const [novoCartaoFechamento, setNovoCartaoFechamento] = useState('')
+  const [novoCartaoVencimento, setNovoCartaoVencimento] = useState('')
+  const [salvandoCartao, setSalvandoCartao] = useState(false)
+  const [editandoCartaoId, setEditandoCartaoId] = useState<string | null>(null)
+  const [confirmDeleteCartao, setConfirmDeleteCartao] = useState(false)
+  const [deletandoCartao, setDeletandoCartao] = useState(false)
+  const [pagandoFatura, setPagandoFatura] = useState<string | null>(null)
+  const [cartaoDetalhado, setCartaoDetalhado] = useState<string | null>(null)
+  const [despesasFixasAberto, setDespesasFixasAberto] = useState(true)
+  const [itensCartaoDetalhe, setItensCartaoDetalhe] = useState<any[]>([])
+  const [carregandoDetalheCartao, setCarregandoDetalheCartao] = useState(false)
+  const [faturasPendentes, setFaturasPendentes] = useState<Record<string, number>>({})
   const [observacao, setObservacao]       = useState('')
   const [parcelado, setParcelado]         = useState(false)
   const [numParcelas, setNumParcelas]     = useState('2')
@@ -90,6 +156,13 @@ export default function MovimentosPage() {
     if (familiaIdRef.current) carregarLancamentos(familiaIdRef.current)
   }, [mesRef])
   useEffect(() => {
+    setLimiteDias(15)
+    setDiaOverride({})
+  }, [mesRef, filtro, filtroMembro, filtroCategoria, busca])
+  useEffect(() => {
+    setCartaoDetalhado(null)
+  }, [mesRef])
+  useEffect(() => {
     const handler = () => {
       if (!document.hidden && familiaIdRef.current) carregarLancamentos(familiaIdRef.current)
     }
@@ -107,25 +180,83 @@ export default function MovimentosPage() {
       .eq('id', session.user.id).single()
     if (profile) {
       const fid = profile.familia_id
+      const nomeFam = (profile.familias as any)?.nome || ''
       setMembroAtual(profile.nome || '')
       setFamiliaId(fid)
       familiaIdRef.current = fid
-      setFamiliaNome((profile.familias as any)?.nome || '')
+      setFamiliaNome(nomeFam)
       setMembroForm(profile.nome || '')
       const { data: membrosData } = await supabase
         .from('profiles').select('nome').eq('familia_id', fid)
       if (membrosData) setMembrosFamilia(membrosData.map((m: any) => m.nome).filter(Boolean))
-      await carregarLancamentos(fid, profile.nome, (profile.familias as any)?.nome)
+
+      const { data: empresasData } = await supabase.from('empresas')
+        .select('*').eq('familia_id', fid).order('created_at', { ascending: true })
+      const listaEmpresas = empresasData || []
+      setEmpresas(listaEmpresas)
+
+      const { data: posicoesData } = await supabase.from('posicoes_investimento')
+        .select('id, nome').eq('familia_id', fid).eq('tipo', 'renda_fixa_cdi')
+        .order('created_at', { ascending: false })
+      setPosicoesRF(posicoesData || [])
+
+      const { data: contasData } = await supabase.from('contas')
+        .select('*').eq('familia_id', fid).order('created_at', { ascending: true })
+      setContas(contasData || [])
+      const contaCorrente = (contasData || []).find((c: any) => c.tipo === 'corrente')
+      if (contaCorrente) setContaSelecionadaId(contaCorrente.id)
+      await carregarFaturasPendentes(fid, contasData || [])
+
+      // Restaura o último contexto usado nesse dispositivo (se ainda existir)
+      let contexto: { tipo: 'pessoal' | 'empresa'; empresaId?: string; nome: string } = { tipo: 'pessoal', nome: nomeFam }
+      try {
+        const salvo = localStorage.getItem('finify_contexto')
+        if (salvo) {
+          const parsed = JSON.parse(salvo)
+          if (parsed.tipo === 'empresa' && parsed.empresaId) {
+            const emp = listaEmpresas.find((e: any) => e.id === parsed.empresaId)
+            if (emp) contexto = { tipo: 'empresa', empresaId: emp.id, nome: emp.nome }
+          }
+        }
+      } catch {}
+      setContextoAtivo(contexto)
+
+      await carregarLancamentos(fid, profile.nome, nomeFam, contexto)
+      await recarregarDespesasFixas(fid, contexto)
     }
     setLoading(false)
   }
 
-  async function carregarLancamentos(fid: string, nomeUsuario?: string, nomeFamilia?: string) {
+  function trocarContexto(novo: { tipo: 'pessoal' | 'empresa'; empresaId?: string; nome: string }) {
+    setContextoAtivo(novo)
+    setContextoAberto(false)
+    try { localStorage.setItem('finify_contexto', JSON.stringify(novo)) } catch {}
+    carregarLancamentos(familiaIdRef.current, membroAtual, familiaNome, novo)
+    recarregarDespesasFixas(familiaIdRef.current, novo)
+  }
+
+  async function recarregarDespesasFixas(fid: string, contexto?: { tipo: 'pessoal' | 'empresa'; empresaId?: string }) {
+    const ctx = contexto || contextoAtivo
+    let query = supabase.from('despesas_fixas').select('*')
+      .eq('familia_id', fid).eq('ativo', true)
+    query = ctx.tipo === 'empresa' && ctx.empresaId
+      ? query.eq('empresa_id', ctx.empresaId)
+      : query.is('empresa_id', null)
+    const { data } = await query.order('dia_vencimento', { ascending: true })
+    if (data) setDespesasFixas(data)
+  }
+
+  async function carregarLancamentos(fid: string, nomeUsuario?: string, nomeFamilia?: string, contexto?: { tipo: 'pessoal' | 'empresa'; empresaId?: string }) {
     if (!fid) return
-    const ini = new Date(mesRef.getFullYear(), mesRef.getMonth(), 1).toISOString().split('T')[0]
-    const fim = new Date(mesRef.getFullYear(), mesRef.getMonth() + 1, 0).toISOString().split('T')[0]
-    const { data: lanc } = await supabase.from('lancamentos').select('*')
+    const ctx = contexto || contextoAtivo
+    const ini = dataLocalISO(new Date(mesRef.getFullYear(), mesRef.getMonth(), 1))
+    const fim = dataLocalISO(new Date(mesRef.getFullYear(), mesRef.getMonth() + 1, 0))
+    let query = supabase.from('lancamentos').select('*')
       .eq('familia_id', fid).gte('data', ini).lte('data', fim)
+    query = ctx.tipo === 'empresa' && ctx.empresaId
+      ? query.eq('empresa_id', ctx.empresaId)
+      : query.is('empresa_id', null)
+    const { data: lanc } = await query
       .order('data', { ascending: false }).order('hora', { ascending: false })
     if (lanc) {
       setLancamentos(lanc)
@@ -143,10 +274,14 @@ export default function MovimentosPage() {
 
   function abrirModalNovo() {
     setEditando(null)
-    setTipo('despesa'); setValor(''); setCategoria('Alimentação')
-    setDataLanc(new Date().toISOString().split('T')[0])
-    setMembroForm(membroAtual); setDizimar(true)
+    setTipo('despesa'); setValor('')
+    setCategoria(contextoAtivo.tipo === 'empresa' ? CATEGORIAS_EMPRESA_DESPESA[0] : 'Alimentação')
+    setDataLanc(dataLocalISO(new Date()))
+    setMembroForm(membroAtual); setDizimar(false)
     setObservacao(''); setParcelado(false); setNumParcelas('2'); setDiaParcela('1')
+    setPosicaoAporteId('')
+    const contaCorrente = contas.find(c => c.tipo === 'corrente')
+    setContaSelecionadaId(contaCorrente?.id || '')
     setConfirmDelete(false)
     setModalOpen(true)
   }
@@ -158,15 +293,201 @@ export default function MovimentosPage() {
     setMembroForm(l.membro); setDizimar(l.dizimar !== false)
     setObservacao(l.descricao || '')
     setParcelado(false); setNumParcelas('2'); setDiaParcela('1')
+    setPosicaoAporteId(l.posicao_investimento_id || '')
+    const contaCorrente = contas.find(c => c.tipo === 'corrente')
+    setContaSelecionadaId(l.conta_id || contaCorrente?.id || '')
     setConfirmDelete(false)
     setModalOpen(true)
   }
 
   function handleTipo(t: 'despesa' | 'receita') {
     setTipo(t)
-    setCategoria(t === 'despesa' ? 'Alimentação' : 'Salário')
-    setDizimar(t === 'receita')
+    if (contextoAtivo.tipo === 'empresa') {
+      setCategoria(t === 'despesa' ? CATEGORIAS_EMPRESA_DESPESA[0] : CATEGORIAS_EMPRESA_RECEITA[0])
+      setDizimar(false) // receita de PJ não dizima por padrão — só se marcado manualmente
+    } else {
+      setCategoria(t === 'despesa' ? 'Alimentação' : 'Salário')
+      setDizimar(t === 'receita')
+    }
     setParcelado(false)
+  }
+
+  function ehCategoriaInvestimento(cat: string) {
+    return cat === 'Investimento' || cat === 'Investimentos'
+  }
+
+  // Aplica um aporte numa posição específica de Renda Fixa, vinculado ao lançamento que o originou.
+  // Substitui a sincronização antiga (que apontava pra tabela investimentos, já descontinuada).
+  async function aplicarAporteEmPosicao(posicaoId: string, lancamentoId: string, valor: number, data: string) {
+    if (!posicaoId) return
+    await supabase.from('aportes_posicao').insert({
+      posicao_id: posicaoId, lancamento_id: lancamentoId, valor, data_aporte: data,
+    })
+  }
+
+  // Remove qualquer aporte já vinculado a esse lançamento (usado antes de recriar, na edição,
+  // ou sozinho, na exclusão).
+  async function removerAporteDoLancamento(lancamentoId: string) {
+    await supabase.from('aportes_posicao').delete().eq('lancamento_id', lancamentoId)
+  }
+
+  async function carregarFaturasPendentes(fid: string, listaContas: any[]) {
+    const cartoes = listaContas.filter((c: any) => c.tipo === 'cartao_credito')
+    if (cartoes.length === 0) { setFaturasPendentes({}); return }
+    const { data } = await supabase.from('lancamentos').select('conta_id, valor, data')
+      .eq('familia_id', fid).eq('tipo', 'despesa').eq('fatura_paga', false)
+      .in('conta_id', cartoes.map((c: any) => c.id))
+    const hoje = new Date()
+    const totais: Record<string, number> = {}
+    ;(data || []).forEach((l: any) => {
+      const cartao = cartoes.find((c: any) => c.id === l.conta_id)
+      // Data do lançamento já vem fixada no dia de vencimento da fatura em que ele cai
+      // (não na data da compra). Então pra saber se é "fatura atual" (mesmo antes do
+      // vencimento) ou "fatura futura" (parcela ainda longe), comparamos com o vencimento
+      // mais próximo daqui pra frente — não com "hoje" diretamente.
+      if (!cartao?.dia_vencimento) {
+        totais[l.conta_id] = (totais[l.conta_id] || 0) + Number(l.valor)
+        return
+      }
+      let vencimentoAtual = new Date(hoje.getFullYear(), hoje.getMonth(), cartao.dia_vencimento)
+      if (hoje.getDate() > cartao.dia_vencimento) {
+        vencimentoAtual = new Date(hoje.getFullYear(), hoje.getMonth() + 1, cartao.dia_vencimento)
+      }
+      const vencimentoAtualStr = dataLocalISO(vencimentoAtual)
+      if (l.data <= vencimentoAtualStr) {
+        totais[l.conta_id] = (totais[l.conta_id] || 0) + Number(l.valor)
+      }
+    })
+    setFaturasPendentes(totais)
+  }
+
+  async function handleCriarCartao() {
+    if (!novoCartaoNome.trim()) return
+    setSalvandoCartao(true)
+    const payload = {
+      nome: novoCartaoNome.trim(),
+      dia_fechamento: novoCartaoFechamento ? parseInt(novoCartaoFechamento) : null,
+      dia_vencimento: novoCartaoVencimento ? parseInt(novoCartaoVencimento) : null,
+    }
+
+    if (editandoCartaoId) {
+      const { data: contaAtualizada, error } = await supabase.from('contas')
+        .update(payload).eq('id', editandoCartaoId).select().single()
+      if (!error && contaAtualizada) {
+        setContas(prev => prev.map(c => c.id === editandoCartaoId ? contaAtualizada : c))
+        fecharModalCartao()
+      }
+    } else {
+      const { data: novaConta, error } = await supabase.from('contas').insert({
+        familia_id: familiaIdRef.current, tipo: 'cartao_credito', ...payload,
+      }).select().single()
+      if (!error && novaConta) {
+        setContas(prev => [...prev, novaConta])
+        setContaSelecionadaId(novaConta.id)
+        fecharModalCartao()
+      }
+    }
+    setSalvandoCartao(false)
+  }
+
+  function fecharModalCartao() {
+    setNovoCartaoOpen(false)
+    setEditandoCartaoId(null)
+    setConfirmDeleteCartao(false)
+    setNovoCartaoNome(''); setNovoCartaoFechamento(''); setNovoCartaoVencimento('')
+  }
+
+  function abrirEditarCartao(c: any) {
+    setEditandoCartaoId(c.id)
+    setNovoCartaoNome(c.nome)
+    setNovoCartaoFechamento(c.dia_fechamento ? String(c.dia_fechamento) : '')
+    setNovoCartaoVencimento(c.dia_vencimento ? String(c.dia_vencimento) : '')
+    setConfirmDeleteCartao(false)
+    setNovoCartaoOpen(true)
+  }
+
+  async function handleDeletarCartao() {
+    if (!editandoCartaoId) return
+    if (!confirmDeleteCartao) { setConfirmDeleteCartao(true); return }
+    setDeletandoCartao(true)
+    const { error } = await supabase.from('contas').delete().eq('id', editandoCartaoId)
+    setDeletandoCartao(false)
+    if (!error) {
+      setContas(prev => prev.filter(c => c.id !== editandoCartaoId))
+      fecharModalCartao()
+    }
+  }
+
+  // Paga a fatura de um cartão: soma tudo que ainda não foi pago nele e cria UM lançamento
+  // único saindo da conta corrente — igual acontece de verdade no extrato do banco. As compras
+  // individuais do cartão continuam existindo (pra categoria), só passam a contar como "pagas".
+  // Mostra os lançamentos daquele cartão só do mês que está sendo visualizado — clica de novo pra fechar.
+  async function toggleDetalheCartao(cartaoId: string) {
+    if (cartaoDetalhado === cartaoId) { setCartaoDetalhado(null); return }
+    setCartaoDetalhado(cartaoId)
+    setCarregandoDetalheCartao(true)
+    const ini = dataLocalISO(new Date(mesRef.getFullYear(), mesRef.getMonth(), 1))
+    const fim = dataLocalISO(new Date(mesRef.getFullYear(), mesRef.getMonth() + 1, 0))
+    const { data } = await supabase.from('lancamentos').select('*')
+      .eq('familia_id', familiaIdRef.current).eq('conta_id', cartaoId)
+      .gte('data', ini).lte('data', fim)
+      .order('data', { ascending: false })
+    setItensCartaoDetalhe(data || [])
+    setCarregandoDetalheCartao(false)
+  }
+
+  async function handlePagarFatura(cartaoId: string) {
+    setPagandoFatura(cartaoId)
+    const fid = familiaIdRef.current
+    const contaCorrente = contas.find(c => c.tipo === 'corrente')
+    if (!contaCorrente) { setPagandoFatura(null); return }
+
+    const cartao = contas.find(c => c.id === cartaoId)
+    const { data: todosPendentes } = await supabase.from('lancamentos').select('id, valor, data')
+      .eq('familia_id', fid).eq('conta_id', cartaoId).eq('tipo', 'despesa').eq('fatura_paga', false)
+
+    // Mesma lógica do card: só quita o que é da fatura atual (mesmo antes do vencimento
+    // chegar) — parcela de fatura realmente futura fica pra ser paga na hora dela.
+    const hoje = new Date()
+    let pendentes = todosPendentes || []
+    if (cartao?.dia_vencimento) {
+      let vencimentoAtual = new Date(hoje.getFullYear(), hoje.getMonth(), cartao.dia_vencimento)
+      if (hoje.getDate() > cartao.dia_vencimento) {
+        vencimentoAtual = new Date(hoje.getFullYear(), hoje.getMonth() + 1, cartao.dia_vencimento)
+      }
+      const vencimentoAtualStr = dataLocalISO(vencimentoAtual)
+      pendentes = pendentes.filter((l: any) => l.data <= vencimentoAtualStr)
+    }
+
+    const total = pendentes.reduce((s: number, l: any) => s + Number(l.valor), 0)
+    if (total <= 0) { setPagandoFatura(null); return }
+
+    const agora = new Date()
+    const hora  = `${String(agora.getHours()).padStart(2,'0')}:${String(agora.getMinutes()).padStart(2,'0')}`
+
+    const { error } = await supabase.from('lancamentos').insert({
+      familia_id: fid, user_id: userId, tipo: 'despesa', valor: total,
+      categoria: 'Cartão de Crédito', membro: membroAtual,
+      data: dataLocalISO(agora), hora, dizimar: false,
+      conta_id: contaCorrente.id, fatura_paga: true,
+      descricao: `Pagamento de fatura — ${cartao?.nome || 'Cartão'}`,
+    })
+
+    if (!error) {
+      const ids = (pendentes || []).map((l: any) => l.id)
+      await supabase.from('lancamentos').update({ fatura_paga: true }).in('id', ids)
+      await carregarLancamentos(fid)
+      await carregarFaturasPendentes(fid, contas)
+    }
+    setPagandoFatura(null)
+  }
+
+  async function ajustarValorAtualMeta(metaId: string | null | undefined, delta: number) {
+    if (!metaId || delta === 0) return
+    const { data: meta } = await supabase.from('metas').select('valor_atual').eq('id', metaId).maybeSingle()
+    if (!meta) return // meta pode ter sido deletada — lançamento fica órfão, sem erro
+    const novoValor = Math.max(Number(meta.valor_atual) + delta, 0)
+    await supabase.from('metas').update({ valor_atual: novoValor }).eq('id', metaId)
   }
 
   async function handleSalvar() {
@@ -177,45 +498,103 @@ export default function MovimentosPage() {
     const fid  = familiaIdRef.current
     const agora = new Date()
     const hora  = `${String(agora.getHours()).padStart(2,'0')}:${String(agora.getMinutes()).padStart(2,'0')}`
+    const empresaId = contextoAtivo.tipo === 'empresa' ? contextoAtivo.empresaId : null
+    const ehInvestimentoAgora = ehCategoriaInvestimento(categoria) && tipo === 'despesa'
+    const posicaoParaAporte = ehInvestimentoAgora && posicaoAporteId ? posicaoAporteId : null
+
+    // Compra em cartão de crédito só sai da conta corrente quando a fatura é paga —
+    // até lá, fatura_paga fica false e o lançamento não conta no Saldo em conta.
+    const contaEscolhida = contas.find(c => c.id === contaSelecionadaId)
+    const faturaPagaValor = tipo === 'despesa' ? (contaEscolhida?.tipo !== 'cartao_credito') : true
+
+    // Mesma regra pra criar ou editar: compra em cartão de crédito depois do fechamento vai
+    // pra fatura do mês seguinte, com a data final seguindo o dia de vencimento do cartão.
+    let dataFinal = dataLanc
+    if (tipo === 'despesa' && contaEscolhida?.tipo === 'cartao_credito' && contaEscolhida.dia_vencimento) {
+      const dataCompra = new Date(dataLanc + 'T12:00:00')
+      let mesFatura = dataCompra.getMonth()
+      if (contaEscolhida.dia_fechamento && dataCompra.getDate() > contaEscolhida.dia_fechamento) {
+        mesFatura += 1
+      }
+      dataFinal = dataLocalISO(new Date(dataCompra.getFullYear(), mesFatura, contaEscolhida.dia_vencimento))
+    }
 
     if (editando) {
       const { error } = await supabase.from('lancamentos').update({
-        tipo, valor: valorNum, categoria, membro: membroForm, data: dataLanc,
+        tipo, valor: valorNum, categoria, membro: membroForm, data: dataFinal,
         dizimar: tipo === 'receita' ? dizimar : false,
         descricao: observacao || null,
+        posicao_investimento_id: posicaoParaAporte,
+        conta_id: contaSelecionadaId || null,
+        fatura_paga: faturaPagaValor,
       }).eq('id', editando.id)
+
+      if (!error) {
+        // Sempre remove o aporte antigo vinculado (se existia) e recria do zero — mais simples
+        // e seguro que tentar "diferenciar" o que mudou (valor, data ou a posição escolhida).
+        await removerAporteDoLancamento(editando.id)
+        if (posicaoParaAporte) await aplicarAporteEmPosicao(posicaoParaAporte, editando.id, valorNum, dataFinal)
+        if (editando.meta_id) await ajustarValorAtualMeta(editando.meta_id, valorNum - Number(editando.valor))
+      }
       setSalvando(false)
-      if (!error) { setModalOpen(false); await carregarLancamentos(fid) }
+      if (!error) { setModalOpen(false); await carregarLancamentos(fid); await carregarFaturasPendentes(fid, contas) }
     } else if (parcelado && tipo === 'despesa') {
-      // Lançamento parcelado — cria N lançamentos
+      // Lançamento parcelado — cria N lançamentos. Aporte automático em posição não se aplica
+      // aqui (compra parcelada não é, na prática, um aporte de investimento recorrente).
       const n = parseInt(numParcelas) || 2
-      const dia = parseInt(diaParcela) || 1
       const valorParcela = valorNum / n
-      const dataBase = new Date(dataLanc + 'T12:00:00')
+      const dataCompra = new Date(dataLanc + 'T12:00:00')
+
+      // Regra de fechamento de fatura: se o cartão tem dia_fechamento configurado e a compra
+      // aconteceu DEPOIS desse dia, a fatura do mês corrente já fechou — a primeira parcela
+      // (e todas as seguintes) empurram um mês pra frente. Cada parcela cai no dia de
+      // vencimento do cartão, não numa data digitada à mão.
+      let mesBase = dataCompra.getMonth()
+      let anoBase = dataCompra.getFullYear()
+      let dia = 1
+      if (contaEscolhida?.tipo === 'cartao_credito') {
+        if (contaEscolhida.dia_fechamento && dataCompra.getDate() > contaEscolhida.dia_fechamento) {
+          mesBase += 1
+        }
+        dia = contaEscolhida.dia_vencimento || dataCompra.getDate()
+      } else {
+        dia = dataCompra.getDate()
+      }
+
       const inserts = []
       for (let i = 0; i < n; i++) {
-        const d = new Date(dataBase.getFullYear(), dataBase.getMonth() + i, dia)
-        const dataStr = d.toISOString().split('T')[0]
+        const d = new Date(anoBase, mesBase + i, dia)
+        const dataStr = dataLocalISO(d)
         inserts.push({
           familia_id: fid, user_id: userId, tipo: 'despesa',
           valor: Math.round(valorParcela * 100) / 100,
           categoria, membro: membroForm, data: dataStr, hora,
-          dizimar: false,
+          dizimar: false, empresa_id: empresaId,
+          conta_id: contaSelecionadaId || null,
+          fatura_paga: faturaPagaValor,
           descricao: `${observacao ? observacao + ' ' : ''}Parcela ${i + 1}/${n}`,
         })
       }
       const { error } = await supabase.from('lancamentos').insert(inserts)
       setSalvando(false)
-      if (!error) { setModalOpen(false); await carregarLancamentos(fid) }
+      if (!error) { setModalOpen(false); await carregarLancamentos(fid); await carregarFaturasPendentes(fid, contas) }
     } else {
-      const { error } = await supabase.from('lancamentos').insert({
+      const { data: novoLancamento, error } = await supabase.from('lancamentos').insert({
         familia_id: fid, user_id: userId, tipo, valor: valorNum,
-        categoria, membro: membroForm, data: dataLanc, hora,
+        categoria, membro: membroForm, data: dataFinal, hora,
         dizimar: tipo === 'receita' ? dizimar : false,
+        empresa_id: empresaId,
         descricao: observacao || null,
-      })
+        posicao_investimento_id: posicaoParaAporte,
+        conta_id: contaSelecionadaId || null,
+        fatura_paga: faturaPagaValor,
+      }).select().single()
+
+      if (!error && novoLancamento && posicaoParaAporte) {
+        await aplicarAporteEmPosicao(posicaoParaAporte, novoLancamento.id, valorNum, dataFinal)
+      }
       setSalvando(false)
-      if (!error) { setModalOpen(false); await carregarLancamentos(fid) }
+      if (!error) { setModalOpen(false); await carregarLancamentos(fid); await carregarFaturasPendentes(fid, contas) }
     }
   }
 
@@ -224,18 +603,188 @@ export default function MovimentosPage() {
     if (!confirmDelete) { setConfirmDelete(true); return }
     setDeletando(true)
     const { error } = await supabase.from('lancamentos').delete().eq('id', editando.id)
+    if (!error && editando.posicao_investimento_id) {
+      await removerAporteDoLancamento(editando.id)
+    }
+    if (!error && editando.meta_id) {
+      await ajustarValorAtualMeta(editando.meta_id, -Number(editando.valor))
+    }
     setDeletando(false)
     if (!error) {
       setLancamentos(prev => prev.filter((l: any) => l.id !== editando.id))
       setModalOpen(false)
+      await carregarFaturasPendentes(familiaIdRef.current, contas)
     }
   }
 
+  function abrirDfModalNovo() {
+    setDfEditando(null); setDfNome(''); setDfValor('')
+    setDfCategoria(contextoAtivo.tipo === 'empresa' ? CATEGORIAS_EMPRESA_DESPESA[0] : 'Moradia')
+    setDfDia('5')
+    setDfVariavel(false); setDfTipo('despesa')
+    setDfConfirmDelete(false); setDfErro(''); setDfModalOpen(true)
+  }
+
+  function abrirDfModalEditar(df: any) {
+    setDfEditando(df); setDfNome(df.nome)
+    setDfValor(Number(df.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
+    setDfCategoria(df.categoria); setDfDia(String(df.dia_vencimento))
+    setDfVariavel(!!df.valor_variavel); setDfTipo(df.tipo === 'receita' ? 'receita' : 'despesa')
+    setDfConfirmDelete(false); setDfErro(''); setDfModalOpen(true)
+  }
+
+  function handleDfTipo(t: 'despesa' | 'receita') {
+    setDfTipo(t)
+    if (contextoAtivo.tipo === 'empresa') {
+      setDfCategoria(t === 'despesa' ? CATEGORIAS_EMPRESA_DESPESA[0] : CATEGORIAS_EMPRESA_RECEITA[0])
+    } else {
+      setDfCategoria(t === 'despesa' ? 'Moradia' : 'Salário')
+    }
+  }
+
+  async function handleSalvarDf() {
+    if (!dfNome.trim() || !dfValor) return
+    setDfSalvando(true)
+    setDfErro('')
+    const valorNum = parseFloat(dfValor.replace(/\./g, '').replace(',', '.'))
+    const diaNum   = Math.min(31, Math.max(1, parseInt(dfDia) || 1))
+    const fid = familiaIdRef.current
+    const empresaId = contextoAtivo.tipo === 'empresa' ? contextoAtivo.empresaId : null
+
+    if (dfEditando) {
+      const { error } = await supabase.from('despesas_fixas').update({
+        nome: dfNome.trim(), valor: valorNum, categoria: dfCategoria, dia_vencimento: diaNum, valor_variavel: dfVariavel, tipo: dfTipo,
+      }).eq('id', dfEditando.id)
+      setDfSalvando(false)
+      if (!error) { setDfModalOpen(false); await recarregarDespesasFixas(fid) }
+      else { console.error('Erro ao atualizar despesa fixa:', error); setDfErro(error.message || 'Não foi possível salvar. Tente novamente.') }
+    } else {
+      const { error } = await supabase.from('despesas_fixas').insert({
+        familia_id: fid, user_id: userId, nome: dfNome.trim(), valor: valorNum,
+        categoria: dfCategoria, dia_vencimento: diaNum, valor_variavel: dfVariavel, tipo: dfTipo, ativo: true,
+        empresa_id: empresaId,
+      })
+      setDfSalvando(false)
+      if (!error) { setDfModalOpen(false); await recarregarDespesasFixas(fid) }
+      else { console.error('Erro ao criar despesa fixa:', error); setDfErro(error.message || 'Não foi possível salvar. Tente novamente.') }
+    }
+  }
+
+  async function handleDeletarDf() {
+    if (!dfEditando) return
+    if (!dfConfirmDelete) { setDfConfirmDelete(true); return }
+    setDfDeletando(true)
+    setDfErro('')
+    const { error } = await supabase.from('despesas_fixas').update({ ativo: false }).eq('id', dfEditando.id)
+    setDfDeletando(false)
+    if (!error) {
+      setDespesasFixas(prev => prev.filter((d: any) => d.id !== dfEditando.id))
+      setDfModalOpen(false)
+    } else {
+      console.error('Erro ao deletar despesa fixa:', error)
+      setDfErro(error.message || 'Não foi possível deletar. Tente novamente.')
+    }
+  }
+
+  function iniciarPagamento(df: any) {
+    setDfErro('')
+    if (df.valor_variavel) {
+      setDfPagando(df)
+      setValorPagar(Number(df.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
+      setPagarModalOpen(true)
+    } else {
+      efetivarPagamento(df, Number(df.valor))
+    }
+  }
+
+  async function efetivarPagamento(df: any, valor: number) {
+    setPagando(true)
+    const fid   = familiaIdRef.current
+    const agora = new Date()
+    const hora  = `${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}`
+    // Data real do pagamento (hoje), não a data de vencimento — evita lançamentos "no futuro"
+    // já marcados como pagos quando você quita a conta antes do dia de vencer.
+    const dataStr = dataLocalISO(agora)
+    const ehReceita = df.tipo === 'receita'
+    const { error } = await supabase.from('lancamentos').insert({
+      familia_id: fid, user_id: userId, tipo: ehReceita ? 'receita' : 'despesa', valor,
+      categoria: df.categoria, membro: membroAtual, data: dataStr, hora,
+      dizimar: ehReceita && !df.empresa_id, descricao: null, despesa_fixa_id: df.id,
+      empresa_id: df.empresa_id || null,
+    })
+    if (!error) {
+      // Despesas fixas ainda não têm seletor de posição no cadastro — se quiser aplicar um
+      // pagamento recorrente numa posição, edite o lançamento gerado aqui embaixo (em Movimentos)
+      // e escolha a posição por lá.
+      // Para valores variáveis, o valor confirmado vira a nova referência do próximo mês
+      if (df.valor_variavel && valor !== Number(df.valor)) {
+        await supabase.from('despesas_fixas').update({ valor }).eq('id', df.id)
+        await recarregarDespesasFixas(fid)
+      }
+      await carregarLancamentos(fid)
+      await carregarFaturasPendentes(fid, contas)
+    } else {
+      console.error('Erro ao registrar pagamento:', error)
+      setDfErro(error.message || 'Não foi possível registrar o pagamento. Tente novamente.')
+    }
+    setPagando(false)
+    if (!error) setPagarModalOpen(false)
+  }
+
+  async function confirmarPagamentoVariavel() {
+    if (!dfPagando || !valorPagar) return
+    const valorNum = parseFloat(valorPagar.replace(/\./g, '').replace(',', '.'))
+    if (isNaN(valorNum) || valorNum <= 0) return
+    await efetivarPagamento(dfPagando, valorNum)
+  }
+
+  async function desfazerPagamento(df: any) {
+    if (!df.lancamento) return
+    const { error } = await supabase.from('lancamentos').delete().eq('id', df.lancamento.id)
+    if (!error) {
+      if (df.lancamento.posicao_investimento_id) {
+        await removerAporteDoLancamento(df.lancamento.id)
+      }
+      await carregarLancamentos(familiaIdRef.current)
+    }
+    else console.error('Erro ao desfazer pagamento:', error)
+  }
+
+  const fixasDoMes = despesasFixas.map((df: any) => {
+    const lanc = lancamentos.find((l: any) => l.despesa_fixa_id === df.id)
+    const hoje = new Date()
+    const ehMesAtual = hoje.getFullYear() === mesRef.getFullYear() && hoje.getMonth() === mesRef.getMonth()
+    const atrasada = !lanc && ehMesAtual && hoje.getDate() > df.dia_vencimento
+    return { ...df, tipo: df.tipo === 'receita' ? 'receita' : 'despesa', lancamento: lanc, pago: !!lanc, atrasada }
+  })
+  const fixasDespesas = fixasDoMes.filter((f: any) => f.tipo === 'despesa')
+  const fixasReceitas = fixasDoMes.filter((f: any) => f.tipo === 'receita')
+  const totalDespesasFixasPendentes = fixasDespesas.filter((f: any) => !f.pago).reduce((s: number, f: any) => s + Number(f.valor), 0)
+  const totalReceitasFixasPendentes = fixasReceitas.filter((f: any) => !f.pago).reduce((s: number, f: any) => s + Number(f.valor), 0)
+
+  // Fluxo de caixa projetado do mês
+  const hojeProj      = new Date()
+  const diasNoMes     = new Date(mesRef.getFullYear(), mesRef.getMonth() + 1, 0).getDate()
+  const ehMesAtualProj = hojeProj.getFullYear() === mesRef.getFullYear() && hojeProj.getMonth() === mesRef.getMonth()
+  const percorridoMes = ehMesAtualProj ? Math.round((Math.min(hojeProj.getDate(), diasNoMes) / diasNoMes) * 100) : 100
+
+  const idsCartoes = new Set(contas.filter((c: any) => c.tipo === 'cartao_credito').map((c: any) => c.id))
+
   const filtrados = lancamentos.filter(l => {
+    if (idsCartoes.has(l.conta_id)) return false // lançamentos de cartão só aparecem dentro do card da fatura, não duplicados aqui
     if (filtro !== 'todos' && l.tipo !== filtro) return false
     if (filtroMembro !== 'todos' && l.membro !== filtroMembro) return false
+    if (filtroCategoria !== 'todos' && l.categoria !== filtroCategoria) return false
+    if (busca.trim() && !(l.descricao || '').toLowerCase().includes(busca.trim().toLowerCase())) return false
     return true
   })
+
+  const categoriasPresentes = Array.from(new Set(
+    lancamentos
+      .filter(l => !idsCartoes.has(l.conta_id))
+      .filter(l => filtro === 'todos' || l.tipo === filtro)
+      .map(l => l.categoria)
+  )).sort()
 
   const grupos: Record<string, any[]> = {}
   filtrados.forEach(l => {
@@ -244,11 +793,344 @@ export default function MovimentosPage() {
   })
   const diasOrdenados = Object.keys(grupos).sort((a, b) => b.localeCompare(a))
 
+  // Só o dia mais recente vem aberto por padrão — os outros ficam recolhidos numa faixa
+  // fina (data + total), só expandindo quando clicado. Evita lista gigante de cara.
+  function diaEstaExpandido(dia: string, idx: number) {
+    if (dia in diaOverride) return diaOverride[dia]
+    return idx === 0
+  }
+  function toggleDia(dia: string, idx: number) {
+    setDiaOverride(prev => ({ ...prev, [dia]: !diaEstaExpandido(dia, idx) }))
+  }
+  const diasVisiveis = diasOrdenados.slice(0, limiteDias)
+  const temMaisDias   = diasOrdenados.length > limiteDias
+
   const totalRec = lancamentos.filter(l => l.tipo === 'receita').reduce((s, l) => s + Number(l.valor), 0)
-  const totalDes = lancamentos.filter(l => l.tipo === 'despesa').reduce((s, l) => s + Number(l.valor), 0)
+  // Aportes em investimento/meta não contam como despesa de consumo — mesma regra já aplicada
+  // no Dashboard e na Linha do Tempo, pra "Resultado do mês" bater igual nas três telas.
+  // Bate com o saldo real do banco: aportes em investimento/meta saíram fisicamente da conta,
+  // então contam como despesa aqui (diferente da Reserva de Emergência no Dashboard, que
+  // olha só despesa de consumo).
+  // Compra em cartão de crédito (fatura_paga === false) só conta como despesa quando a fatura é paga.
+  const totalDes = lancamentos.filter(l => l.tipo === 'despesa' && l.fatura_paga !== false).reduce((s, l) => s + Number(l.valor), 0)
   const resultado = totalRec - totalDes
+  const saldoProjetado = resultado + totalReceitasFixasPendentes - totalDespesasFixasPendentes
   const mesLabel  = `${MESES[mesRef.getMonth()]} ${mesRef.getFullYear()}`
-  const categorias = tipo === 'despesa' ? CATEGORIAS_DESPESA : CATEGORIAS_RECEITA
+  const categorias = contextoAtivo.tipo === 'empresa'
+    ? (tipo === 'despesa' ? CATEGORIAS_EMPRESA_DESPESA : CATEGORIAS_EMPRESA_RECEITA)
+    : (tipo === 'despesa' ? CATEGORIAS_DESPESA : CATEGORIAS_RECEITA)
+
+  // Seção "Despesas Fixas" — compartilhada entre mobile e desktop
+  const despesasFixasSection = (isMob: boolean) => (
+    <div style={{ marginBottom: isMob ? '16px' : '24px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+        <button onClick={() => setDespesasFixasAberto(!despesasFixasAberto)}
+          style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+          <Repeat size={isMob ? 14 : 16} color="#64748B" strokeWidth={1.75} />
+          <span style={{ fontSize: isMob ? '13px' : '15px', fontWeight: 700, color: '#0B3B2E', letterSpacing: '-0.2px' }}>Despesas Fixas</span>
+          {totalDespesasFixasPendentes > 0 && (
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#EF4444', backgroundColor: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.25)', padding: '5px 12px', borderRadius: '999px' }}>
+              {fmt(totalDespesasFixasPendentes)} a pagar
+            </span>
+          )}
+          <ChevronDown size={16} color="#94A3B8" strokeWidth={2} style={{ transform: despesasFixasAberto ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+        </button>
+        <button onClick={abrirDfModalNovo} className="df-new-btn"
+          style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 600, color: '#0B3B2E', background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: '10px', padding: '6px 12px', cursor: 'pointer' }}>
+          <Plus size={14} strokeWidth={2.5} /> Nova
+        </button>
+      </div>
+
+      {despesasFixasAberto && (
+      fixasDespesas.length === 0 ? (
+        <div style={{ backgroundColor: '#fff', border: '1px solid #ECEFF3', borderRadius: '20px', padding: '24px', textAlign: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 12px 40px rgba(0,0,0,0.07)' }}>
+          <p style={{ fontSize: '13px', color: '#94A3B8', margin: 0 }}>Nenhuma despesa fixa cadastrada.</p>
+        </div>
+      ) : (
+        <div style={{ backgroundColor: '#fff', border: '1px solid #ECEFF3', borderRadius: '20px', overflow: 'hidden', boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 12px 40px rgba(0,0,0,0.07)' }}>
+          {fixasDespesas.map((df: any, i: number) => {
+            const Icon = ICONES_CAT[df.categoria] || MoreHorizontal
+            return (
+              <div key={df.id} className="df-card"
+                style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: isMob ? '12px 14px' : '14px 20px', borderTop: i > 0 ? '1px solid #F1F5F9' : 'none' }}>
+                <button onClick={() => abrirDfModalEditar(df)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'rgba(11,59,46,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Icon size={15} color="#0B3B2E" strokeWidth={1.75} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <p style={{ fontSize: '13px', fontWeight: 600, color: '#111827', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{df.nome}</p>
+                      {df.valor_variavel && (
+                        <span style={{ fontSize: '9.5px', fontWeight: 700, color: '#94A3B8', border: '1px solid #E5E7EB', borderRadius: '5px', padding: '1px 5px', flexShrink: 0 }}>VARIÁVEL</span>
+                      )}
+                    </div>
+                    <p style={{ fontSize: '11px', color: '#94A3B8', margin: 0 }}>
+                      Vence dia {df.dia_vencimento} · {df.valor_variavel && !df.pago ? '~' : ''}{fmt(Number(df.valor))}
+                    </p>
+                  </div>
+                </button>
+                {df.pago ? (
+                  <button onClick={() => desfazerPagamento(df)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 14px', borderRadius: '999px', border: '1px solid rgba(47,179,106,0.25)', backgroundColor: 'rgba(47,179,106,0.12)', color: '#2FB36A', fontSize: '11px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
+                    <CheckCircle2 size={12} strokeWidth={2} /> Pago
+                  </button>
+                ) : (
+                  <button onClick={() => iniciarPagamento(df)}
+                    style={{ padding: '5px 14px', borderRadius: '999px', border: df.atrasada ? '1px solid rgba(239,68,68,0.25)' : '1px solid #E5E7EB', backgroundColor: df.atrasada ? 'rgba(239,68,68,0.10)' : '#F7F8FA', color: df.atrasada ? '#EF4444' : '#64748B', fontSize: '11px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
+                    {df.atrasada ? 'Atrasada' : 'A pagar'}
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )
+      )}
+    </div>
+  )
+
+  // Seção "Faturas de Cartão" — compartilhada entre mobile e desktop, só aparece se houver cartões
+  const faturasCartaoSection = (isMob: boolean) => {
+    const cartoes = contas.filter((c: any) => c.tipo === 'cartao_credito')
+    if (cartoes.length === 0) return null
+    return (
+      <div style={{ marginBottom: isMob ? '16px' : '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+          <CreditCard size={isMob ? 14 : 16} color="#64748B" strokeWidth={1.75} />
+          <span style={{ fontSize: isMob ? '13px' : '15px', fontWeight: 700, color: '#0B3B2E', letterSpacing: '-0.2px' }}>Faturas de Cartão</span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {cartoes.map((c: any) => {
+            const pendente = faturasPendentes[c.id] || 0
+            const expandido = cartaoDetalhado === c.id
+            return (
+              <div key={c.id} style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '14px', overflow: 'hidden' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isMob ? '12px 14px' : '14px 18px' }}>
+                  <div>
+                    <p style={{ fontSize: isMob ? '13px' : '14px', fontWeight: 600, color: '#0F172A', margin: 0 }}>{c.nome}</p>
+                    <p style={{ fontSize: '11.5px', color: '#94A3B8', margin: '2px 0 0' }}>
+                      {pendente > 0 ? `${fmt(pendente)} na fatura atual` : 'Sem pendências'}
+                      {' · '}
+                      <button onClick={() => toggleDetalheCartao(c.id)} style={{ background: 'none', border: 'none', color: '#0E3B2E', fontWeight: 600, cursor: 'pointer', padding: 0, fontSize: '11.5px' }}>
+                        {expandido ? 'Ocultar' : 'Detalhar'}
+                      </button>
+                    </p>
+                  </div>
+                  {pendente > 0 && (
+                    <button onClick={() => handlePagarFatura(c.id)} disabled={pagandoFatura === c.id}
+                      style={{ padding: '8px 14px', borderRadius: '10px', border: 'none', backgroundColor: '#0E3B2E', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: pagandoFatura === c.id ? 'not-allowed' : 'pointer', flexShrink: 0 }}>
+                      {pagandoFatura === c.id ? 'Pagando...' : 'Pagar fatura'}
+                    </button>
+                  )}
+                  <button onClick={() => abrirEditarCartao(c)} title="Editar cartão"
+                    style={{ width: '32px', height: '32px', borderRadius: '9px', border: '1px solid #E2E8F0', backgroundColor: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, marginLeft: '8px' }}>
+                    <Pencil size={13} color="#64748B" strokeWidth={1.75} />
+                  </button>
+                </div>
+                {expandido && (
+                  <div style={{ borderTop: '1px solid #F1F5F9' }}>
+                    <p style={{ padding: '8px 14px 0', fontSize: '10.5px', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      {mesLabel}
+                    </p>
+                    {carregandoDetalheCartao ? (
+                      <p style={{ padding: '16px', fontSize: '12.5px', color: '#94A3B8', textAlign: 'center' }}>Carregando...</p>
+                    ) : itensCartaoDetalhe.length === 0 ? (
+                      <p style={{ padding: '16px', fontSize: '12.5px', color: '#94A3B8', textAlign: 'center' }}>Nenhum lançamento nesse cartão ainda.</p>
+                    ) : (
+                      itensCartaoDetalhe.map((l: any, i: number) => (
+                        <button key={l.id} onClick={() => abrirModalEditar(l)}
+                          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderTop: i > 0 ? '1px solid #F1F5F9' : 'none', background: 'none', border: i > 0 ? '1px solid #F1F5F9' : 'none', borderLeft: 'none', borderRight: 'none', borderBottom: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ fontSize: '12.5px', fontWeight: 500, color: '#0F172A', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.descricao || l.categoria}</p>
+                            <p style={{ fontSize: '11px', color: '#94A3B8', margin: 0 }}>{new Date(l.data + 'T12:00:00').toLocaleDateString('pt-BR')}</p>
+                          </div>
+                          <span style={{
+                            fontSize: '10px', fontWeight: 600, padding: '2px 8px', borderRadius: '999px', flexShrink: 0,
+                            backgroundColor: l.fatura_paga ? '#ECFDF5' : '#FFFBEB',
+                            color: l.fatura_paga ? '#2F8F68' : '#B7791F',
+                          }}>
+                            {l.fatura_paga ? 'Pago' : 'Pendente'}
+                          </span>
+                          <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#EF4444', flexShrink: 0, minWidth: '70px', textAlign: 'right' }}>
+                            {fmt(Number(l.valor))}
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
+
+  const dfModalContent = (isMob: boolean) => (
+    <>
+      {isMob && <div style={{ width: '40px', height: '4px', borderRadius: '2px', backgroundColor: '#E2E8F0', margin: '12px auto 4px', flexShrink: 0 }} />}
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', borderBottom: '1px solid #F1F5F9', flexShrink: 0 }}>
+        <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0B3B2E', margin: 0, letterSpacing: '-0.3px' }}>
+          {dfEditando ? 'Editar despesa fixa' : 'Nova despesa fixa'}
+        </h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {dfEditando && (
+            <button onClick={handleDeletarDf} disabled={dfDeletando}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 700, border: 'none', cursor: 'pointer', backgroundColor: dfConfirmDelete ? '#EF4444' : 'rgba(239,68,68,0.10)', color: dfConfirmDelete ? '#fff' : '#DC2626', transition: 'all 0.15s ease' }}>
+              <Trash2 size={13} strokeWidth={2} />
+              {dfDeletando ? 'Deletando...' : dfConfirmDelete ? 'Confirmar' : 'Deletar'}
+            </button>
+          )}
+          <button onClick={() => setDfModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}>
+            <X size={20} strokeWidth={2} />
+          </button>
+        </div>
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto', padding: '18px 24px 8px' }}>
+
+        {/* Tipo */}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+          {[{ key: 'despesa', label: 'Despesa', cor: '#EF4444' }, { key: 'receita', label: 'Receita', cor: '#10B981' }].map(t => (
+            <button key={t.key} onClick={() => handleDfTipo(t.key as any)}
+              style={{ flex: 1, padding: '10px', borderRadius: '12px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', border: `2px solid ${dfTipo === t.key ? t.cor : '#E2E8F0'}`, backgroundColor: dfTipo === t.key ? t.cor + '12' : '#fff', color: dfTipo === t.key ? t.cor : '#64748B' }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Nome</p>
+        <input value={dfNome} onChange={e => setDfNome(e.target.value)} placeholder="Ex: Aluguel" className="df-input"
+          style={{ width: '100%', height: '52px', padding: '0 16px', borderRadius: '14px', border: '1.5px solid #E5E7EB', backgroundColor: '#FAFAFA', fontSize: '14px', color: '#111827', marginBottom: '16px', boxSizing: 'border-box' }} />
+
+        <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Valor {dfVariavel ? 'de referência' : ''}</p>
+        <input
+          type="text" inputMode="numeric" value={dfValor} className="df-input"
+          onChange={e => {
+            const digits = e.target.value.replace(/\D/g, '')
+            const num = parseInt(digits || '0', 10)
+            setDfValor(digits === '' ? '' : (num / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
+          }}
+          placeholder="0,00"
+          style={{ width: '100%', height: '52px', padding: '0 16px', borderRadius: '14px', border: '1.5px solid #E5E7EB', backgroundColor: '#FAFAFA', fontSize: '14px', color: '#111827', marginBottom: '10px', boxSizing: 'border-box' }} />
+
+        <button onClick={() => setDfVariavel(!dfVariavel)}
+          style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '10px 14px', borderRadius: '12px', border: dfVariavel ? '1.5px solid #2FB36A' : '1.5px solid #E5E7EB', backgroundColor: dfVariavel ? '#F0FDF4' : '#FAFAFA', cursor: 'pointer', marginBottom: '16px', boxSizing: 'border-box' }}>
+          <div style={{ position: 'relative', width: '36px', height: '20px', borderRadius: '10px', backgroundColor: dfVariavel ? '#2FB36A' : '#E2E8F0', flexShrink: 0 }}>
+            <div style={{ position: 'absolute', top: '2px', left: dfVariavel ? '18px' : '2px', width: '16px', height: '16px', borderRadius: '50%', backgroundColor: '#fff', transition: 'left 0.2s' }} />
+          </div>
+          <div style={{ textAlign: 'left' }}>
+            <p style={{ fontSize: '13px', fontWeight: 700, color: dfVariavel ? '#0B3B2E' : '#111827', margin: 0 }}>Valor variável</p>
+            <p style={{ fontSize: '11px', color: '#94A3B8', margin: 0 }}>
+              {dfVariavel ? 'Você confirma o valor ao marcar como pago' : 'O valor é sempre o mesmo (ex: aluguel, internet)'}
+            </p>
+          </div>
+        </button>
+
+        <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Categoria</p>
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '16px' }}>
+          {(contextoAtivo.tipo === 'empresa'
+              ? (dfTipo === 'despesa' ? CATEGORIAS_EMPRESA_DESPESA : CATEGORIAS_EMPRESA_RECEITA)
+              : (dfTipo === 'despesa' ? CATEGORIAS_DESPESA : CATEGORIAS_RECEITA)).map(c => {
+            const Icon = ICONES_CAT[c] || MoreHorizontal
+            const ativo = dfCategoria === c
+            return (
+              <button key={c} onClick={() => setDfCategoria(c)} className="df-chip"
+                style={{ padding: '8px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', border: ativo ? '1.5px solid #2FB36A' : '1.5px solid #E5E7EB', backgroundColor: ativo ? '#F0FDF4' : '#fff', color: ativo ? '#0B3B2E' : '#64748B', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', minWidth: '64px' }}>
+                <Icon size={14} strokeWidth={1.75} color={ativo ? '#2FB36A' : '#94A3B8'} />
+                {c}
+              </button>
+            )
+          })}
+        </div>
+
+        <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Dia de vencimento</p>
+        <input type="number" min="1" max="31" value={dfDia} onChange={e => setDfDia(e.target.value)} className="df-input"
+          style={{ width: '100%', height: '52px', padding: '0 16px', borderRadius: '14px', border: '1.5px solid #E5E7EB', backgroundColor: '#FAFAFA', fontSize: '14px', color: '#111827', marginBottom: '8px', boxSizing: 'border-box' }} />
+
+        {dfConfirmDelete && (
+          <p style={{ fontSize: '12px', color: '#EF4444', textAlign: 'center', marginBottom: '4px' }}>
+            Toque em "Confirmar" para deletar permanentemente.
+          </p>
+        )}
+      </div>
+
+      <div style={{ padding: '14px 24px 24px', borderTop: '1px solid #F1F5F9', backgroundColor: '#fff', flexShrink: 0 }}>
+        {dfErro && (
+          <p style={{ fontSize: '12.5px', color: '#DC2626', textAlign: 'center', marginBottom: '10px', backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', padding: '8px 12px' }}>
+            {dfErro}
+          </p>
+        )}
+        <button onClick={handleSalvarDf} disabled={dfSalvando || !dfNome.trim() || !dfValor} className="df-cta"
+          style={{
+            width: '100%', height: '56px', borderRadius: '16px', border: 'none', fontSize: '15px', fontWeight: 700, color: '#fff',
+            cursor: dfSalvando || !dfNome.trim() || !dfValor ? 'not-allowed' : 'pointer',
+            background: 'linear-gradient(135deg, #05281F 0%, #0C342A 55%, #0E3B2F 100%)',
+            boxShadow: '0 4px 16px rgba(11,59,46,0.3)',
+            opacity: dfSalvando || !dfNome.trim() || !dfValor ? 0.6 : 1,
+          }}>
+          {dfSalvando ? 'Salvando...' : dfEditando ? 'Salvar alterações' : 'Criar despesa fixa'}
+        </button>
+      </div>
+    </>
+  )
+
+  // Conteúdo do modal de confirmação de pagamento (despesas variáveis)
+  const pagarModalContent = (isMob: boolean) => (
+    <>
+      {isMob && <div style={{ width: '40px', height: '4px', borderRadius: '2px', backgroundColor: '#E2E8F0', margin: '12px auto 4px', flexShrink: 0 }} />}
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', borderBottom: '1px solid #F1F5F9', flexShrink: 0 }}>
+        <div>
+          <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0B3B2E', margin: 0, letterSpacing: '-0.3px' }}>Confirmar pagamento</h2>
+          <p style={{ fontSize: '12px', color: '#94A3B8', margin: '2px 0 0' }}>{dfPagando?.nome}</p>
+        </div>
+        <button onClick={() => setPagarModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}>
+          <X size={20} strokeWidth={2} />
+        </button>
+      </div>
+
+      <div style={{ padding: '18px 24px 8px' }}>
+        <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>
+          Valor pago esse mês
+        </p>
+        <input
+          type="text" inputMode="numeric" value={valorPagar} className="df-input" autoFocus
+          onChange={e => {
+            const digits = e.target.value.replace(/\D/g, '')
+            const num = parseInt(digits || '0', 10)
+            setValorPagar(digits === '' ? '' : (num / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
+          }}
+          placeholder="0,00"
+          style={{ width: '100%', height: '56px', padding: '0 16px', borderRadius: '14px', border: '1.5px solid #E5E7EB', backgroundColor: '#FAFAFA', fontSize: '20px', fontWeight: 700, color: '#111827', marginBottom: '8px', boxSizing: 'border-box' }} />
+        <p style={{ fontSize: '11px', color: '#94A3B8', margin: '0 0 16px' }}>
+          Essa despesa é variável — o valor confirmado vira a referência do próximo mês.
+        </p>
+      </div>
+
+      <div style={{ padding: '14px 24px 24px', borderTop: '1px solid #F1F5F9', backgroundColor: '#fff', flexShrink: 0 }}>
+        {dfErro && (
+          <p style={{ fontSize: '12.5px', color: '#DC2626', textAlign: 'center', marginBottom: '10px', backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', padding: '8px 12px' }}>
+            {dfErro}
+          </p>
+        )}
+        <button onClick={confirmarPagamentoVariavel} disabled={pagando || !valorPagar} className="df-cta"
+          style={{
+            width: '100%', height: '56px', borderRadius: '16px', border: 'none', fontSize: '15px', fontWeight: 700, color: '#fff',
+            cursor: pagando || !valorPagar ? 'not-allowed' : 'pointer',
+            background: 'linear-gradient(135deg, #05281F 0%, #0C342A 55%, #0E3B2F 100%)',
+            boxShadow: '0 4px 16px rgba(11,59,46,0.3)',
+            opacity: pagando || !valorPagar ? 0.6 : 1,
+          }}>
+          {pagando ? 'Registrando...' : 'Confirmar pagamento'}
+        </button>
+      </div>
+    </>
+  )
 
   // Conteúdo do modal compartilhado
   const modalContent = (isMob: boolean) => (
@@ -277,6 +1159,48 @@ export default function MovimentosPage() {
 
       {/* Scroll area */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px 8px' }}>
+
+        {/* Lançando em — mini-seletor de contexto */}
+        {!editando && (
+          <div style={{ position: 'relative', marginBottom: '14px' }}>
+            <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Lançando em</p>
+            <button type="button" onClick={() => setContextoAberto(!contextoAberto)}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '12px', border: `1.5px solid ${contextoAtivo.tipo === 'empresa' ? 'rgba(20,90,69,0.35)' : '#E2E8F0'}`, backgroundColor: contextoAtivo.tipo === 'empresa' ? '#F0FDF4' : '#F8FAFC', cursor: 'pointer' }}>
+              <div style={{ width: '28px', height: '28px', borderRadius: '8px', flexShrink: 0, backgroundColor: contextoAtivo.tipo === 'empresa' ? '#14574518' : '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {contextoAtivo.tipo === 'empresa'
+                  ? <Building2 size={14} color="#145A45" strokeWidth={1.75} />
+                  : <Users size={14} color="#64748B" strokeWidth={1.75} />}
+              </div>
+              <span style={{ flex: 1, textAlign: 'left', fontSize: '13.5px', fontWeight: 600, color: '#0F172A' }}>{contextoAtivo.nome}</span>
+              {contextoAtivo.tipo === 'empresa' && (
+                <span style={{ fontSize: '10px', fontWeight: 700, color: '#145A45', backgroundColor: '#D1FAE5', padding: '2px 7px', borderRadius: '999px' }}>PJ</span>
+              )}
+              <ChevronDown size={15} color="#94A3B8" strokeWidth={2} style={{ transform: contextoAberto ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+            </button>
+            {contextoAberto && (
+              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 8px 24px rgba(0,0,0,0.1)', zIndex: 10, overflow: 'hidden' }}>
+                <button type="button" onClick={() => { trocarContexto({ tipo: 'pessoal', nome: familiaNome }); handleTipo(tipo) }}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                  <Users size={14} color="#64748B" strokeWidth={1.75} />
+                  <span style={{ flex: 1, fontSize: '13px', color: '#0F172A' }}>{familiaNome}</span>
+                  {contextoAtivo.tipo === 'pessoal' && <Check size={14} color="#145A45" strokeWidth={2.5} />}
+                </button>
+                {empresas.map((emp: any) => (
+                  <button key={emp.id} type="button" onClick={() => { trocarContexto({ tipo: 'empresa', empresaId: emp.id, nome: emp.nome }); handleTipo(tipo) }}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: 'none', border: 'none', borderTop: '1px solid #F1F5F9', cursor: 'pointer', textAlign: 'left' }}>
+                    <Building2 size={14} color="#145A45" strokeWidth={1.75} />
+                    <span style={{ flex: 1, fontSize: '13px', color: '#0F172A' }}>{emp.nome}</span>
+                    {contextoAtivo.tipo === 'empresa' && contextoAtivo.empresaId === emp.id && <Check size={14} color="#145A45" strokeWidth={2.5} />}
+                  </button>
+                ))}
+                <a href="/dashboard/perfil"
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderTop: '1px solid #F1F5F9', textDecoration: 'none', color: '#145A45', fontSize: '13px', fontWeight: 600 }}>
+                  <Plus size={14} strokeWidth={2.5} /> Adicionar empresa (CNPJ)
+                </a>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Tipo */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
@@ -316,18 +1240,85 @@ export default function MovimentosPage() {
 
         {/* Categoria */}
         <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Categoria</p>
-        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', marginBottom: '10px', paddingBottom: '4px' }}>
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
           {categorias.map(c => {
             const Icon = ICONES_CAT[c] || MoreHorizontal
             return (
               <button key={c} onClick={() => setCategoria(c)}
-                style={{ padding: '8px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 500, cursor: 'pointer', border: `1px solid ${categoria === c ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: categoria === c ? '#F0FDF4' : '#fff', color: categoria === c ? '#0E3B2E' : '#64748B', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flexShrink: 0, minWidth: '64px' }}>
+                style={{ padding: '8px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 500, cursor: 'pointer', border: `1px solid ${categoria === c ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: categoria === c ? '#F0FDF4' : '#fff', color: categoria === c ? '#0E3B2E' : '#64748B', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', minWidth: '64px' }}>
                 <Icon size={14} strokeWidth={1.75} color={categoria === c ? '#0E3B2E' : '#94A3B8'} />
                 {c}
               </button>
             )
           })}
         </div>
+
+        {/* Conta — só aparece pra despesa */}
+        {tipo === 'despesa' && (
+          <div style={{ marginBottom: '10px' }}>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Conta</p>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {contas.map((c: any) => (
+                <button key={c.id} onClick={() => setContaSelecionadaId(c.id)}
+                  style={{ padding: '8px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 500, cursor: 'pointer', border: `1px solid ${contaSelecionadaId === c.id ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: contaSelecionadaId === c.id ? '#F0FDF4' : '#fff', color: contaSelecionadaId === c.id ? '#0E3B2E' : '#64748B' }}>
+                  {c.nome}
+                </button>
+              ))}
+              <button onClick={() => { setEditandoCartaoId(null); setNovoCartaoNome(''); setNovoCartaoFechamento(''); setNovoCartaoVencimento(''); setNovoCartaoOpen(true) }}
+                style={{ padding: '8px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 500, cursor: 'pointer', border: '1px dashed #CBD5E1', backgroundColor: '#fff', color: '#64748B' }}>
+                + Novo cartão
+              </button>
+            </div>
+            {contaSelecionadaId && contas.find((c: any) => c.id === contaSelecionadaId)?.tipo === 'cartao_credito' && (
+              <>
+                <p style={{ fontSize: '11px', color: '#94A3B8', marginTop: '6px' }}>
+                  Fica pendente até você pagar a fatura desse cartão — não conta no Saldo em conta ainda.
+                </p>
+                {!parcelado && (() => {
+                  const cartaoForm = contas.find((c: any) => c.id === contaSelecionadaId)
+                  if (!cartaoForm.dia_fechamento || !cartaoForm.dia_vencimento) return null
+                  const dataCompra = new Date(dataLanc + 'T12:00:00')
+                  const empurrou = dataCompra.getDate() > cartaoForm.dia_fechamento
+                  let mesFatura = dataCompra.getMonth()
+                  if (empurrou) mesFatura += 1
+                  const dataFatura = new Date(dataCompra.getFullYear(), mesFatura, cartaoForm.dia_vencimento)
+                  return (
+                    <p style={{ fontSize: '11px', color: '#1D4ED8', backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '8px', padding: '6px 10px', marginTop: '6px' }}>
+                      {empurrou
+                        ? `Compra depois do fechamento (dia ${cartaoForm.dia_fechamento}) — vai pra fatura de ${dataFatura.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}, vencendo dia ${cartaoForm.dia_vencimento}.`
+                        : `Entra na fatura deste mês, vencendo dia ${cartaoForm.dia_vencimento}.`}
+                    </p>
+                  )
+                })()}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Aplicar em posição — só aparece pra despesa categoria Investimento(s) */}
+        {tipo === 'despesa' && ehCategoriaInvestimento(categoria) && (
+          <div style={{ marginBottom: '10px' }}>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Aplicar em qual posição?</p>
+            {posicoesRF.length === 0 ? (
+              <p style={{ fontSize: '12px', color: '#94A3B8', backgroundColor: '#F8FAFC', border: '1px solid #F1F5F9', borderRadius: '12px', padding: '10px 12px' }}>
+                Nenhuma posição de Renda Fixa cadastrada ainda — esse lançamento não vai render em nenhuma posição. Cadastre uma em Investimentos primeiro, se quiser aplicar.
+              </p>
+            ) : (
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                <button onClick={() => setPosicaoAporteId('')}
+                  style={{ padding: '8px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 500, cursor: 'pointer', border: `1px solid ${posicaoAporteId === '' ? '#94A3B8' : '#E2E8F0'}`, backgroundColor: posicaoAporteId === '' ? '#F1F5F9' : '#fff', color: '#64748B' }}>
+                  Nenhuma
+                </button>
+                {posicoesRF.map((p: any) => (
+                  <button key={p.id} onClick={() => setPosicaoAporteId(p.id)}
+                    style={{ padding: '8px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 500, cursor: 'pointer', border: `1px solid ${posicaoAporteId === p.id ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: posicaoAporteId === p.id ? '#F0FDF4' : '#fff', color: posicaoAporteId === p.id ? '#0E3B2E' : '#64748B' }}>
+                    {p.nome}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Data + Dízimo */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', alignItems: 'center' }}>
@@ -371,9 +1362,36 @@ export default function MovimentosPage() {
                 </div>
                 <div>
                   <p style={{ fontSize: '11px', fontWeight: 600, color: '#1D4ED8', marginBottom: '4px' }}>Dia de vencimento</p>
-                  <input type="number" min="1" max="31" value={diaParcela} onChange={e => setDiaParcela(e.target.value)}
-                    style={{ width: '100%', padding: '6px 10px', borderRadius: '8px', border: '1px solid #BFDBFE', fontSize: '16px', fontWeight: 700, color: '#1D4ED8', outline: 'none', backgroundColor: '#fff', boxSizing: 'border-box' }} />
+                  {(() => {
+                    const contaForm = contas.find(c => c.id === contaSelecionadaId)
+                    if (contaForm?.tipo === 'cartao_credito' && contaForm.dia_vencimento) {
+                      return (
+                        <div style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #BFDBFE', backgroundColor: '#fff', fontSize: '13px', fontWeight: 700, color: '#1D4ED8' }}>
+                          Dia {contaForm.dia_vencimento} <span style={{ fontWeight: 500, color: '#64748B', fontSize: '11px' }}>(do cartão)</span>
+                        </div>
+                      )
+                    }
+                    return (
+                      <input type="number" min="1" max="31" value={diaParcela} onChange={e => setDiaParcela(e.target.value)}
+                        style={{ width: '100%', padding: '6px 10px', borderRadius: '8px', border: '1px solid #BFDBFE', fontSize: '16px', fontWeight: 700, color: '#1D4ED8', outline: 'none', backgroundColor: '#fff', boxSizing: 'border-box' }} />
+                    )
+                  })()}
                 </div>
+                {(() => {
+                  const contaForm = contas.find(c => c.id === contaSelecionadaId)
+                  if (contaForm?.tipo === 'cartao_credito' && contaForm.dia_fechamento) {
+                    const diaCompra = new Date(dataLanc + 'T12:00:00').getDate()
+                    const empurrou = diaCompra > contaForm.dia_fechamento
+                    return (
+                      <div style={{ gridColumn: '1 / -1', fontSize: '11px', color: '#1D4ED8', backgroundColor: '#fff', padding: '6px 10px', borderRadius: '8px', border: '1px solid #BFDBFE' }}>
+                        {empurrou
+                          ? `Compra depois do fechamento (dia ${contaForm.dia_fechamento}) — a 1ª parcela cai na fatura do mês seguinte.`
+                          : `Compra antes do fechamento (dia ${contaForm.dia_fechamento}) — a 1ª parcela entra na fatura deste mês.`}
+                      </div>
+                    )
+                  }
+                  return null
+                })()}
                 {valor && (
                   <div style={{ gridColumn: '1 / -1', padding: '8px', backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #BFDBFE', textAlign: 'center' }}>
                     <p style={{ fontSize: '12px', color: '#64748B', margin: 0 }}>
@@ -414,15 +1432,66 @@ export default function MovimentosPage() {
 
   return (
     <>
+      <style jsx>{`
+        .df-card { transition: background-color 0.15s ease; }
+        .df-card:hover { background-color: #F7F8FA; }
+        .df-new-btn { transition: all 0.15s ease; }
+        .df-new-btn:hover { border-color: #2FB36A !important; background-color: #F0FDF4 !important; color: #0B3B2E !important; }
+        .df-chip { transition: all 0.15s ease; }
+        .df-chip:hover { border-color: #2FB36A; }
+        .df-input { transition: all 0.2s ease; }
+        .df-input:focus { border-color: #2FB36A !important; background-color: #fff !important; box-shadow: 0 0 0 3px rgba(47,179,106,0.12); outline: none; }
+        .df-cta { transition: all 0.15s ease; }
+        .df-cta:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(11,59,46,0.35); }
+        .mov-cta:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(11,59,46,0.4) !important; }
+        .mov-row:hover { background-color: #FAFBFC !important; }
+      `}</style>
+
       {/* ── MOBILE ── */}
       <div className="lg:hidden" style={{ backgroundColor: '#F8FAFC', minHeight: '100vh', paddingBottom: '100px' }}>
-        <div style={{ backgroundColor: '#0E3B2E', padding: '20px 20px 36px' }}>
+        <div style={{
+          backgroundColor: '#0E3B2E', padding: '20px 20px 36px',
+          border: contextoAtivo.tipo === 'empresa' ? '1.5px solid rgba(47,179,106,0.4)' : 'none',
+          borderTop: 'none', borderLeft: 'none', borderRight: 'none',
+        }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <h1 style={{ fontSize: '18px', fontWeight: 600, color: '#fff', margin: 0 }}>Fluxo Patrimonial</h1>
+            <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+              <button onClick={() => setContextoAbertoHeader(!contextoAbertoHeader)}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', padding: 0, maxWidth: '100%' }}>
+                <h1 style={{ fontSize: '18px', fontWeight: 600, color: '#fff', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {contextoAtivo.nome || 'Fluxo Patrimonial'}
+                </h1>
+                {contextoAtivo.tipo === 'empresa' && (
+                  <span style={{ fontSize: '9.5px', fontWeight: 700, color: '#0E3B2E', backgroundColor: '#58D68D', padding: '2px 6px', borderRadius: '999px', flexShrink: 0 }}>PJ</span>
+                )}
+                <ChevronDown size={14} color="rgba(255,255,255,0.6)" style={{ transform: contextoAbertoHeader ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }} />
+              </button>
               <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>{mesLabel}</p>
+
+              {contextoAbertoHeader && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '8px', width: '240px', backgroundColor: '#fff', borderRadius: '14px', border: '1px solid #E2E8F0', boxShadow: '0 12px 32px rgba(0,0,0,0.2)', zIndex: 20, overflow: 'hidden' }}>
+                  <button onClick={() => { trocarContexto({ tipo: 'pessoal', nome: familiaNome }); setContextoAbertoHeader(false) }}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                    <Users size={15} color="#64748B" strokeWidth={1.75} />
+                    <span style={{ flex: 1, fontSize: '13.5px', color: '#0F172A' }}>{familiaNome}</span>
+                    {contextoAtivo.tipo === 'pessoal' && <Check size={15} color="#145A45" strokeWidth={2.5} />}
+                  </button>
+                  {empresas.map((emp: any) => (
+                    <button key={emp.id} onClick={() => { trocarContexto({ tipo: 'empresa', empresaId: emp.id, nome: emp.nome }); setContextoAbertoHeader(false) }}
+                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', background: 'none', border: 'none', borderTop: '1px solid #F1F5F9', cursor: 'pointer', textAlign: 'left' }}>
+                      <Building2 size={15} color="#145A45" strokeWidth={1.75} />
+                      <span style={{ flex: 1, fontSize: '13.5px', color: '#0F172A' }}>{emp.nome}</span>
+                      {contextoAtivo.tipo === 'empresa' && contextoAtivo.empresaId === emp.id && <Check size={15} color="#145A45" strokeWidth={2.5} />}
+                    </button>
+                  ))}
+                  <a href="/dashboard/perfil"
+                    style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', borderTop: '1px solid #F1F5F9', textDecoration: 'none', color: '#145A45', fontSize: '13.5px', fontWeight: 600 }}>
+                    <Plus size={15} strokeWidth={2.5} /> Adicionar empresa (CNPJ)
+                  </a>
+                </div>
+              )}
             </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
               <button onClick={() => mudarMes(-1)} style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.1)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                 <ChevronLeft size={16} color="#fff" />
               </button>
@@ -445,15 +1514,48 @@ export default function MovimentosPage() {
               </div>
               <p style={{ fontSize: '11px', fontWeight: 500, color: '#64748B', marginBottom: '4px' }}>{c.label}</p>
               <p style={{ fontSize: '13px', fontWeight: 600, color: c.cor, lineHeight: 1.2 }}>
-                {loading ? '...' : `R$ ${Math.abs(c.val).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                {loading ? '...' : `R$ ${Math.abs(c.val).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
               </p>
             </div>
           ))}
         </div>
 
+        <div style={{ padding: '0 16px' }}>
+          {despesasFixasSection(true)}
+          {faturasCartaoSection(true)}
+        </div>
+
+        {contextoAtivo.tipo === 'pessoal' && !loading && familiaId && (
+          <div style={{ padding: '0 16px' }}>
+            <OrcamentosSection
+              supabase={supabase}
+              familiaId={familiaId}
+              mesRef={mesRef}
+              lancamentos={lancamentos}
+              isMobile
+            />
+          </div>
+        )}
+
+        <div style={{ padding: '0 16px 10px' }}>
+          <div style={{ position: 'relative' }}>
+            <Search size={15} color="#94A3B8" strokeWidth={1.75} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
+            <input
+              type="text" value={busca} onChange={e => setBusca(e.target.value)}
+              placeholder="Buscar por observação..."
+              style={{ width: '100%', height: '42px', paddingLeft: '38px', paddingRight: busca ? '38px' : '14px', borderRadius: '12px', border: '1px solid #E2E8F0', backgroundColor: '#fff', fontSize: '13px', color: '#0F172A', outline: 'none', boxSizing: 'border-box' }} />
+            {busca && (
+              <button onClick={() => setBusca('')}
+                style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}>
+                <X size={15} strokeWidth={2} />
+              </button>
+            )}
+          </div>
+        </div>
+
         <div style={{ display: 'flex', gap: '8px', padding: '0 16px 8px', overflowX: 'auto' }}>
           {[{ key: 'todos', label: 'Todos' }, { key: 'receita', label: 'Receitas' }, { key: 'despesa', label: 'Despesas' }].map(f => (
-            <button key={f.key} onClick={() => setFiltro(f.key as any)}
+            <button key={f.key} onClick={() => { setFiltro(f.key as any); setFiltroCategoria('todos') }}
               style={{ padding: '6px 16px', borderRadius: '999px', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap', border: `1px solid ${filtro === f.key ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: filtro === f.key ? '#0E3B2E' : '#fff', color: filtro === f.key ? '#fff' : '#64748B', cursor: 'pointer' }}>
               {f.label}
             </button>
@@ -466,17 +1568,23 @@ export default function MovimentosPage() {
           ))}
         </div>
 
-        <div style={{ padding: '0 16px' }}>
-          {!loading && familiaId && (
-            <OrcamentosSection
-              supabase={supabase}
-              familiaId={familiaId}
-              mesRef={mesRef}
-              lancamentos={lancamentos}
-              isMobile
-            />
-          )}
+        {categoriasPresentes.length > 0 && (
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', padding: '0 16px 12px' }}>
+            {categoriasPresentes.map(c => {
+              const Icon = ICONES_CAT[c] || MoreHorizontal
+              const ativo = filtroCategoria === c
+              return (
+                <button key={c} onClick={() => setFiltroCategoria(ativo ? 'todos' : c)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 12px', borderRadius: '999px', fontSize: '11.5px', fontWeight: 600, whiteSpace: 'nowrap', border: `1px solid ${ativo ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: ativo ? '#0E3B2E' : '#fff', color: ativo ? '#fff' : '#64748B', cursor: 'pointer' }}>
+                  <Icon size={12} strokeWidth={1.75} color={ativo ? '#fff' : '#94A3B8'} />
+                  {c}
+                </button>
+              )
+            })}
+          </div>
+        )}
 
+        <div style={{ padding: '0 16px' }}>
           {loading ? (
             <p style={{ textAlign: 'center', padding: '64px 0', fontSize: '14px', color: '#94A3B8' }}>Carregando...</p>
           ) : diasOrdenados.length === 0 ? (
@@ -484,46 +1592,78 @@ export default function MovimentosPage() {
               <Wallet size={32} color="#E2E8F0" strokeWidth={1} />
               <p style={{ fontSize: '14px', color: '#94A3B8' }}>Nenhum lançamento neste período.</p>
             </div>
-          ) : diasOrdenados.map(dia => {
+          ) : diasVisiveis.map((dia, idx) => {
             const itens    = grupos[dia]
-            const totalDia = itens.reduce((s, l) => s + (l.tipo === 'receita' ? Number(l.valor) : -Number(l.valor)), 0)
+            const totalDia = itens.filter((l: any) => l.tipo === 'receita' || l.fatura_paga !== false).reduce((s, l) => s + (l.tipo === 'receita' ? Number(l.valor) : -Number(l.valor)), 0)
+            const expandido = diaEstaExpandido(dia, idx)
             return (
-              <div key={dia} style={{ marginBottom: '16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', padding: '0 4px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{formatDiaLabel(dia)}</span>
-                  <span style={{ fontSize: '11px', fontWeight: 600, color: totalDia >= 0 ? '#10B981' : '#EF4444' }}>
-                    {totalDia >= 0 ? '+' : '-'} {fmt(Math.abs(totalDia))}
-                  </span>
-                </div>
-                <div style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', overflow: 'hidden' }}>
-                  {itens.map((l: any, i: number) => {
-                    const Icon = ICONES_CAT[l.categoria] || (l.tipo === 'receita' ? ArrowDownLeft : ArrowUpRight)
-                    return (
-                      <button key={l.id} onClick={() => abrirModalEditar(l)}
-                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderTop: i > 0 ? '1px solid #F1F5F9' : 'none', backgroundColor: 'transparent', border: i > 0 ? '1px solid #F1F5F9' : 'none', borderLeft: 'none', borderRight: 'none', borderBottom: 'none', cursor: 'pointer', textAlign: 'left' }}>
-                        <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: l.tipo === 'receita' ? '#ECFDF5' : '#FEF2F2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <Icon size={16} color={l.tipo === 'receita' ? '#10B981' : '#EF4444'} strokeWidth={1.75} />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ fontSize: '14px', fontWeight: 500, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{l.categoria}</p>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <p style={{ fontSize: '12px', color: '#94A3B8', margin: 0 }}>{l.membro?.split(' ')[0]} · {l.hora}</p>
-                            {l.descricao && <AlignLeft size={10} color="#94A3B8" strokeWidth={1.75} />}
+              <div key={dia} style={{ marginBottom: '10px' }}>
+                {expandido ? (
+                  <button onClick={() => toggleDia(dia, idx)}
+                    style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', padding: '0 4px', background: 'none', border: 'none', cursor: 'pointer' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      {formatDiaLabel(dia)}
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: totalDia >= 0 ? '#10B981' : '#EF4444' }}>
+                        {totalDia >= 0 ? '+' : '-'} {fmt(Math.abs(totalDia))}
+                      </span>
+                      <ChevronDown size={14} color="#94A3B8" style={{ transform: 'rotate(180deg)', transition: 'transform 0.15s' }} />
+                    </span>
+                  </button>
+                ) : (
+                  <button onClick={() => toggleDia(dia, idx)}
+                    style={{ display: 'flex', width: '100%', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#fff', border: '1px solid #E2E8F0', borderRadius: '14px', cursor: 'pointer' }}>
+                    <div style={{ width: '38px', height: '38px', borderRadius: '50%', backgroundColor: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Calendar size={16} color="#64748B" strokeWidth={1.75} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                      <p style={{ fontSize: '13.5px', fontWeight: 600, color: '#0F172A', margin: 0 }}>{formatDiaLabel(dia)}</p>
+                      <p style={{ fontSize: '12px', color: '#94A3B8', margin: '1px 0 0' }}>{itens.length} lançamento{itens.length > 1 ? 's' : ''}</p>
+                    </div>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: totalDia >= 0 ? '#10B981' : '#EF4444', flexShrink: 0 }}>
+                      {totalDia >= 0 ? '+' : '-'} {fmt(Math.abs(totalDia))}
+                    </span>
+                    <ChevronDown size={16} color="#CBD5E1" strokeWidth={2} style={{ flexShrink: 0 }} />
+                  </button>
+                )}
+                {expandido && (
+                  <div style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', overflow: 'hidden' }}>
+                    {itens.map((l: any, i: number) => {
+                      const Icon = ICONES_CAT[l.categoria] || (l.tipo === 'receita' ? ArrowDownLeft : ArrowUpRight)
+                      return (
+                        <button key={l.id} onClick={() => abrirModalEditar(l)}
+                          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderTop: i > 0 ? '1px solid #F1F5F9' : 'none', backgroundColor: 'transparent', border: i > 0 ? '1px solid #F1F5F9' : 'none', borderLeft: 'none', borderRight: 'none', borderBottom: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                          <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: l.tipo === 'receita' ? '#ECFDF5' : '#FEF2F2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <Icon size={16} color={l.tipo === 'receita' ? '#10B981' : '#EF4444'} strokeWidth={1.75} />
                           </div>
-                        </div>
-                        <p style={{ fontSize: '14px', fontWeight: 600, color: l.tipo === 'receita' ? '#10B981' : '#EF4444', flexShrink: 0, margin: 0 }}>
-                          {l.tipo === 'receita' ? '+' : '-'} {fmt(Number(l.valor))}
-                        </p>
-                        <div style={{ width: '28px', height: '28px', borderRadius: '8px', backgroundColor: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <Pencil size={12} color="#64748B" strokeWidth={1.75} />
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ fontSize: '14px', fontWeight: 500, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{l.categoria}</p>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <p style={{ fontSize: '12px', color: '#94A3B8', margin: 0 }}>{l.membro?.split(' ')[0]} · {l.hora}</p>
+                              {l.descricao && <AlignLeft size={10} color="#94A3B8" strokeWidth={1.75} />}
+                            </div>
+                          </div>
+                          <p style={{ fontSize: '14px', fontWeight: 600, color: l.tipo === 'receita' ? '#10B981' : '#EF4444', flexShrink: 0, margin: 0 }}>
+                            {l.tipo === 'receita' ? '+' : '-'} {fmt(Number(l.valor))}
+                          </p>
+                          <div style={{ width: '28px', height: '28px', borderRadius: '8px', backgroundColor: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <Pencil size={12} color="#64748B" strokeWidth={1.75} />
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             )
           })}
+          {temMaisDias && (
+            <button onClick={() => setLimiteDias(prev => prev + 15)}
+              style={{ width: '100%', height: '44px', borderRadius: '12px', border: '1px solid #E2E8F0', backgroundColor: '#fff', color: '#0E3B2E', fontSize: '13px', fontWeight: 600, cursor: 'pointer', marginBottom: '8px' }}>
+              Carregar mais
+            </button>
+          )}
         </div>
 
         <button onClick={abrirModalNovo}
@@ -533,15 +1673,52 @@ export default function MovimentosPage() {
       </div>
 
       {/* ── DESKTOP ── */}
-      <div className="hidden lg:block p-8 max-w-[1440px] mx-auto" style={{ backgroundColor: '#F8FAFC' }}>
+      <div className="hidden lg:block p-8 max-w-[1440px] mx-auto" style={{ backgroundColor: '#F7F9FB' }}>
         <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', letterSpacing: '-0.5px' }}>Fluxo Patrimonial</h1>
-            <p className="text-sm mt-1" style={{ color: '#64748B' }}>Acompanhe receitas e despesas{familiaNome ? ` da família ${familiaNome}` : ''}</p>
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => setContextoAbertoHeader(!contextoAbertoHeader)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 10px', marginLeft: '-10px', borderRadius: '10px',
+                backgroundColor: contextoAtivo.tipo === 'empresa' ? 'rgba(20,90,69,0.06)' : 'transparent',
+              }}>
+              <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', letterSpacing: '-0.5px' }}>{contextoAtivo.nome || 'Fluxo Patrimonial'}</h1>
+              {contextoAtivo.tipo === 'empresa' && (
+                <span style={{ fontSize: '11px', fontWeight: 700, color: '#145A45', backgroundColor: '#D1FAE5', padding: '3px 9px', borderRadius: '999px' }}>PJ</span>
+              )}
+              <ChevronDown size={18} color="#94A3B8" style={{ transform: contextoAbertoHeader ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+            </button>
+            <p className="text-sm mt-1" style={{ color: '#64748B' }}>Acompanhe receitas e despesas{contextoAtivo.tipo === 'pessoal' && familiaNome ? ` da família ${familiaNome}` : ''}</p>
+
+            {contextoAbertoHeader && (
+              <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '6px', width: '260px', backgroundColor: '#fff', borderRadius: '14px', border: '1px solid #E2E8F0', boxShadow: '0 12px 32px rgba(0,0,0,0.12)', zIndex: 20, overflow: 'hidden' }}>
+                <button onClick={() => { trocarContexto({ tipo: 'pessoal', nome: familiaNome }); setContextoAbertoHeader(false) }}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                  <Users size={15} color="#64748B" strokeWidth={1.75} />
+                  <span style={{ flex: 1, fontSize: '13.5px', color: '#0F172A' }}>{familiaNome}</span>
+                  {contextoAtivo.tipo === 'pessoal' && <Check size={15} color="#145A45" strokeWidth={2.5} />}
+                </button>
+                {empresas.map((emp: any) => (
+                  <button key={emp.id} onClick={() => { trocarContexto({ tipo: 'empresa', empresaId: emp.id, nome: emp.nome }); setContextoAbertoHeader(false) }}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', background: 'none', border: 'none', borderTop: '1px solid #F1F5F9', cursor: 'pointer', textAlign: 'left' }}>
+                    <Building2 size={15} color="#145A45" strokeWidth={1.75} />
+                    <span style={{ flex: 1, fontSize: '13.5px', color: '#0F172A' }}>{emp.nome}</span>
+                    {contextoAtivo.tipo === 'empresa' && contextoAtivo.empresaId === emp.id && <Check size={15} color="#145A45" strokeWidth={2.5} />}
+                  </button>
+                ))}
+                <a href="/dashboard/perfil"
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', borderTop: '1px solid #F1F5F9', textDecoration: 'none', color: '#145A45', fontSize: '13.5px', fontWeight: 600 }}>
+                  <Plus size={15} strokeWidth={2.5} /> Adicionar empresa (CNPJ)
+                </a>
+              </div>
+            )}
           </div>
-          <button onClick={abrirModalNovo}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white hover:opacity-90"
-            style={{ backgroundColor: '#0F766E', boxShadow: '0 4px 12px rgba(15,118,110,0.3)', border: 'none', cursor: 'pointer' }}>
+          <button onClick={abrirModalNovo} className="mov-cta"
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 22px', borderRadius: '14px',
+              fontSize: '14px', fontWeight: 600, color: '#fff', border: 'none', cursor: 'pointer',
+              background: 'linear-gradient(135deg, #07271F 0%, #145A45 100%)',
+              boxShadow: '0 4px 16px rgba(11,59,46,0.3)', transition: 'all 0.15s ease',
+            }}>
             <Plus size={16} strokeWidth={2.5} /> Novo lançamento
           </button>
         </div>
@@ -562,17 +1739,25 @@ export default function MovimentosPage() {
             { label: 'Despesas', val: totalDes, cor: '#EF4444', bg: '#FEF2F2', Icon: ArrowUpRight },
             { label: 'Resultado do mês', val: resultado, cor: '#F59E0B', bg: '#FFFBEB', Icon: Wallet },
           ].map(c => (
-            <div key={c.label} className="rounded-[20px] p-6 border" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+            <div key={c.label} className="rounded-[20px] p-6" style={{
+              backgroundColor: '#fff', border: '1px solid rgba(15,23,42,0.06)',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 12px 40px rgba(0,0,0,0.07)', transition: 'all 0.2s ease',
+            }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px) scale(1.01)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 16px 48px rgba(15,23,42,0.08)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'none'; (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 6px rgba(0,0,0,0.04), 0 12px 40px rgba(0,0,0,0.07)' }}>
               <div className="w-11 h-11 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: c.bg }}>
                 <c.Icon size={19} color={c.cor} strokeWidth={1.75} />
               </div>
               <p className="text-sm font-medium mb-1" style={{ color: '#64748B' }}>{c.label}</p>
-              <p className="text-2xl font-semibold" style={{ color: c.cor, letterSpacing: '-0.5px' }}>{loading ? '...' : fmt(c.val)}</p>
+              <p className="text-[30px] font-bold" style={{ color: c.cor, letterSpacing: '-0.5px' }}>{loading ? '...' : fmt(c.val)}</p>
             </div>
           ))}
         </div>
 
-        {!loading && familiaId && (
+        {despesasFixasSection(false)}
+        {faturasCartaoSection(false)}
+
+        {contextoAtivo.tipo === 'pessoal' && !loading && familiaId && (
           <OrcamentosSection
             supabase={supabase}
             familiaId={familiaId}
@@ -584,7 +1769,7 @@ export default function MovimentosPage() {
         <div className="flex items-center gap-3 mb-5 flex-wrap">
           <div className="flex items-center gap-1 p-1 rounded-xl" style={{ backgroundColor: '#F1F5F9' }}>
             {[{ key: 'todos', label: 'Todos' }, { key: 'receita', label: 'Receitas' }, { key: 'despesa', label: 'Despesas' }].map(f => (
-              <button key={f.key} onClick={() => setFiltro(f.key as any)}
+              <button key={f.key} onClick={() => { setFiltro(f.key as any); setFiltroCategoria('todos') }}
                 className="px-4 py-2 rounded-lg text-sm font-medium"
                 style={{ backgroundColor: filtro === f.key ? '#fff' : 'transparent', color: filtro === f.key ? '#0F172A' : '#64748B', boxShadow: filtro === f.key ? '0 1px 3px rgba(0,0,0,0.08)' : 'none', border: 'none', cursor: 'pointer' }}>
                 {f.label}
@@ -605,9 +1790,43 @@ export default function MovimentosPage() {
               </button>
             ))}
           </div>
+
+          <div style={{ position: 'relative', marginLeft: 'auto', minWidth: '260px' }}>
+            <Search size={15} color="#94A3B8" strokeWidth={1.75} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
+            <input
+              type="text" value={busca} onChange={e => setBusca(e.target.value)}
+              placeholder="Buscar por observação..."
+              style={{ width: '100%', height: '38px', paddingLeft: '38px', paddingRight: busca ? '38px' : '14px', borderRadius: '10px', border: '1px solid #E2E8F0', backgroundColor: '#fff', fontSize: '13px', color: '#0F172A', outline: 'none', boxSizing: 'border-box' }} />
+            {busca && (
+              <button onClick={() => setBusca('')}
+                style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}>
+                <X size={15} strokeWidth={2} />
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="rounded-[20px] border overflow-hidden" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+        {categoriasPresentes.length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap mb-5">
+            {categoriasPresentes.map(c => {
+              const Icon = ICONES_CAT[c] || MoreHorizontal
+              const ativo = filtroCategoria === c
+              return (
+                <button key={c} onClick={() => setFiltroCategoria(ativo ? 'todos' : c)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
+                  style={{ border: `1px solid ${ativo ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: ativo ? '#0E3B2E' : '#fff', color: ativo ? '#fff' : '#64748B', cursor: 'pointer' }}>
+                  <Icon size={12} strokeWidth={1.75} color={ativo ? '#fff' : '#94A3B8'} />
+                  {c}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        <div className="rounded-[20px] overflow-hidden" style={{
+          backgroundColor: '#fff', border: '1px solid rgba(15,23,42,0.06)',
+          boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 12px 40px rgba(0,0,0,0.07)',
+        }}>
           {loading ? (
             <p className="text-sm text-center py-16" style={{ color: '#94A3B8' }}>Carregando...</p>
           ) : diasOrdenados.length === 0 ? (
@@ -616,22 +1835,48 @@ export default function MovimentosPage() {
               <p className="text-sm" style={{ color: '#94A3B8' }}>Nenhum lançamento neste período.</p>
               <button onClick={abrirModalNovo} className="text-sm font-semibold hover:underline" style={{ color: '#0F766E', background: 'none', border: 'none', cursor: 'pointer' }}>Registrar primeiro lançamento →</button>
             </div>
-          ) : diasOrdenados.map(dia => {
+          ) : diasVisiveis.map((dia, idx) => {
             const itens    = grupos[dia]
-            const totalDia = itens.reduce((s, l) => s + (l.tipo === 'receita' ? Number(l.valor) : -Number(l.valor)), 0)
+            const totalDia = itens.filter((l: any) => l.tipo === 'receita' || l.fatura_paga !== false).reduce((s, l) => s + (l.tipo === 'receita' ? Number(l.valor) : -Number(l.valor)), 0)
+            const expandido = diaEstaExpandido(dia, idx)
             return (
-              <div key={dia}>
-                <div className="flex items-center justify-between px-6 py-3" style={{ backgroundColor: '#F8FAFC' }}>
-                  <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#64748B' }}>{formatDiaLabel(dia)}</span>
-                  <span className="text-xs font-semibold" style={{ color: totalDia >= 0 ? '#10B981' : '#EF4444' }}>
-                    {totalDia >= 0 ? '+' : '-'} {fmt(Math.abs(totalDia))}
-                  </span>
-                </div>
-                {itens.map((l: any) => {
+              <div key={dia} style={{ borderBottom: !expandido ? '1px solid #F1F5F9' : 'none' }}>
+                {expandido ? (
+                  <button onClick={() => toggleDia(dia, idx)}
+                    className="w-full flex items-center justify-between px-6 py-3"
+                    style={{ backgroundColor: '#F8FAFC', border: 'none', cursor: 'pointer' }}>
+                    <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#64748B' }}>
+                      {formatDiaLabel(dia)}
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <span className="text-xs font-semibold" style={{ color: totalDia >= 0 ? '#10B981' : '#EF4444' }}>
+                        {totalDia >= 0 ? '+' : '-'} {fmt(Math.abs(totalDia))}
+                      </span>
+                      <ChevronDown size={14} color="#94A3B8" style={{ transform: 'rotate(180deg)', transition: 'transform 0.15s' }} />
+                    </span>
+                  </button>
+                ) : (
+                  <button onClick={() => toggleDia(dia, idx)}
+                    className="w-full flex items-center gap-3 px-6 py-4 hover:bg-gray-50"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                    <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#F1F5F9' }}>
+                      <Calendar size={15} color="#64748B" strokeWidth={1.75} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>{formatDiaLabel(dia)}</p>
+                      <p className="text-xs" style={{ color: '#94A3B8' }}>{itens.length} lançamento{itens.length > 1 ? 's' : ''}</p>
+                    </div>
+                    <span className="text-sm font-semibold flex-shrink-0" style={{ color: totalDia >= 0 ? '#10B981' : '#EF4444' }}>
+                      {totalDia >= 0 ? '+' : '-'} {fmt(Math.abs(totalDia))}
+                    </span>
+                    <ChevronDown size={16} color="#CBD5E1" strokeWidth={2} style={{ flexShrink: 0 }} />
+                  </button>
+                )}
+                {expandido && itens.map((l: any) => {
                   const Icon = ICONES_CAT[l.categoria] || (l.tipo === 'receita' ? ArrowDownLeft : ArrowUpRight)
                   return (
                     <button key={l.id} onClick={() => abrirModalEditar(l)}
-                      className="w-full flex items-center gap-3 px-6 py-3.5 border-t text-left hover:bg-gray-50"
+                      className="w-full flex items-center gap-3 px-6 py-3.5 border-t text-left mov-row"
                       style={{ borderColor: '#F1F5F9', background: 'none', cursor: 'pointer' }}>
                       <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
                         style={{ backgroundColor: l.tipo === 'receita' ? '#ECFDF5' : '#FEF2F2' }}>
@@ -658,6 +1903,13 @@ export default function MovimentosPage() {
               </div>
             )
           })}
+          {temMaisDias && (
+            <button onClick={() => setLimiteDias(prev => prev + 15)}
+              className="w-full py-3 text-sm font-semibold hover:bg-gray-50"
+              style={{ color: '#0E3B2E', background: 'none', border: 'none', borderTop: '1px solid #F1F5F9', cursor: 'pointer' }}>
+              Carregar mais
+            </button>
+          )}
         </div>
       </div>
 
@@ -677,6 +1929,90 @@ export default function MovimentosPage() {
           style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
           <div style={{ width: '520px', backgroundColor: '#fff', borderRadius: '20px', display: 'flex', flexDirection: 'column', maxHeight: '90vh', margin: 'auto' }}>
             {modalContent(false)}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Despesa Fixa — Mobile */}
+      {dfModalOpen && isMobile && (
+        <div onClick={e => { if (e.target === e.currentTarget) setDfModalOpen(false) }}
+          style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
+          <div style={{ width: '100%', backgroundColor: '#fff', borderRadius: '28px 28px 0 0', display: 'flex', flexDirection: 'column', maxHeight: 'calc(85vh - 65px)', marginBottom: '65px' }}>
+            {dfModalContent(true)}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Despesa Fixa — Desktop */}
+      {dfModalOpen && !isMobile && (
+        <div onClick={e => { if (e.target === e.currentTarget) setDfModalOpen(false) }}
+          style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
+          <div style={{ width: '480px', backgroundColor: '#fff', borderRadius: '20px', display: 'flex', flexDirection: 'column', maxHeight: '90vh', margin: 'auto' }}>
+            {dfModalContent(false)}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Confirmar Pagamento — Mobile */}
+      {pagarModalOpen && isMobile && (
+        <div onClick={e => { if (e.target === e.currentTarget) setPagarModalOpen(false) }}
+          style={{ position: 'fixed', inset: 0, zIndex: 55, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
+          <div style={{ width: '100%', backgroundColor: '#fff', borderRadius: '28px 28px 0 0', display: 'flex', flexDirection: 'column', marginBottom: '65px' }}>
+            {pagarModalContent(true)}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Confirmar Pagamento — Desktop */}
+      {pagarModalOpen && !isMobile && (
+        <div onClick={e => { if (e.target === e.currentTarget) setPagarModalOpen(false) }}
+          style={{ position: 'fixed', inset: 0, zIndex: 55, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
+          <div style={{ width: '420px', backgroundColor: '#fff', borderRadius: '20px', display: 'flex', flexDirection: 'column', margin: 'auto' }}>
+            {pagarModalContent(false)}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Novo Cartão */}
+      {novoCartaoOpen && (
+        <div onClick={e => { if (e.target === e.currentTarget) fecharModalCartao() }}
+          style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
+          <div style={{ width: isMobile ? '100%' : '380px', backgroundColor: '#fff', borderRadius: isMobile ? '28px 28px 0 0' : '20px', padding: '24px' }}>
+            {isMobile && <div style={{ width: '40px', height: '4px', borderRadius: '2px', backgroundColor: '#E2E8F0', margin: '-8px auto 16px' }} />}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', margin: 0 }}>{editandoCartaoId ? 'Editar cartão' : 'Novo cartão de crédito'}</h2>
+              <button onClick={fecharModalCartao} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}>
+                <X size={20} strokeWidth={2} />
+              </button>
+            </div>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Nome</p>
+            <input type="text" value={novoCartaoNome} onChange={e => setNovoCartaoNome(e.target.value)}
+              placeholder="Ex: Nubank, Inter..."
+              style={{ width: '100%', height: '44px', padding: '0 14px', borderRadius: '12px', border: '1px solid #E2E8F0', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box', marginBottom: '12px' }} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+              <div>
+                <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Dia de fechamento</p>
+                <input type="number" min="1" max="31" value={novoCartaoFechamento} onChange={e => setNovoCartaoFechamento(e.target.value)}
+                  placeholder="Ex: 20"
+                  style={{ width: '100%', height: '44px', padding: '0 14px', borderRadius: '12px', border: '1px solid #E2E8F0', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Dia de vencimento</p>
+                <input type="number" min="1" max="31" value={novoCartaoVencimento} onChange={e => setNovoCartaoVencimento(e.target.value)}
+                  placeholder="Ex: 27"
+                  style={{ width: '100%', height: '44px', padding: '0 14px', borderRadius: '12px', border: '1px solid #E2E8F0', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box' }} />
+              </div>
+            </div>
+            <button onClick={handleCriarCartao} disabled={salvandoCartao || !novoCartaoNome.trim()}
+              style={{ width: '100%', height: '46px', borderRadius: '12px', border: 'none', backgroundColor: '#0E3B2E', color: '#fff', fontSize: '14px', fontWeight: 600, cursor: salvandoCartao || !novoCartaoNome.trim() ? 'not-allowed' : 'pointer', opacity: salvandoCartao || !novoCartaoNome.trim() ? 0.6 : 1, marginBottom: editandoCartaoId ? '10px' : 0 }}>
+              {salvandoCartao ? 'Salvando...' : editandoCartaoId ? 'Salvar alterações' : 'Criar cartão'}
+            </button>
+            {editandoCartaoId && (
+              <button onClick={handleDeletarCartao} disabled={deletandoCartao}
+                style={{ width: '100%', height: '44px', borderRadius: '12px', border: '1px solid #FCA5A5', backgroundColor: confirmDeleteCartao ? '#FEF2F2' : '#fff', color: '#DC2626', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+                {deletandoCartao ? 'Excluindo...' : confirmDeleteCartao ? 'Confirmar exclusão do cartão' : 'Excluir cartão'}
+              </button>
+            )}
           </div>
         </div>
       )}
