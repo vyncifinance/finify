@@ -578,6 +578,41 @@ export default function DashboardPage() {
                 })}
               </div>
 
+              {/* Despesas Fixas do Mês — mobile (sempre visível, respeita o contexto) */}
+              <div className="rounded-2xl border" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0' }}>
+                <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: '#F1F5F9' }}>
+                  <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>Despesas Fixas</p>
+                  <a href="/dashboard/movimentos" className="flex items-center gap-1 text-xs font-semibold" style={{ color: '#145A45' }}>
+                    Ver todas <ChevronRight size={13} strokeWidth={2} />
+                  </a>
+                </div>
+                {despesasFixas.length === 0 ? (
+                  <div className="p-6 text-center">
+                    <p className="text-sm" style={{ color: '#94A3B8' }}>Nenhuma despesa fixa cadastrada.</p>
+                  </div>
+                ) : despesasFixas.map((df: any) => {
+                  const Icon = ICONES_CAT[df.categoria] || MoreHorizontal
+                  return (
+                    <div key={df.id} className="flex items-center gap-3 px-4 py-3 border-t" style={{ borderColor: '#F1F5F9', opacity: df.pago ? 0.55 : 1 }}>
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'rgba(20,90,69,0.08)' }}>
+                        <Icon size={14} color="#145A45" strokeWidth={1.75} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate" style={{ color: '#0F172A' }}>{df.nome}</p>
+                        <p className="text-xs" style={{ color: '#94A3B8' }}>Vence dia {df.dia_vencimento} · {fmtShort(Number(df.valor))}</p>
+                      </div>
+                      <span style={{
+                        fontSize: '10px', fontWeight: 700, padding: '3px 9px', borderRadius: '999px', flexShrink: 0,
+                        backgroundColor: df.pago ? 'rgba(47,143,104,0.10)' : df.atrasada ? 'rgba(239,68,68,0.10)' : '#F7F8FA',
+                        color: df.pago ? '#2F8F68' : df.atrasada ? '#EF4444' : '#64748B',
+                      }}>
+                        {df.pago ? 'Pago' : df.atrasada ? 'Atrasada' : 'A pagar'}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+
               <div className="rounded-2xl border" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0' }}>
                 <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: '#F1F5F9' }}>
                   <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>Orçamento por Categoria</p>
@@ -622,41 +657,6 @@ export default function DashboardPage() {
               </div>
             </>
           )}
-
-          {/* Despesas Fixas do Mês — mobile (sempre visível, respeita o contexto) */}
-          <div className="rounded-2xl border" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0' }}>
-            <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: '#F1F5F9' }}>
-              <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>Despesas Fixas</p>
-              <a href="/dashboard/movimentos" className="flex items-center gap-1 text-xs font-semibold" style={{ color: '#145A45' }}>
-                Ver todas <ChevronRight size={13} strokeWidth={2} />
-              </a>
-            </div>
-            {despesasFixas.length === 0 ? (
-              <div className="p-6 text-center">
-                <p className="text-sm" style={{ color: '#94A3B8' }}>Nenhuma despesa fixa cadastrada.</p>
-              </div>
-            ) : despesasFixas.map((df: any) => {
-              const Icon = ICONES_CAT[df.categoria] || MoreHorizontal
-              return (
-                <div key={df.id} className="flex items-center gap-3 px-4 py-3 border-t" style={{ borderColor: '#F1F5F9', opacity: df.pago ? 0.55 : 1 }}>
-                  <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'rgba(20,90,69,0.08)' }}>
-                    <Icon size={14} color="#145A45" strokeWidth={1.75} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate" style={{ color: '#0F172A' }}>{df.nome}</p>
-                    <p className="text-xs" style={{ color: '#94A3B8' }}>Vence dia {df.dia_vencimento} · {fmtShort(Number(df.valor))}</p>
-                  </div>
-                  <span style={{
-                    fontSize: '10px', fontWeight: 700, padding: '3px 9px', borderRadius: '999px', flexShrink: 0,
-                    backgroundColor: df.pago ? 'rgba(47,143,104,0.10)' : df.atrasada ? 'rgba(239,68,68,0.10)' : '#F7F8FA',
-                    color: df.pago ? '#2F8F68' : df.atrasada ? '#EF4444' : '#64748B',
-                  }}>
-                    {df.pago ? 'Pago' : df.atrasada ? 'Atrasada' : 'A pagar'}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
 
           <div className="rounded-2xl border p-4" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0' }}>
             <p className="text-sm font-semibold mb-1" style={{ color: '#0F172A' }}>Despesas por Categoria</p>
@@ -1116,65 +1116,11 @@ export default function DashboardPage() {
                 </div>
               )}
             </div>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{
-              borderRadius: '20px', padding: '28px', backgroundColor: '#fff', display: 'flex', flexDirection: 'column',
-              border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
-            }}>
-              <h2 style={{ fontSize: '14px', fontWeight: 600, color: '#0B1F18', marginBottom: '2px', letterSpacing: '-0.2px' }}>Saúde Financeira</h2>
-              <p style={{ fontSize: '12px', color: '#64748B', marginBottom: '12px' }}>Score geral</p>
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px', height: '150px' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <RadialBarChart innerRadius="78%" outerRadius="100%" data={[{ value: score, fill: scoreCor }]} startAngle={90} endAngle={-270}>
-                    <RadialBar background={{ fill: '#F1F5F9' }} dataKey="value" cornerRadius={20} />
-                  </RadialBarChart>
-                </ResponsiveContainer>
-                <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                  <span style={{ fontSize: '34px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-1px', lineHeight: 1 }}>{score}</span>
-                  <span style={{ fontSize: '12px', color: '#94A3B8', marginTop: '2px' }}>de 100</span>
-                </div>
-              </div>
-              <div style={{ textAlign: 'center', marginBottom: '10px' }}>
-                <span style={{
-                  fontSize: '12.5px', fontWeight: 600, padding: '5px 14px', borderRadius: '999px',
-                  backgroundColor: scoreCor + '15', color: scoreCor,
-                }}>
-                  {scoreLabel}
-                </span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flex: 1 }}>
-                {saude.map((s, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                    {s.ok
-                      ? <CheckCircle2 size={16} color="#2F8F68" strokeWidth={1.75} style={{ flexShrink: 0, marginTop: '2px' }} />
-                      : <AlertCircle  size={16} color="#EF4444" strokeWidth={1.75} style={{ flexShrink: 0, marginTop: '2px' }} />
-                    }
-                    <div>
-                      <p style={{ fontSize: '12.5px', fontWeight: 600, color: '#0B1F18' }}>{s.label}</p>
-                      <p style={{ fontSize: '12px', color: '#94A3B8' }}>{s.desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <a href="/dashboard/movimentos" style={{
-                marginTop: '20px', textAlign: 'center', fontSize: '13.5px', fontWeight: 600, padding: '11px',
-                borderRadius: '13px', backgroundColor: '#F0FDF4', color: '#145A45', textDecoration: 'none',
-                transition: 'all 0.2s',
-              }}
-              onMouseEnter={e => (e.currentTarget as HTMLElement).style.opacity = '0.85'}
-              onMouseLeave={e => (e.currentTarget as HTMLElement).style.opacity = '1'}
-              >
-                Ver detalhes
-              </a>
-            </div>
 
             {/* Orçamento por Categoria */}
             <div style={{
               borderRadius: '20px', padding: '24px', backgroundColor: '#fff',
               border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
-              flex: 1, display: 'flex', flexDirection: 'column',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: orcamentosStatus.length === 0 ? '0' : '14px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -1234,6 +1180,57 @@ export default function DashboardPage() {
                 </div>
               )}
             </div>
+            </div>
+
+            <div style={{
+              borderRadius: '20px', padding: '28px', backgroundColor: '#fff', display: 'flex', flexDirection: 'column',
+              border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
+            }}>
+              <h2 style={{ fontSize: '14px', fontWeight: 600, color: '#0B1F18', marginBottom: '2px', letterSpacing: '-0.2px' }}>Saúde Financeira</h2>
+              <p style={{ fontSize: '12px', color: '#64748B', marginBottom: '12px' }}>Score geral</p>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px', height: '150px' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadialBarChart innerRadius="78%" outerRadius="100%" data={[{ value: score, fill: scoreCor }]} startAngle={90} endAngle={-270}>
+                    <RadialBar background={{ fill: '#F1F5F9' }} dataKey="value" cornerRadius={20} />
+                  </RadialBarChart>
+                </ResponsiveContainer>
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                  <span style={{ fontSize: '34px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-1px', lineHeight: 1 }}>{score}</span>
+                  <span style={{ fontSize: '12px', color: '#94A3B8', marginTop: '2px' }}>de 100</span>
+                </div>
+              </div>
+              <div style={{ textAlign: 'center', marginBottom: '10px' }}>
+                <span style={{
+                  fontSize: '12.5px', fontWeight: 600, padding: '5px 14px', borderRadius: '999px',
+                  backgroundColor: scoreCor + '15', color: scoreCor,
+                }}>
+                  {scoreLabel}
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flex: 1 }}>
+                {saude.map((s, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                    {s.ok
+                      ? <CheckCircle2 size={16} color="#2F8F68" strokeWidth={1.75} style={{ flexShrink: 0, marginTop: '2px' }} />
+                      : <AlertCircle  size={16} color="#EF4444" strokeWidth={1.75} style={{ flexShrink: 0, marginTop: '2px' }} />
+                    }
+                    <div>
+                      <p style={{ fontSize: '12.5px', fontWeight: 600, color: '#0B1F18' }}>{s.label}</p>
+                      <p style={{ fontSize: '12px', color: '#94A3B8' }}>{s.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <a href="/dashboard/movimentos" style={{
+                marginTop: '20px', textAlign: 'center', fontSize: '13.5px', fontWeight: 600, padding: '11px',
+                borderRadius: '13px', backgroundColor: '#F0FDF4', color: '#145A45', textDecoration: 'none',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.opacity = '0.85'}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.opacity = '1'}
+              >
+                Ver detalhes
+              </a>
             </div>
           </div>
           ) : (
