@@ -1008,7 +1008,7 @@ export default function DashboardPage() {
 
           {/* Metas + Saúde Financeira (pessoal) OU Despesas Fixas + Resultado Mensal (empresa) */}
           {contextoAtivo.tipo === 'pessoal' ? (
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px', marginBottom: '10px', alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px', marginBottom: '10px', alignItems: 'stretch' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div style={{
               borderRadius: '20px', padding: '24px', backgroundColor: '#fff',
@@ -1116,11 +1116,65 @@ export default function DashboardPage() {
                 </div>
               )}
             </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{
+              borderRadius: '20px', padding: '28px', backgroundColor: '#fff', display: 'flex', flexDirection: 'column',
+              border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
+            }}>
+              <h2 style={{ fontSize: '14px', fontWeight: 600, color: '#0B1F18', marginBottom: '2px', letterSpacing: '-0.2px' }}>Saúde Financeira</h2>
+              <p style={{ fontSize: '12px', color: '#64748B', marginBottom: '12px' }}>Score geral</p>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px', height: '150px' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadialBarChart innerRadius="78%" outerRadius="100%" data={[{ value: score, fill: scoreCor }]} startAngle={90} endAngle={-270}>
+                    <RadialBar background={{ fill: '#F1F5F9' }} dataKey="value" cornerRadius={20} />
+                  </RadialBarChart>
+                </ResponsiveContainer>
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                  <span style={{ fontSize: '34px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-1px', lineHeight: 1 }}>{score}</span>
+                  <span style={{ fontSize: '12px', color: '#94A3B8', marginTop: '2px' }}>de 100</span>
+                </div>
+              </div>
+              <div style={{ textAlign: 'center', marginBottom: '10px' }}>
+                <span style={{
+                  fontSize: '12.5px', fontWeight: 600, padding: '5px 14px', borderRadius: '999px',
+                  backgroundColor: scoreCor + '15', color: scoreCor,
+                }}>
+                  {scoreLabel}
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flex: 1 }}>
+                {saude.map((s, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                    {s.ok
+                      ? <CheckCircle2 size={16} color="#2F8F68" strokeWidth={1.75} style={{ flexShrink: 0, marginTop: '2px' }} />
+                      : <AlertCircle  size={16} color="#EF4444" strokeWidth={1.75} style={{ flexShrink: 0, marginTop: '2px' }} />
+                    }
+                    <div>
+                      <p style={{ fontSize: '12.5px', fontWeight: 600, color: '#0B1F18' }}>{s.label}</p>
+                      <p style={{ fontSize: '12px', color: '#94A3B8' }}>{s.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <a href="/dashboard/movimentos" style={{
+                marginTop: '20px', textAlign: 'center', fontSize: '13.5px', fontWeight: 600, padding: '11px',
+                borderRadius: '13px', backgroundColor: '#F0FDF4', color: '#145A45', textDecoration: 'none',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.opacity = '0.85'}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.opacity = '1'}
+              >
+                Ver detalhes
+              </a>
+            </div>
 
             {/* Orçamento por Categoria */}
             <div style={{
               borderRadius: '20px', padding: '24px', backgroundColor: '#fff',
               border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
+              flex: 1, display: 'flex', flexDirection: 'column',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: orcamentosStatus.length === 0 ? '0' : '14px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -1180,57 +1234,6 @@ export default function DashboardPage() {
                 </div>
               )}
             </div>
-            </div>
-
-            <div style={{
-              borderRadius: '20px', padding: '28px', backgroundColor: '#fff', display: 'flex', flexDirection: 'column',
-              border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 12px 40px rgba(15,23,42,0.05)',
-            }}>
-              <h2 style={{ fontSize: '14px', fontWeight: 600, color: '#0B1F18', marginBottom: '2px', letterSpacing: '-0.2px' }}>Saúde Financeira</h2>
-              <p style={{ fontSize: '12px', color: '#64748B', marginBottom: '12px' }}>Score geral</p>
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px', height: '150px' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <RadialBarChart innerRadius="78%" outerRadius="100%" data={[{ value: score, fill: scoreCor }]} startAngle={90} endAngle={-270}>
-                    <RadialBar background={{ fill: '#F1F5F9' }} dataKey="value" cornerRadius={20} />
-                  </RadialBarChart>
-                </ResponsiveContainer>
-                <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                  <span style={{ fontSize: '34px', fontWeight: 700, color: '#0B1F18', letterSpacing: '-1px', lineHeight: 1 }}>{score}</span>
-                  <span style={{ fontSize: '12px', color: '#94A3B8', marginTop: '2px' }}>de 100</span>
-                </div>
-              </div>
-              <div style={{ textAlign: 'center', marginBottom: '10px' }}>
-                <span style={{
-                  fontSize: '12.5px', fontWeight: 600, padding: '5px 14px', borderRadius: '999px',
-                  backgroundColor: scoreCor + '15', color: scoreCor,
-                }}>
-                  {scoreLabel}
-                </span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flex: 1 }}>
-                {saude.map((s, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                    {s.ok
-                      ? <CheckCircle2 size={16} color="#2F8F68" strokeWidth={1.75} style={{ flexShrink: 0, marginTop: '2px' }} />
-                      : <AlertCircle  size={16} color="#EF4444" strokeWidth={1.75} style={{ flexShrink: 0, marginTop: '2px' }} />
-                    }
-                    <div>
-                      <p style={{ fontSize: '12.5px', fontWeight: 600, color: '#0B1F18' }}>{s.label}</p>
-                      <p style={{ fontSize: '12px', color: '#94A3B8' }}>{s.desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <a href="/dashboard/movimentos" style={{
-                marginTop: '20px', textAlign: 'center', fontSize: '13.5px', fontWeight: 600, padding: '11px',
-                borderRadius: '13px', backgroundColor: '#F0FDF4', color: '#145A45', textDecoration: 'none',
-                transition: 'all 0.2s',
-              }}
-              onMouseEnter={e => (e.currentTarget as HTMLElement).style.opacity = '0.85'}
-              onMouseLeave={e => (e.currentTarget as HTMLElement).style.opacity = '1'}
-              >
-                Ver detalhes
-              </a>
             </div>
           </div>
           ) : (
