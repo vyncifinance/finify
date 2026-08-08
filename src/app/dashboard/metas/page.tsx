@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useOcultarValores, fmtOculto } from '@/hooks/useOcultarValores'
+import { aportarEmMeta } from '@/lib/metaAportes'
 import {
   Home, BookOpen, Shield, TrendingUp, Send, Heart, Star, Target,
   Plus, X, Calendar, ArrowUp, CheckCircle2, Pencil, Trash2
@@ -192,41 +193,12 @@ export default function MetasPage() {
     setSalvandoAporte(true)
     const valor = parseValorMasked(valorAporte)
 
-    if (metaSelecionada.automatica) {
-      // Meta automática: o aporte vira/soma um registro de Caixa em Patrimônio, não um lançamento de despesa
-      const NOME_BEM_RESERVA = 'Reserva de Emergência (aportes)'
-      const { data: bemExistente } = await supabase.from('bens').select('id, valor')
-        .eq('familia_id', familiaId).eq('tipo', 'caixa').eq('nome', NOME_BEM_RESERVA).maybeSingle()
-
-      if (bemExistente) {
-        await supabase.from('bens').update({ valor: Number(bemExistente.valor) + valor }).eq('id', bemExistente.id)
-      } else {
-        await supabase.from('bens').insert({
-          familia_id: familiaId, user_id: userId, nome: NOME_BEM_RESERVA,
-          tipo: 'caixa', valor, eh_divida: false,
-        })
-      }
-
-      const novoValorAtual = Number(metaSelecionada.valor_atual) + valor
-      const { error } = await supabase.from('metas').update({ valor_atual: novoValorAtual }).eq('id', metaSelecionada.id)
-      if (!error) { setAporteOpen(false); await carregarMetas(familiaId) }
-      setSalvandoAporte(false)
-      return
-    }
-
-    const novoValorAtual = Number(metaSelecionada.valor_atual) + valor
-    const { error } = await supabase.from('metas').update({ valor_atual: novoValorAtual }).eq('id', metaSelecionada.id)
-    if (!error) {
-      const agora = new Date()
-      const hora  = `${String(agora.getHours()).padStart(2,'0')}:${String(agora.getMinutes()).padStart(2,'0')}`
-      await supabase.from('lancamentos').insert({
-        familia_id: familiaId, user_id: userId, tipo: 'despesa', valor,
-        categoria: 'Investimento', membro: membroAtual,
-        data: agora.toISOString().split('T')[0], hora,
-        descricao: `Aporte para meta: ${metaSelecionada.nome}`,
-        meta_id: metaSelecionada.id,
-      })
-      setAporteOpen(false); await carregarMetas(familiaId)
+    try {
+      await aportarEmMeta({ supabase, meta: metaSelecionada, valor, familiaId, userId, membroAtual })
+      setAporteOpen(false)
+      await carregarMetas(familiaId)
+    } catch (e) {
+      console.log('Erro ao aportar:', e)
     }
     setSalvandoAporte(false)
   }

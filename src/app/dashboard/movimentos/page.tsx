@@ -10,16 +10,17 @@ import {
   Plus, Wallet, X, UtensilsCrossed, Home, Car, Smile,
   Heart, BookOpen, ShoppingBag, Church, MoreHorizontal, HandHeart,
   Briefcase, TrendingUp, Laptop, DollarSign, Trash2, Pencil,
-  CreditCard, FileText, AlignLeft, Repeat, CheckCircle2, Target,
+  CreditCard, FileText, AlignLeft, Repeat, CheckCircle2,
   Pill, Gift, Sparkles, GraduationCap, Smartphone, Shirt, Wrench, ClipboardList, Filter, Search, PawPrint,
   Building2, Truck, Landmark, Megaphone, Calculator, Users, Check
 } from 'lucide-react'
 import OrcamentosSection from './OrcamentosSection'
+import { aportarEmMeta } from '@/lib/metaAportes'
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 
-const CATEGORIAS_DESPESA = ['Alimentação','Moradia','Transporte','Lazer','Saúde','Educação','Cartão de Crédito','Dízimo','Doações','Farmácia','Presente','Estética','Estudos','Eletrônicos','Vestuário','Consertos','Serviços','Pet','Investimentos','Meta','Outros']
+const CATEGORIAS_DESPESA = ['Alimentação','Moradia','Transporte','Lazer','Saúde','Educação','Cartão de Crédito','Dízimo','Doações','Farmácia','Presente','Estética','Estudos','Eletrônicos','Vestuário','Consertos','Serviços','Pet','Investimentos','Outros']
 const CATEGORIAS_RECEITA = ['Salário','Renda Extra','Freelance','Investimento','Outros']
 
 const CATEGORIAS_EMPRESA_DESPESA = ['Fornecedores','Impostos','Pró-labore','Folha de Pagamento','Marketing','Aluguel/Sede','Software/Ferramentas','Contabilidade','Outros']
@@ -32,7 +33,7 @@ const ICONES_CAT: Record<string, any> = {
   'Farmácia': Pill, 'Presente': Gift, 'Estética': Sparkles, 'Estudos': GraduationCap,
   'Eletrônicos': Smartphone, 'Vestuário': Shirt, 'Consertos': Wrench, 'Serviços': ClipboardList,
   'Pet': PawPrint,
-  'Investimentos': TrendingUp, 'Meta': Target,
+  'Investimentos': TrendingUp,
   'Salário': Briefcase, 'Renda Extra': DollarSign, 'Freelance': Laptop, 'Investimento': TrendingUp,
   'Fornecedores': Truck, 'Impostos': Landmark, 'Pró-labore': Wallet, 'Folha de Pagamento': Users,
   'Marketing': Megaphone, 'Aluguel/Sede': Building2, 'Software/Ferramentas': Laptop, 'Contabilidade': Calculator,
@@ -118,6 +119,7 @@ export default function MovimentosPage() {
   const [posicoesRF, setPosicoesRF]       = useState<any[]>([])
   const [posicaoAporteId, setPosicaoAporteId] = useState('')
   const [metas, setMetas]                 = useState<any[]>([])
+  const [modoAporte, setModoAporte]       = useState<'posicao' | 'meta'>('posicao')
   const [metaAporteId, setMetaAporteId]   = useState('')
   const [contas, setContas]               = useState<any[]>([])
   const [contaSelecionadaId, setContaSelecionadaId] = useState('')
@@ -203,7 +205,7 @@ export default function MovimentosPage() {
       setPosicoesRF(posicoesData || [])
 
       const { data: metasData } = await supabase.from('metas')
-        .select('id, nome, valor_atual, valor_alvo').eq('familia_id', fid)
+        .select('id, nome, valor_atual, valor_alvo, automatica').eq('familia_id', fid)
         .order('created_at', { ascending: false })
       setMetas(metasData || [])
 
@@ -288,6 +290,7 @@ export default function MovimentosPage() {
     setObservacao(''); setParcelado(false); setNumParcelas('2'); setDiaParcela('1')
     setPosicaoAporteId('')
     setMetaAporteId('')
+    setModoAporte('posicao')
     const contaCorrente = contas.find(c => c.tipo === 'corrente')
     setContaSelecionadaId(contaCorrente?.id || '')
     setConfirmDelete(false)
@@ -303,6 +306,7 @@ export default function MovimentosPage() {
     setParcelado(false); setNumParcelas('2'); setDiaParcela('1')
     setPosicaoAporteId(l.posicao_investimento_id || '')
     setMetaAporteId(l.meta_id || '')
+    setModoAporte(l.meta_id ? 'meta' : 'posicao')
     const contaCorrente = contas.find(c => c.tipo === 'corrente')
     setContaSelecionadaId(l.conta_id || contaCorrente?.id || '')
     setConfirmDelete(false)
@@ -323,10 +327,6 @@ export default function MovimentosPage() {
 
   function ehCategoriaInvestimento(cat: string) {
     return cat === 'Investimento' || cat === 'Investimentos'
-  }
-
-  function ehCategoriaMeta(cat: string) {
-    return cat === 'Meta'
   }
 
   // Aplica um aporte numa posição específica de Renda Fixa, vinculado ao lançamento que o originou.
@@ -514,8 +514,6 @@ export default function MovimentosPage() {
     const empresaId = contextoAtivo.tipo === 'empresa' ? contextoAtivo.empresaId : null
     const ehInvestimentoAgora = ehCategoriaInvestimento(categoria) && tipo === 'despesa'
     const posicaoParaAporte = ehInvestimentoAgora && posicaoAporteId ? posicaoAporteId : null
-    const ehMetaAgora = ehCategoriaMeta(categoria) && tipo === 'despesa'
-    const metaParaAporte = ehMetaAgora && metaAporteId ? metaAporteId : null
 
     // Compra em cartão de crédito só sai da conta corrente quando a fatura é paga —
     // até lá, fatura_paga fica false e o lançamento não conta no Saldo em conta.
@@ -540,7 +538,6 @@ export default function MovimentosPage() {
         dizimar: tipo === 'receita' ? dizimar : false,
         descricao: observacao || null,
         posicao_investimento_id: posicaoParaAporte,
-        meta_id: metaParaAporte,
         conta_id: contaSelecionadaId || null,
         fatura_paga: faturaPagaValor,
       }).eq('id', editando.id)
@@ -550,18 +547,7 @@ export default function MovimentosPage() {
         // e seguro que tentar "diferenciar" o que mudou (valor, data ou a posição escolhida).
         await removerAporteDoLancamento(editando.id)
         if (posicaoParaAporte) await aplicarAporteEmPosicao(posicaoParaAporte, editando.id, valorNum, dataFinal)
-
-        // Meta: se trocou de meta (ou desvinculou), tira o valor antigo da meta antiga e
-        // soma o novo na meta nova — se continuou na mesma meta, só ajusta a diferença.
-        const metaAntigaId = editando.meta_id || null
-        const valorAntigo  = Number(editando.valor)
-        if (metaAntigaId && metaAntigaId !== metaParaAporte) {
-          await ajustarValorAtualMeta(metaAntigaId, -valorAntigo)
-        }
-        if (metaParaAporte) {
-          const delta = metaAntigaId === metaParaAporte ? (valorNum - valorAntigo) : valorNum
-          await ajustarValorAtualMeta(metaParaAporte, delta)
-        }
+        if (editando.meta_id) await ajustarValorAtualMeta(editando.meta_id, valorNum - Number(editando.valor))
       }
       setSalvando(false)
       if (!error) { setModalOpen(false); await carregarLancamentos(fid); await carregarFaturasPendentes(fid, contas) }
@@ -606,6 +592,26 @@ export default function MovimentosPage() {
       setSalvando(false)
       if (!error) { setModalOpen(false); await carregarLancamentos(fid); await carregarFaturasPendentes(fid, contas) }
     } else {
+      // Despesa "Investimentos" alocada pra uma meta usa o mesmo fluxo único do botão
+      // "Aportar" da tela de Metas — trata meta automática, data de hoje, descrição padrão etc.
+      // Não passa pelo insert genérico abaixo (evita divergir dos dois fluxos de novo).
+      if (ehInvestimentoAgora && modoAporte === 'meta' && metaAporteId) {
+        const meta = metas.find((m: any) => m.id === metaAporteId)
+        if (meta) {
+          try {
+            await aportarEmMeta({ supabase, meta, valor: valorNum, familiaId: fid, userId, membroAtual })
+            setSalvando(false)
+            setModalOpen(false)
+            await carregarLancamentos(fid)
+            return
+          } catch (e) {
+            console.log('Erro ao aportar em meta:', e)
+            setSalvando(false)
+            return
+          }
+        }
+      }
+
       const { data: novoLancamento, error } = await supabase.from('lancamentos').insert({
         familia_id: fid, user_id: userId, tipo, valor: valorNum,
         categoria, membro: membroForm, data: dataFinal, hora,
@@ -613,16 +619,12 @@ export default function MovimentosPage() {
         empresa_id: empresaId,
         descricao: observacao || null,
         posicao_investimento_id: posicaoParaAporte,
-        meta_id: metaParaAporte,
         conta_id: contaSelecionadaId || null,
         fatura_paga: faturaPagaValor,
       }).select().single()
 
       if (!error && novoLancamento && posicaoParaAporte) {
         await aplicarAporteEmPosicao(posicaoParaAporte, novoLancamento.id, valorNum, dataFinal)
-      }
-      if (!error && novoLancamento && metaParaAporte) {
-        await ajustarValorAtualMeta(metaParaAporte, valorNum)
       }
       setSalvando(false)
       if (!error) { setModalOpen(false); await carregarLancamentos(fid); await carregarFaturasPendentes(fid, contas) }
@@ -1333,53 +1335,71 @@ export default function MovimentosPage() {
           </div>
         )}
 
-        {/* Aplicar em posição — só aparece pra despesa categoria Investimento(s) */}
+        {/* Aporte — só aparece pra despesa categoria Investimentos, com toggle entre
+            aplicar numa posição de Renda Fixa ou alocar pra uma meta */}
         {tipo === 'despesa' && ehCategoriaInvestimento(categoria) && (
           <div style={{ marginBottom: '10px' }}>
-            <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Aplicar em qual posição?</p>
-            {posicoesRF.length === 0 ? (
-              <p style={{ fontSize: '12px', color: '#94A3B8', backgroundColor: '#F8FAFC', border: '1px solid #F1F5F9', borderRadius: '12px', padding: '10px 12px' }}>
-                Nenhuma posição de Renda Fixa cadastrada ainda — esse lançamento não vai render em nenhuma posição. Cadastre uma em Investimentos primeiro, se quiser aplicar.
-              </p>
-            ) : (
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                <button onClick={() => setPosicaoAporteId('')}
-                  style={{ padding: '8px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 500, cursor: 'pointer', border: `1px solid ${posicaoAporteId === '' ? '#94A3B8' : '#E2E8F0'}`, backgroundColor: posicaoAporteId === '' ? '#F1F5F9' : '#fff', color: '#64748B' }}>
-                  Nenhuma
-                </button>
-                {posicoesRF.map((p: any) => (
-                  <button key={p.id} onClick={() => setPosicaoAporteId(p.id)}
-                    style={{ padding: '8px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 500, cursor: 'pointer', border: `1px solid ${posicaoAporteId === p.id ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: posicaoAporteId === p.id ? '#F0FDF4' : '#fff', color: posicaoAporteId === p.id ? '#0E3B2E' : '#64748B' }}>
-                    {p.nome}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+            <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
+              <button onClick={() => setModoAporte('posicao')}
+                style={{ flex: 1, padding: '8px', borderRadius: '10px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: `1.5px solid ${modoAporte === 'posicao' ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: modoAporte === 'posicao' ? '#F0FDF4' : '#fff', color: modoAporte === 'posicao' ? '#0E3B2E' : '#64748B' }}>
+                Renda Fixa
+              </button>
+              <button onClick={() => setModoAporte('meta')}
+                style={{ flex: 1, padding: '8px', borderRadius: '10px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: `1.5px solid ${modoAporte === 'meta' ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: modoAporte === 'meta' ? '#F0FDF4' : '#fff', color: modoAporte === 'meta' ? '#0E3B2E' : '#64748B' }}>
+                Meta
+              </button>
+            </div>
 
-        {/* Alocar para uma meta — só aparece pra despesa categoria Meta */}
-        {tipo === 'despesa' && ehCategoriaMeta(categoria) && (
-          <div style={{ marginBottom: '10px' }}>
-            <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Alocar para qual meta?</p>
-            {metas.length === 0 ? (
-              <p style={{ fontSize: '12px', color: '#94A3B8', backgroundColor: '#F8FAFC', border: '1px solid #F1F5F9', borderRadius: '12px', padding: '10px 12px' }}>
-                Nenhuma meta cadastrada ainda. Crie uma na tela de Metas primeiro.
-              </p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {metas.map((m: any) => {
-                  const pctAtual = Math.min(Math.round((Number(m.valor_atual) / Number(m.valor_alvo)) * 100), 100)
-                  const selecionada = metaAporteId === m.id
-                  return (
-                    <button key={m.id} onClick={() => setMetaAporteId(selecionada ? '' : m.id)}
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '10px 12px', borderRadius: '12px', cursor: 'pointer', textAlign: 'left', border: `1px solid ${selecionada ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: selecionada ? '#F0FDF4' : '#fff' }}>
-                      <span style={{ fontSize: '13px', fontWeight: 500, color: selecionada ? '#0E3B2E' : '#0F172A' }}>{m.nome}</span>
-                      <span style={{ fontSize: '11px', color: '#94A3B8', flexShrink: 0 }}>{pctAtual}% de {fmt(Number(m.valor_alvo))}</span>
+            {modoAporte === 'posicao' ? (
+              <>
+                <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Aplicar em qual posição?</p>
+                {posicoesRF.length === 0 ? (
+                  <p style={{ fontSize: '12px', color: '#94A3B8', backgroundColor: '#F8FAFC', border: '1px solid #F1F5F9', borderRadius: '12px', padding: '10px 12px' }}>
+                    Nenhuma posição de Renda Fixa cadastrada ainda — esse lançamento não vai render em nenhuma posição. Cadastre uma em Investimentos primeiro, se quiser aplicar.
+                  </p>
+                ) : (
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    <button onClick={() => setPosicaoAporteId('')}
+                      style={{ padding: '8px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 500, cursor: 'pointer', border: `1px solid ${posicaoAporteId === '' ? '#94A3B8' : '#E2E8F0'}`, backgroundColor: posicaoAporteId === '' ? '#F1F5F9' : '#fff', color: '#64748B' }}>
+                      Nenhuma
                     </button>
-                  )
-                })}
-              </div>
+                    {posicoesRF.map((p: any) => (
+                      <button key={p.id} onClick={() => setPosicaoAporteId(p.id)}
+                        style={{ padding: '8px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 500, cursor: 'pointer', border: `1px solid ${posicaoAporteId === p.id ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: posicaoAporteId === p.id ? '#F0FDF4' : '#fff', color: posicaoAporteId === p.id ? '#0E3B2E' : '#64748B' }}>
+                        {p.nome}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Alocar para qual meta?</p>
+                {metas.length === 0 ? (
+                  <p style={{ fontSize: '12px', color: '#94A3B8', backgroundColor: '#F8FAFC', border: '1px solid #F1F5F9', borderRadius: '12px', padding: '10px 12px' }}>
+                    Nenhuma meta cadastrada ainda. Crie uma na tela de Metas primeiro.
+                  </p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {metas.map((m: any) => {
+                      const pctAtual = Math.min(Math.round((Number(m.valor_atual) / Number(m.valor_alvo)) * 100), 100)
+                      const selecionada = metaAporteId === m.id
+                      return (
+                        <button key={m.id} onClick={() => setMetaAporteId(selecionada ? '' : m.id)}
+                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '10px 12px', borderRadius: '12px', cursor: 'pointer', textAlign: 'left', border: `1px solid ${selecionada ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: selecionada ? '#F0FDF4' : '#fff' }}>
+                          <span style={{ fontSize: '13px', fontWeight: 500, color: selecionada ? '#0E3B2E' : '#0F172A' }}>{m.nome}</span>
+                          <span style={{ fontSize: '11px', color: '#94A3B8', flexShrink: 0 }}>{pctAtual}% de {fmt(Number(m.valor_alvo))}</span>
+                        </button>
+                      )
+                    })}
+                    {metaAporteId && metas.find((m: any) => m.id === metaAporteId)?.automatica && !editando && (
+                      <p style={{ fontSize: '11px', color: '#94A3B8', backgroundColor: '#F8FAFC', border: '1px solid #F1F5F9', borderRadius: '10px', padding: '8px 10px', marginTop: '2px' }}>
+                        Essa meta é automática — o aporte vai direto pro Patrimônio (Caixa), sem gerar lançamento aqui em Movimentos.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
