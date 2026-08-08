@@ -10,7 +10,7 @@ import {
   Plus, Wallet, X, UtensilsCrossed, Home, Car, Smile,
   Heart, BookOpen, ShoppingBag, Church, MoreHorizontal, HandHeart,
   Briefcase, TrendingUp, Laptop, DollarSign, Trash2, Pencil,
-  CreditCard, FileText, AlignLeft, Repeat, CheckCircle2,
+  CreditCard, FileText, AlignLeft, Repeat, CheckCircle2, Target,
   Pill, Gift, Sparkles, GraduationCap, Smartphone, Shirt, Wrench, ClipboardList, Filter, Search, PawPrint,
   Building2, Truck, Landmark, Megaphone, Calculator, Users, Check
 } from 'lucide-react'
@@ -19,7 +19,7 @@ import OrcamentosSection from './OrcamentosSection'
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 
-const CATEGORIAS_DESPESA = ['Alimentação','Moradia','Transporte','Lazer','Saúde','Educação','Cartão de Crédito','Dízimo','Doações','Farmácia','Presente','Estética','Estudos','Eletrônicos','Vestuário','Consertos','Serviços','Pet','Investimentos','Outros']
+const CATEGORIAS_DESPESA = ['Alimentação','Moradia','Transporte','Lazer','Saúde','Educação','Cartão de Crédito','Dízimo','Doações','Farmácia','Presente','Estética','Estudos','Eletrônicos','Vestuário','Consertos','Serviços','Pet','Investimentos','Meta','Outros']
 const CATEGORIAS_RECEITA = ['Salário','Renda Extra','Freelance','Investimento','Outros']
 
 const CATEGORIAS_EMPRESA_DESPESA = ['Fornecedores','Impostos','Pró-labore','Folha de Pagamento','Marketing','Aluguel/Sede','Software/Ferramentas','Contabilidade','Outros']
@@ -32,7 +32,7 @@ const ICONES_CAT: Record<string, any> = {
   'Farmácia': Pill, 'Presente': Gift, 'Estética': Sparkles, 'Estudos': GraduationCap,
   'Eletrônicos': Smartphone, 'Vestuário': Shirt, 'Consertos': Wrench, 'Serviços': ClipboardList,
   'Pet': PawPrint,
-  'Investimentos': TrendingUp,
+  'Investimentos': TrendingUp, 'Meta': Target,
   'Salário': Briefcase, 'Renda Extra': DollarSign, 'Freelance': Laptop, 'Investimento': TrendingUp,
   'Fornecedores': Truck, 'Impostos': Landmark, 'Pró-labore': Wallet, 'Folha de Pagamento': Users,
   'Marketing': Megaphone, 'Aluguel/Sede': Building2, 'Software/Ferramentas': Laptop, 'Contabilidade': Calculator,
@@ -117,6 +117,8 @@ export default function MovimentosPage() {
   const [dizimar, setDizimar]             = useState(true)
   const [posicoesRF, setPosicoesRF]       = useState<any[]>([])
   const [posicaoAporteId, setPosicaoAporteId] = useState('')
+  const [metas, setMetas]                 = useState<any[]>([])
+  const [metaAporteId, setMetaAporteId]   = useState('')
   const [contas, setContas]               = useState<any[]>([])
   const [contaSelecionadaId, setContaSelecionadaId] = useState('')
   const [novoCartaoOpen, setNovoCartaoOpen] = useState(false)
@@ -200,6 +202,11 @@ export default function MovimentosPage() {
         .order('created_at', { ascending: false })
       setPosicoesRF(posicoesData || [])
 
+      const { data: metasData } = await supabase.from('metas')
+        .select('id, nome, valor_atual, valor_alvo').eq('familia_id', fid)
+        .order('created_at', { ascending: false })
+      setMetas(metasData || [])
+
       const { data: contasData } = await supabase.from('contas')
         .select('*').eq('familia_id', fid).order('created_at', { ascending: true })
       setContas(contasData || [])
@@ -280,6 +287,7 @@ export default function MovimentosPage() {
     setMembroForm(membroAtual); setDizimar(false)
     setObservacao(''); setParcelado(false); setNumParcelas('2'); setDiaParcela('1')
     setPosicaoAporteId('')
+    setMetaAporteId('')
     const contaCorrente = contas.find(c => c.tipo === 'corrente')
     setContaSelecionadaId(contaCorrente?.id || '')
     setConfirmDelete(false)
@@ -294,6 +302,7 @@ export default function MovimentosPage() {
     setObservacao(l.descricao || '')
     setParcelado(false); setNumParcelas('2'); setDiaParcela('1')
     setPosicaoAporteId(l.posicao_investimento_id || '')
+    setMetaAporteId(l.meta_id || '')
     const contaCorrente = contas.find(c => c.tipo === 'corrente')
     setContaSelecionadaId(l.conta_id || contaCorrente?.id || '')
     setConfirmDelete(false)
@@ -314,6 +323,10 @@ export default function MovimentosPage() {
 
   function ehCategoriaInvestimento(cat: string) {
     return cat === 'Investimento' || cat === 'Investimentos'
+  }
+
+  function ehCategoriaMeta(cat: string) {
+    return cat === 'Meta'
   }
 
   // Aplica um aporte numa posição específica de Renda Fixa, vinculado ao lançamento que o originou.
@@ -501,6 +514,8 @@ export default function MovimentosPage() {
     const empresaId = contextoAtivo.tipo === 'empresa' ? contextoAtivo.empresaId : null
     const ehInvestimentoAgora = ehCategoriaInvestimento(categoria) && tipo === 'despesa'
     const posicaoParaAporte = ehInvestimentoAgora && posicaoAporteId ? posicaoAporteId : null
+    const ehMetaAgora = ehCategoriaMeta(categoria) && tipo === 'despesa'
+    const metaParaAporte = ehMetaAgora && metaAporteId ? metaAporteId : null
 
     // Compra em cartão de crédito só sai da conta corrente quando a fatura é paga —
     // até lá, fatura_paga fica false e o lançamento não conta no Saldo em conta.
@@ -525,6 +540,7 @@ export default function MovimentosPage() {
         dizimar: tipo === 'receita' ? dizimar : false,
         descricao: observacao || null,
         posicao_investimento_id: posicaoParaAporte,
+        meta_id: metaParaAporte,
         conta_id: contaSelecionadaId || null,
         fatura_paga: faturaPagaValor,
       }).eq('id', editando.id)
@@ -534,7 +550,18 @@ export default function MovimentosPage() {
         // e seguro que tentar "diferenciar" o que mudou (valor, data ou a posição escolhida).
         await removerAporteDoLancamento(editando.id)
         if (posicaoParaAporte) await aplicarAporteEmPosicao(posicaoParaAporte, editando.id, valorNum, dataFinal)
-        if (editando.meta_id) await ajustarValorAtualMeta(editando.meta_id, valorNum - Number(editando.valor))
+
+        // Meta: se trocou de meta (ou desvinculou), tira o valor antigo da meta antiga e
+        // soma o novo na meta nova — se continuou na mesma meta, só ajusta a diferença.
+        const metaAntigaId = editando.meta_id || null
+        const valorAntigo  = Number(editando.valor)
+        if (metaAntigaId && metaAntigaId !== metaParaAporte) {
+          await ajustarValorAtualMeta(metaAntigaId, -valorAntigo)
+        }
+        if (metaParaAporte) {
+          const delta = metaAntigaId === metaParaAporte ? (valorNum - valorAntigo) : valorNum
+          await ajustarValorAtualMeta(metaParaAporte, delta)
+        }
       }
       setSalvando(false)
       if (!error) { setModalOpen(false); await carregarLancamentos(fid); await carregarFaturasPendentes(fid, contas) }
@@ -586,12 +613,16 @@ export default function MovimentosPage() {
         empresa_id: empresaId,
         descricao: observacao || null,
         posicao_investimento_id: posicaoParaAporte,
+        meta_id: metaParaAporte,
         conta_id: contaSelecionadaId || null,
         fatura_paga: faturaPagaValor,
       }).select().single()
 
       if (!error && novoLancamento && posicaoParaAporte) {
         await aplicarAporteEmPosicao(posicaoParaAporte, novoLancamento.id, valorNum, dataFinal)
+      }
+      if (!error && novoLancamento && metaParaAporte) {
+        await ajustarValorAtualMeta(metaParaAporte, valorNum)
       }
       setSalvando(false)
       if (!error) { setModalOpen(false); await carregarLancamentos(fid); await carregarFaturasPendentes(fid, contas) }
@@ -1322,6 +1353,32 @@ export default function MovimentosPage() {
                     {p.nome}
                   </button>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Alocar para uma meta — só aparece pra despesa categoria Meta */}
+        {tipo === 'despesa' && ehCategoriaMeta(categoria) && (
+          <div style={{ marginBottom: '10px' }}>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Alocar para qual meta?</p>
+            {metas.length === 0 ? (
+              <p style={{ fontSize: '12px', color: '#94A3B8', backgroundColor: '#F8FAFC', border: '1px solid #F1F5F9', borderRadius: '12px', padding: '10px 12px' }}>
+                Nenhuma meta cadastrada ainda. Crie uma na tela de Metas primeiro.
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {metas.map((m: any) => {
+                  const pctAtual = Math.min(Math.round((Number(m.valor_atual) / Number(m.valor_alvo)) * 100), 100)
+                  const selecionada = metaAporteId === m.id
+                  return (
+                    <button key={m.id} onClick={() => setMetaAporteId(selecionada ? '' : m.id)}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '10px 12px', borderRadius: '12px', cursor: 'pointer', textAlign: 'left', border: `1px solid ${selecionada ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: selecionada ? '#F0FDF4' : '#fff' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 500, color: selecionada ? '#0E3B2E' : '#0F172A' }}>{m.nome}</span>
+                      <span style={{ fontSize: '11px', color: '#94A3B8', flexShrink: 0 }}>{pctAtual}% de {fmt(Number(m.valor_alvo))}</span>
+                    </button>
+                  )
+                })}
               </div>
             )}
           </div>
