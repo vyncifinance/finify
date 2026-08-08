@@ -812,7 +812,14 @@ export default function MovimentosPage() {
   // então contam como despesa aqui (diferente da Reserva de Emergência no Dashboard, que
   // olha só despesa de consumo).
   // Compra em cartão de crédito (fatura_paga === false) só conta como despesa quando a fatura é paga.
-  const totalDes = lancamentos.filter(l => l.tipo === 'despesa' && l.fatura_paga !== false).reduce((s, l) => s + Number(l.valor), 0)
+  // E, quando paga, conta pela categoria REAL da compra (Alimentação, Transporte...) — o
+  // lançamento consolidado "Pagamento de fatura" (categoria 'Cartão de Crédito', debitado da
+  // conta corrente) é descartado aqui pra não somar o mesmo valor duas vezes.
+  const idsCartoesResumo = new Set(contas.filter((c: any) => c.tipo === 'cartao_credito').map((c: any) => c.id))
+  const totalDes = lancamentos
+    .filter(l => l.tipo === 'despesa' && l.fatura_paga !== false)
+    .filter(l => !(l.categoria === 'Cartão de Crédito' && !idsCartoesResumo.has(l.conta_id)))
+    .reduce((s, l) => s + Number(l.valor), 0)
   const resultado = totalRec - totalDes
   const saldoProjetado = resultado + totalReceitasFixasPendentes - totalDespesasFixasPendentes
   const mesLabel  = `${MESES[mesRef.getMonth()]} ${mesRef.getFullYear()}`
