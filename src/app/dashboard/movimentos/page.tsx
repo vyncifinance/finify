@@ -1532,6 +1532,7 @@ export default function MovimentosPage() {
               familiaId={familiaId}
               mesRef={mesRef}
               lancamentos={lancamentos}
+              contas={contas}
               isMobile
             />
           </div>
@@ -1763,6 +1764,7 @@ export default function MovimentosPage() {
             familiaId={familiaId}
             mesRef={mesRef}
             lancamentos={lancamentos}
+            contas={contas}
           />
         )}
 

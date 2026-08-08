@@ -189,8 +189,15 @@ export default function DashboardPage() {
     setContas(listaContas)
     const idsCartoes = new Set(listaContas.filter((c: any) => c.tipo === 'cartao_credito').map((c: any) => c.id))
     // Compra no cartão só "sai da conta" de verdade quando a fatura é paga — até lá, não conta
-    // como despesa efetivada no resumo do mês (mesma regra de Movimentos).
-    const naoEhCartaoPendente = (l: any) => !idsCartoes.has(l.conta_id)
+    // como despesa efetivada no resumo do mês (mesma regra de Movimentos). Uma vez paga, conta
+    // pela CATEGORIA REAL da compra (Alimentação, Transporte...), não como "Cartão de Crédito" —
+    // esse rótulo só existe no lançamento consolidado que quita a fatura na conta corrente, e
+    // esse consolidado é descartado aqui pra não contar o valor em dobro.
+    const contarComoDespesa = (l: any) => {
+      if (idsCartoes.has(l.conta_id)) return l.fatura_paga === true
+      if (l.categoria === 'Cartão de Crédito') return false
+      return true
+    }
 
     const ini = new Date(agora.getFullYear(), agora.getMonth(), 1).toISOString().split('T')[0]
     const fim = new Date(agora.getFullYear(), agora.getMonth() + 1, 0).toISOString().split('T')[0]
@@ -198,7 +205,7 @@ export default function DashboardPage() {
       .eq('familia_id', fid).gte('data', ini).lte('data', fim)
     queryLanc = ehEmpresa ? queryLanc.eq('empresa_id', ctx.empresaId) : queryLanc.is('empresa_id', null)
     const { data: lancBruto } = await queryLanc.order('data', { ascending: false }).order('hora', { ascending: false })
-    const lanc = (lancBruto || []).filter(naoEhCartaoPendente)
+    const lanc = (lancBruto || []).filter(contarComoDespesa)
 
     if (lanc) {
       const r = lanc.filter((l: any) => l.tipo === 'receita').reduce((s: number, l: any) => s + Number(l.valor), 0)
@@ -250,11 +257,11 @@ export default function DashboardPage() {
       const d2 = new Date(agora.getFullYear(), agora.getMonth() - i, 1)
       const i2 = new Date(d2.getFullYear(), d2.getMonth(), 1).toISOString().split('T')[0]
       const f2 = new Date(d2.getFullYear(), d2.getMonth() + 1, 0).toISOString().split('T')[0]
-      let queryMes = supabase.from('lancamentos').select('tipo, valor, categoria, conta_id')
+      let queryMes = supabase.from('lancamentos').select('tipo, valor, categoria, conta_id, fatura_paga')
         .eq('familia_id', fid).gte('data', i2).lte('data', f2)
       queryMes = ehEmpresa ? queryMes.eq('empresa_id', ctx.empresaId) : queryMes.is('empresa_id', null)
       const { data: mesBruto } = await queryMes
-      const mes = (mesBruto || []).filter(naoEhCartaoPendente)
+      const mes = (mesBruto || []).filter(contarComoDespesa)
       const r2 = mes.filter((l: any) => l.tipo === 'receita').reduce((s: number, l: any) => s + Number(l.valor), 0)
       const d2Bruto = mes.filter((l: any) => l.tipo === 'despesa').reduce((s: number, l: any) => s + Number(l.valor), 0)
       const d3 = mes.filter((l: any) => l.tipo === 'despesa' && !ehCategoriaAlocacao(l.categoria)).reduce((s: number, l: any) => s + Number(l.valor), 0)

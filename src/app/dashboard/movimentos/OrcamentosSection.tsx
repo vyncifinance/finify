@@ -37,12 +37,14 @@ export default function OrcamentosSection({
   familiaId,
   mesRef,
   lancamentos,
+  contas = [],
   isMobile = false,
 }: {
   supabase: any
   familiaId: string
   mesRef: Date
   lancamentos: Lancamento[]
+  contas?: { id: string; tipo: string }[]
   isMobile?: boolean
 }) {
   const [orcamentos, setOrcamentos] = useState<OrcamentoRow[]>([])
@@ -74,14 +76,20 @@ export default function OrcamentosSection({
   }
 
   const gastoPorCategoria = useMemo(() => {
+    const idsCartoes = new Set(contas.filter(c => c.tipo === 'cartao_credito').map(c => c.id))
     const m: Record<string, number> = {}
     lancamentos.forEach(l => {
       if (l.tipo !== 'despesa') return
-      if ((l as any).fatura_paga === false) return // compra no cartão, fatura ainda não paga — não conta como gasto efetivado
+      const contaId = (l as any).conta_id
+      if (idsCartoes.has(contaId)) {
+        if ((l as any).fatura_paga !== true) return // compra no cartão, fatura ainda não paga — não conta como gasto efetivado
+      } else if (l.categoria === 'Cartão de Crédito') {
+        return // lançamento consolidado do pagamento da fatura — já contabilizado acima, pela categoria real de cada compra
+      }
       m[l.categoria] = (m[l.categoria] || 0) + Number(l.valor)
     })
     return m
-  }, [lancamentos])
+  }, [lancamentos, contas])
 
   const linhas = orcamentos
     .map(o => {
