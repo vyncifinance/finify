@@ -844,13 +844,13 @@ export default function MovimentosPage() {
   // Bate com o saldo real do banco: aportes em investimento/meta saíram fisicamente da conta,
   // então contam como despesa aqui (diferente da Reserva de Emergência no Dashboard, que
   // olha só despesa de consumo).
-  // Compra em cartão de crédito (fatura_paga === false) só conta como despesa quando a fatura é paga.
-  // E, quando paga, conta pela categoria REAL da compra (Alimentação, Transporte...) — o
+  // Compra em cartão de crédito conta como despesa NA HORA (regime de competência), pela
+  // categoria REAL da compra (Alimentação, Transporte...) — não espera a fatura ser paga. O
   // lançamento consolidado "Pagamento de fatura" (categoria 'Cartão de Crédito', debitado da
-  // conta corrente) é descartado aqui pra não somar o mesmo valor duas vezes.
+  // conta corrente) é só transferência entre contas, descartado aqui pra não somar em dobro.
   const idsCartoesResumo = new Set(contas.filter((c: any) => c.tipo === 'cartao_credito').map((c: any) => c.id))
   const totalDes = lancamentos
-    .filter(l => l.tipo === 'despesa' && l.fatura_paga !== false)
+    .filter(l => l.tipo === 'despesa')
     .filter(l => !(l.categoria === 'Cartão de Crédito' && !idsCartoesResumo.has(l.conta_id)))
     .reduce((s, l) => s + Number(l.valor), 0)
   const resultado = totalRec - totalDes

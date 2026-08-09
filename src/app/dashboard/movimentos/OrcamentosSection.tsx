@@ -81,11 +81,10 @@ export default function OrcamentosSection({
     lancamentos.forEach(l => {
       if (l.tipo !== 'despesa') return
       const contaId = (l as any).conta_id
-      if (idsCartoes.has(contaId)) {
-        if ((l as any).fatura_paga !== true) return // compra no cartão, fatura ainda não paga — não conta como gasto efetivado
-      } else if (l.categoria === 'Cartão de Crédito') {
-        return // lançamento consolidado do pagamento da fatura — já contabilizado acima, pela categoria real de cada compra
-      }
+      // Compra no cartão conta na hora, pela categoria real. Só descarta o lançamento
+      // consolidado "Pagamento de fatura" (categoria 'Cartão de Crédito', debitado de fora do
+      // cartão), que é só transferência entre contas — a compra já foi contada antes.
+      if (!idsCartoes.has(contaId) && l.categoria === 'Cartão de Crédito') return
       m[l.categoria] = (m[l.categoria] || 0) + Number(l.valor)
     })
     return m

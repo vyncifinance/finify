@@ -188,14 +188,14 @@ export default function DashboardPage() {
     const listaContas = contasData || []
     setContas(listaContas)
     const idsCartoes = new Set(listaContas.filter((c: any) => c.tipo === 'cartao_credito').map((c: any) => c.id))
-    // Compra no cartão só "sai da conta" de verdade quando a fatura é paga — até lá, não conta
-    // como despesa efetivada no resumo do mês (mesma regra de Movimentos). Uma vez paga, conta
-    // pela CATEGORIA REAL da compra (Alimentação, Transporte...), não como "Cartão de Crédito" —
-    // esse rótulo só existe no lançamento consolidado que quita a fatura na conta corrente, e
-    // esse consolidado é descartado aqui pra não contar o valor em dobro.
+    // Compra no cartão conta como despesa NA HORA (regime de competência) — assim que você
+    // passa o cartão, entra na categoria real (Alimentação, Transporte...) pro resumo do mês
+    // já refletir o gasto real, sem esperar a fatura fechar/ser paga. O lançamento consolidado
+    // "Pagamento de fatura" (categoria "Cartão de Crédito", debitado da conta corrente) é só uma
+    // transferência de dinheiro entre contas — a compra já foi contabilizada antes, então esse
+    // consolidado é descartado aqui pra não contar o valor em dobro.
     const contarComoDespesa = (l: any) => {
-      if (idsCartoes.has(l.conta_id)) return l.fatura_paga === true
-      if (l.categoria === 'Cartão de Crédito') return false
+      if (l.categoria === 'Cartão de Crédito' && !idsCartoes.has(l.conta_id)) return false
       return true
     }
 
