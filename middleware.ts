@@ -28,12 +28,21 @@ export async function middleware(request: NextRequest) {
   console.log('[middleware] user:', user?.email ?? 'null', '| error:', error?.message ?? 'none')
 
   const isDashboard = pathname.startsWith('/dashboard')
+  const isConsultor = pathname.startsWith('/consultor')
   const isLogin     = pathname === '/'
   const isCadastro  = pathname === '/cadastro'
 
-  if (!user && isDashboard) {
+  if (!user && (isDashboard || isConsultor)) {
     console.log('[middleware] → redirecionando para login')
     return NextResponse.redirect(new URL('/', request.url))
+  }
+
+  // Área do consultor: travada exclusivamente ao seu e-mail.
+  // A checagem aqui é só UX (evita renderizar a tela) — a proteção
+  // real de dados está nas policies de RLS (is_admin_consultor()).
+  if (isConsultor && user?.email !== 'hudson.fix@gmail.com') {
+    console.log('[middleware] → acesso negado a /consultor, redirecionando para dashboard')
+    return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
   if (user && (isLogin || isCadastro)) {

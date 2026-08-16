@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import {
   User, Users, Mail, LogOut, Lock, Save, Check, Copy, CheckCheck, Church, ChevronRight,
-  Building2, Plus, X, Trash2, Pencil, Wallet
+  Building2, Plus, X, Trash2, Pencil, Wallet, ShieldCheck
 } from 'lucide-react'
 
 function formatCNPJ(v: string) {
@@ -205,6 +205,7 @@ export default function PerfilPage() {
   }
 
   const iniciais = nome ? nome.trim().split(' ').slice(0, 2).map(p => p[0]).join('').toUpperCase() : '?'
+  const ehConsultorAdmin = email === 'hudson.fix@gmail.com'
 
   return (
     <>
@@ -413,6 +414,22 @@ export default function PerfilPage() {
               {salvandoSenha ? 'Atualizando...' : 'Atualizar senha'}
             </button>
           </div>
+
+          {/* Painel do Consultor mobile — só visível para o e-mail admin */}
+          {ehConsultorAdmin && (
+            <button onClick={() => window.location.assign('/consultor')}
+              className="w-full flex items-center gap-3 p-4 rounded-2xl transition-all"
+              style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', cursor: 'pointer' }}>
+              <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#145A4518' }}>
+                <ShieldCheck size={16} color="#145A45" strokeWidth={1.75} />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>Painel do Consultor</p>
+                <p className="text-xs" style={{ color: '#94A3B8' }}>Acesso administrativo</p>
+              </div>
+              <ChevronRight size={16} color="#CBD5E1" strokeWidth={2} />
+            </button>
+          )}
 
           {/* Sair mobile */}
           <button onClick={handleLogout}
@@ -636,6 +653,21 @@ export default function PerfilPage() {
                   })}
                 </div>
               </div>
+
+              {ehConsultorAdmin && (
+                <div className="rounded-[20px] border p-6" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <ShieldCheck size={18} color="#145A45" strokeWidth={1.75} />
+                    <h2 className="font-semibold" style={{ color: '#0F172A' }}>Acesso administrativo</h2>
+                  </div>
+                  <p className="text-sm mb-4" style={{ color: '#64748B' }}>Painel de gestão das consultorias.</p>
+                  <button onClick={() => window.location.assign('/consultor')}
+                    className="w-full flex items-center justify-center gap-2 h-12 rounded-xl text-sm font-semibold transition-opacity"
+                    style={{ backgroundColor: '#F0FDF4', color: '#145A45', border: '1px solid #D1FAE5', cursor: 'pointer' }}>
+                    <ShieldCheck size={16} strokeWidth={2} /> Painel do Consultor
+                  </button>
+                </div>
+              )}
 
               <div className="rounded-[20px] border p-6" style={{ backgroundColor: '#fff', borderColor: '#E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
                 <div className="flex items-center gap-2 mb-2">

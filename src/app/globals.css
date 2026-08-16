@@ -1,3 +1,39 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* ── Tokens de Estilo Premium (CLAUDE.md) — foco/hover reaproveitados
+   em todos os inputs e botões do módulo de consultoria. */
+
+.premium-input {
+  transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
+}
+.premium-input:focus {
+  outline: none;
+  border-color: #2FB36A !important;
+  background-color: #fff !important;
+  box-shadow: 0 0 0 3px rgba(47, 179, 106, 0.12);
+}
+
+.btn-cta {
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.btn-cta:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(11, 59, 46, 0.38) !important;
+}
+
+.btn-soft {
+  transition: border-color 0.15s, background-color 0.15s, color 0.15s;
+}
+.btn-soft:hover {
+  border-color: #2FB36A !important;
+  background-color: #F0FDF4 !important;
+  color: #145A45 !important;
+}
