@@ -12,7 +12,7 @@ import {
   Briefcase, TrendingUp, Laptop, DollarSign, Trash2, Pencil,
   CreditCard, FileText, AlignLeft, Repeat, CheckCircle2,
   Pill, Gift, Sparkles, GraduationCap, Smartphone, Shirt, Wrench, ClipboardList, Filter, Search, PawPrint,
-  Building2, Truck, Landmark, Megaphone, Calculator, Users, Check
+  Building2, Truck, Landmark, Megaphone, Calculator, Users, Check, AlertTriangle
 } from 'lucide-react'
 import OrcamentosSection from './OrcamentosSection'
 import { aportarEmMeta } from '@/lib/metaAportes'
@@ -855,6 +855,13 @@ export default function MovimentosPage() {
     .reduce((s, l) => s + Number(l.valor), 0)
   const resultado = totalRec - totalDes
   const saldoProjetado = resultado + totalReceitasFixasPendentes - totalDespesasFixasPendentes
+
+  // Quanto está comprometido nas faturas de cartão (soma de todos os cartões, regime de caixa)
+  // vs. quanto sobrou de fato disponível pra cobrir isso. "resultado"/"saldoProjetado" já contam
+  // a compra no cartão como despesa na hora (regime de competência) — somamos de volta o total
+  // ainda pendente pra "desfazer" esse desconto e chegar no saldo real de caixa projetado.
+  const totalFaturasPendentes  = Object.values(faturasPendentes).reduce((s, v) => s + v, 0)
+  const saldoDisponivelCartao  = saldoProjetado + totalFaturasPendentes
   const mesLabel  = `${MESES[mesRef.getMonth()]} ${mesRef.getFullYear()}`
   const categorias = contextoAtivo.tipo === 'empresa'
     ? (tipo === 'despesa' ? CATEGORIAS_EMPRESA_DESPESA : CATEGORIAS_EMPRESA_RECEITA)
@@ -940,6 +947,54 @@ export default function MovimentosPage() {
           <CreditCard size={isMob ? 14 : 16} color="#64748B" strokeWidth={1.75} />
           <span style={{ fontSize: isMob ? '13px' : '15px', fontWeight: 700, color: '#0B3B2E', letterSpacing: '-0.2px' }}>Faturas de Cartão</span>
         </div>
+
+        {/* Resumo: comprometido no cartão vs. saldo disponível pra cobrir */}
+        {totalFaturasPendentes > 0 && (() => {
+          const disponivel = Math.max(saldoDisponivelCartao, 0)
+          const base       = saldoDisponivelCartao > 0 ? saldoDisponivelCartao : totalFaturasPendentes
+          const pct        = Math.round((totalFaturasPendentes / base) * 100)
+          const excedido    = totalFaturasPendentes > saldoDisponivelCartao
+          const alerta      = !excedido && pct >= 80
+          const cor         = excedido ? '#EF4444' : alerta ? '#F59E0B' : '#10B981'
+          return (
+            <div style={{
+              backgroundColor: '#fff', border: '1px solid #E2E8F0',
+              borderRadius: isMob ? '14px' : '16px', padding: isMob ? '14px' : '18px',
+              marginBottom: '10px',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Comprometido no cartão
+                </span>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: cor }}>{Math.min(pct, 999)}%</span>
+              </div>
+              <div style={{ height: '8px', backgroundColor: '#F1F5F9', borderRadius: '4px', overflow: 'hidden', marginBottom: '10px' }}>
+                <div style={{ height: '8px', borderRadius: '4px', width: `${Math.min(pct, 100)}%`, backgroundColor: cor, transition: 'width 0.2s' }} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: isMob ? '13px' : '14px', fontWeight: 700, color: '#0F172A' }}>
+                  {fmt(totalFaturasPendentes)} <span style={{ fontSize: '11.5px', fontWeight: 500, color: '#94A3B8' }}>nas faturas</span>
+                </span>
+                <span style={{ fontSize: isMob ? '13px' : '14px', fontWeight: 700, color: '#0F172A' }}>
+                  {fmt(disponivel)} <span style={{ fontSize: '11.5px', fontWeight: 500, color: '#94A3B8' }}>disponível</span>
+                </span>
+              </div>
+              {excedido && (
+                <div style={{
+                  display: 'flex', alignItems: 'flex-start', gap: '8px',
+                  backgroundColor: '#FEF2F2', border: '1px solid #FECACA',
+                  borderRadius: '10px', padding: '8px 10px', marginTop: '10px',
+                }}>
+                  <AlertTriangle size={14} color="#DC2626" strokeWidth={2} style={{ flexShrink: 0, marginTop: '1px' }} />
+                  <p style={{ fontSize: '11.5px', color: '#B91C1C', margin: 0, lineHeight: 1.4 }}>
+                    As faturas somam {fmt(totalFaturasPendentes - disponivel)} a mais do que você tem disponível este mês.
+                  </p>
+                </div>
+              )}
+            </div>
+          )
+        })()}
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {cartoes.map((c: any) => {
             const pendente = faturasPendentes[c.id] || 0
