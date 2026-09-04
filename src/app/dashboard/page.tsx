@@ -162,8 +162,8 @@ export default function MovimentosPage() {
     if (familiaIdRef.current) carregarLancamentos(familiaIdRef.current)
   }, [mesRef])
   useEffect(() => {
-    if (familiaIdRef.current) carregarFaturasPendentes(familiaIdRef.current, contas, mesRef)
-  }, [mesRef, contas])
+    if (familiaIdRef.current) carregarFaturasPendentes(familiaIdRef.current, contas)
+  }, [contas])
   useEffect(() => {
     setLimiteDias(15)
     setDiaOverride({})
@@ -219,7 +219,7 @@ export default function MovimentosPage() {
       setContas(contasData || [])
       const contaCorrente = (contasData || []).find((c: any) => c.tipo === 'corrente')
       if (contaCorrente) setContaSelecionadaId(contaCorrente.id)
-      await carregarFaturasPendentes(fid, contasData || [], mesRef)
+      await carregarFaturasPendentes(fid, contasData || [])
 
       // Restaura o último contexto usado nesse dispositivo (se ainda existir)
       let contexto: { tipo: 'pessoal' | 'empresa'; empresaId?: string; nome: string } = { tipo: 'pessoal', nome: nomeFam }
@@ -349,16 +349,18 @@ export default function MovimentosPage() {
     await supabase.from('aportes_posicao').delete().eq('lancamento_id', lancamentoId)
   }
 
-  async function carregarFaturasPendentes(fid: string, listaContas: any[], mesVisualizado?: Date) {
+  async function carregarFaturasPendentes(fid: string, listaContas: any[]) {
     const cartoes = listaContas.filter((c: any) => c.tipo === 'cartao_credito')
     if (cartoes.length === 0) { setFaturasPendentes({}); return }
     const { data } = await supabase.from('lancamentos').select('conta_id, valor, data')
       .eq('familia_id', fid).eq('tipo', 'despesa').eq('fatura_paga', false)
       .in('conta_id', cartoes.map((c: any) => c.id))
-    // Referência do "vencimento atual" segue o mês que está sendo visualizado na tela
-    // (mesRef), não a data real de hoje — assim navegar pra outro mês mostra a fatura
-    // (e a barra de disponível) daquele mês, e não sempre a de hoje.
-    const ref = mesVisualizado || new Date()
+    // Essa conta é sempre "de agora" — compara o saldo disponível hoje com a fatura que
+    // está sendo formada neste momento (não com o mês que está sendo navegado na tela).
+    // Se o fechamento do cartão já passou este mês, a fatura "em formação" já é a do mês
+    // seguinte — por isso empurramos o vencimento de referência pra frente quando hoje já
+    // passou do dia de vencimento.
+    const hoje = new Date()
     const totais: Record<string, number> = {}
     ;(data || []).forEach((l: any) => {
       const cartao = cartoes.find((c: any) => c.id === l.conta_id)
@@ -366,7 +368,10 @@ export default function MovimentosPage() {
         totais[l.conta_id] = (totais[l.conta_id] || 0) + Number(l.valor)
         return
       }
-      const vencimentoAtual = new Date(ref.getFullYear(), ref.getMonth(), cartao.dia_vencimento)
+      let vencimentoAtual = new Date(hoje.getFullYear(), hoje.getMonth(), cartao.dia_vencimento)
+      if (hoje.getDate() > cartao.dia_vencimento) {
+        vencimentoAtual = new Date(hoje.getFullYear(), hoje.getMonth() + 1, cartao.dia_vencimento)
+      }
       const vencimentoAtualStr = dataLocalISO(vencimentoAtual)
       if (l.data <= vencimentoAtualStr) {
         totais[l.conta_id] = (totais[l.conta_id] || 0) + Number(l.valor)
@@ -524,12 +529,12 @@ export default function MovimentosPage() {
       setErroFaturaCartaoId(cartaoId)
       setPagandoFatura(null)
       await carregarLancamentos(fid)
-      await carregarFaturasPendentes(fid, contas, mesRef)
+      await carregarFaturasPendentes(fid, contas)
       return
     }
 
     await carregarLancamentos(fid)
-    await carregarFaturasPendentes(fid, contas, mesRef)
+    await carregarFaturasPendentes(fid, contas)
     setPagandoFatura(null)
   }
 
@@ -588,7 +593,7 @@ export default function MovimentosPage() {
         if (editando.meta_id) await ajustarValorAtualMeta(editando.meta_id, valorNum - Number(editando.valor))
       }
       setSalvando(false)
-      if (!error) { setModalOpen(false); await carregarLancamentos(fid); await carregarFaturasPendentes(fid, contas, mesRef) }
+      if (!error) { setModalOpen(false); await carregarLancamentos(fid); await carregarFaturasPendentes(fid, contas) }
     } else if (parcelado && tipo === 'despesa') {
       // Lançamento parcelado — cria N lançamentos. Aporte automático em posição não se aplica
       // aqui (compra parcelada não é, na prática, um aporte de investimento recorrente).
@@ -628,7 +633,7 @@ export default function MovimentosPage() {
       }
       const { error } = await supabase.from('lancamentos').insert(inserts)
       setSalvando(false)
-      if (!error) { setModalOpen(false); await carregarLancamentos(fid); await carregarFaturasPendentes(fid, contas, mesRef) }
+      if (!error) { setModalOpen(false); await carregarLancamentos(fid); await carregarFaturasPendentes(fid, contas) }
     } else {
       // Despesa "Investimentos" alocada pra uma meta usa o mesmo fluxo único do botão
       // "Aportar" da tela de Metas — trata meta automática, data de hoje, descrição padrão etc.
@@ -665,7 +670,7 @@ export default function MovimentosPage() {
         await aplicarAporteEmPosicao(posicaoParaAporte, novoLancamento.id, valorNum, dataFinal)
       }
       setSalvando(false)
-      if (!error) { setModalOpen(false); await carregarLancamentos(fid); await carregarFaturasPendentes(fid, contas, mesRef) }
+      if (!error) { setModalOpen(false); await carregarLancamentos(fid); await carregarFaturasPendentes(fid, contas) }
     }
   }
 
@@ -684,7 +689,7 @@ export default function MovimentosPage() {
     if (!error) {
       setLancamentos(prev => prev.filter((l: any) => l.id !== editando.id))
       setModalOpen(false)
-      await carregarFaturasPendentes(familiaIdRef.current, contas, mesRef)
+      await carregarFaturasPendentes(familiaIdRef.current, contas)
     }
   }
 
@@ -793,7 +798,7 @@ export default function MovimentosPage() {
         await recarregarDespesasFixas(fid)
       }
       await carregarLancamentos(fid)
-      await carregarFaturasPendentes(fid, contas, mesRef)
+      await carregarFaturasPendentes(fid, contas)
     } else {
       console.error('Erro ao registrar pagamento:', error)
       setDfErro(error.message || 'Não foi possível registrar o pagamento. Tente novamente.')
