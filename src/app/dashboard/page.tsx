@@ -357,9 +357,12 @@ export default function MovimentosPage() {
       .in('conta_id', cartoes.map((c: any) => c.id))
     // Essa conta é sempre "de agora" — compara o saldo disponível hoje com a fatura que
     // está sendo formada neste momento (não com o mês que está sendo navegado na tela).
-    // Se o fechamento do cartão já passou este mês, a fatura "em formação" já é a do mês
-    // seguinte — por isso empurramos o vencimento de referência pra frente quando hoje já
-    // passou do dia de vencimento.
+    // Precisa usar o dia de FECHAMENTO (não o de vencimento) pra decidir se a fatura em
+    // formação já virou a do mês seguinte — é o mesmo critério usado ao lançar uma compra
+    // nova (handleSalvar). Se usássemos o vencimento aqui, ficaria descompassado: uma
+    // compra lançada hoje já cai na fatura do mês seguinte (pelo fechamento), mas essa
+    // conta só empurraria pro mês seguinte depois que a data de hoje passasse do
+    // vencimento — bem mais tarde — ignorando itens que já existem pra frente.
     const hoje = new Date()
     const totais: Record<string, number> = {}
     ;(data || []).forEach((l: any) => {
@@ -368,8 +371,9 @@ export default function MovimentosPage() {
         totais[l.conta_id] = (totais[l.conta_id] || 0) + Number(l.valor)
         return
       }
+      const diaCorte = cartao.dia_fechamento || cartao.dia_vencimento
       let vencimentoAtual = new Date(hoje.getFullYear(), hoje.getMonth(), cartao.dia_vencimento)
-      if (hoje.getDate() > cartao.dia_vencimento) {
+      if (hoje.getDate() > diaCorte) {
         vencimentoAtual = new Date(hoje.getFullYear(), hoje.getMonth() + 1, cartao.dia_vencimento)
       }
       const vencimentoAtualStr = dataLocalISO(vencimentoAtual)
