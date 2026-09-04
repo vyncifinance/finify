@@ -991,12 +991,13 @@ export default function MovimentosPage() {
           <span style={{ fontSize: isMob ? '13px' : '15px', fontWeight: 700, color: '#0B3B2E', letterSpacing: '-0.2px' }}>Faturas de Cartão</span>
         </div>
 
-        {/* Resumo: comprometido no cartão vs. saldo disponível pra cobrir */}
-        {totalFaturasPendentes > 0 && (() => {
+        {/* Resumo: comprometido no cartão vs. saldo disponível pra cobrir — sempre aparece,
+            mesmo com R$ 0,00 nas faturas, pra não parecer que a funcionalidade sumiu */}
+        {(() => {
           const disponivel = Math.max(saldoDisponivelCartao, 0)
-          const base       = saldoDisponivelCartao > 0 ? saldoDisponivelCartao : totalFaturasPendentes
-          const pct        = Math.round((totalFaturasPendentes / base) * 100)
-          const excedido    = totalFaturasPendentes > saldoDisponivelCartao
+          const base       = saldoDisponivelCartao > 0 ? saldoDisponivelCartao : (totalFaturasPendentes || 1)
+          const pct        = totalFaturasPendentes > 0 ? Math.round((totalFaturasPendentes / base) * 100) : 0
+          const excedido    = totalFaturasPendentes > 0 && totalFaturasPendentes > saldoDisponivelCartao
           const alerta      = !excedido && pct >= 80
           const cor         = excedido ? '#EF4444' : alerta ? '#F59E0B' : '#10B981'
           return (
