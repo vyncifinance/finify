@@ -132,6 +132,8 @@ export default function MovimentosPage() {
   const [confirmDeleteCartao, setConfirmDeleteCartao] = useState(false)
   const [deletandoCartao, setDeletandoCartao] = useState(false)
   const [pagandoFatura, setPagandoFatura] = useState<string | null>(null)
+  const [erroFatura, setErroFatura] = useState('')
+  const [erroFaturaCartaoId, setErroFaturaCartaoId] = useState<string | null>(null)
   const [cartaoDetalhado, setCartaoDetalhado] = useState<string | null>(null)
   const [despesasFixasAberto, setDespesasFixasAberto] = useState(true)
   const [itensCartaoDetalhe, setItensCartaoDetalhe] = useState<any[]>([])
@@ -159,6 +161,9 @@ export default function MovimentosPage() {
   useEffect(() => {
     if (familiaIdRef.current) carregarLancamentos(familiaIdRef.current)
   }, [mesRef])
+  useEffect(() => {
+    if (familiaIdRef.current) carregarFaturasPendentes(familiaIdRef.current, contas)
+  }, [contas])
   useEffect(() => {
     setLimiteDias(15)
     setDiaOverride({})
@@ -350,20 +355,25 @@ export default function MovimentosPage() {
     const { data } = await supabase.from('lancamentos').select('conta_id, valor, data')
       .eq('familia_id', fid).eq('tipo', 'despesa').eq('fatura_paga', false)
       .in('conta_id', cartoes.map((c: any) => c.id))
+    // Essa conta é sempre "de agora" — compara o saldo disponível hoje com a fatura que
+    // está sendo formada neste momento (não com o mês que está sendo navegado na tela).
+    // Precisa usar o dia de FECHAMENTO (não o de vencimento) pra decidir se a fatura em
+    // formação já virou a do mês seguinte — é o mesmo critério usado ao lançar uma compra
+    // nova (handleSalvar). Se usássemos o vencimento aqui, ficaria descompassado: uma
+    // compra lançada hoje já cai na fatura do mês seguinte (pelo fechamento), mas essa
+    // conta só empurraria pro mês seguinte depois que a data de hoje passasse do
+    // vencimento — bem mais tarde — ignorando itens que já existem pra frente.
     const hoje = new Date()
     const totais: Record<string, number> = {}
     ;(data || []).forEach((l: any) => {
       const cartao = cartoes.find((c: any) => c.id === l.conta_id)
-      // Data do lançamento já vem fixada no dia de vencimento da fatura em que ele cai
-      // (não na data da compra). Então pra saber se é "fatura atual" (mesmo antes do
-      // vencimento) ou "fatura futura" (parcela ainda longe), comparamos com o vencimento
-      // mais próximo daqui pra frente — não com "hoje" diretamente.
       if (!cartao?.dia_vencimento) {
         totais[l.conta_id] = (totais[l.conta_id] || 0) + Number(l.valor)
         return
       }
+      const diaCorte = cartao.dia_fechamento || cartao.dia_vencimento
       let vencimentoAtual = new Date(hoje.getFullYear(), hoje.getMonth(), cartao.dia_vencimento)
-      if (hoje.getDate() > cartao.dia_vencimento) {
+      if (hoje.getDate() > diaCorte) {
         vencimentoAtual = new Date(hoje.getFullYear(), hoje.getMonth() + 1, cartao.dia_vencimento)
       }
       const vencimentoAtualStr = dataLocalISO(vencimentoAtual)
@@ -451,13 +461,28 @@ export default function MovimentosPage() {
 
   async function handlePagarFatura(cartaoId: string) {
     setPagandoFatura(cartaoId)
+    setErroFatura('')
+    setErroFaturaCartaoId(null)
     const fid = familiaIdRef.current
     const contaCorrente = contas.find(c => c.tipo === 'corrente')
-    if (!contaCorrente) { setPagandoFatura(null); return }
+    if (!contaCorrente) {
+      setErroFatura('Nenhuma conta corrente encontrada para debitar o pagamento.')
+      setErroFaturaCartaoId(cartaoId)
+      setPagandoFatura(null)
+      return
+    }
 
     const cartao = contas.find(c => c.id === cartaoId)
-    const { data: todosPendentes } = await supabase.from('lancamentos').select('id, valor, data')
+    const { data: todosPendentes, error: erroBusca } = await supabase.from('lancamentos').select('id, valor, data')
       .eq('familia_id', fid).eq('conta_id', cartaoId).eq('tipo', 'despesa').eq('fatura_paga', false)
+
+    if (erroBusca) {
+      console.error('Erro ao buscar lançamentos pendentes da fatura:', erroBusca)
+      setErroFatura('Não foi possível carregar a fatura. Tente novamente.')
+      setErroFaturaCartaoId(cartaoId)
+      setPagandoFatura(null)
+      return
+    }
 
     // Mesma lógica do card: só quita o que é da fatura atual (mesmo antes do vencimento
     // chegar) — parcela de fatura realmente futura fica pra ser paga na hora dela.
@@ -478,20 +503,42 @@ export default function MovimentosPage() {
     const agora = new Date()
     const hora  = `${String(agora.getHours()).padStart(2,'0')}:${String(agora.getMinutes()).padStart(2,'0')}`
 
-    const { error } = await supabase.from('lancamentos').insert({
+    const { data: lancamentoPagamento, error } = await supabase.from('lancamentos').insert({
       familia_id: fid, user_id: userId, tipo: 'despesa', valor: total,
       categoria: 'Cartão de Crédito', membro: membroAtual,
       data: dataLocalISO(agora), hora, dizimar: false,
       conta_id: contaCorrente.id, fatura_paga: true,
       descricao: `Pagamento de fatura — ${cartao?.nome || 'Cartão'}`,
-    })
+    }).select().single()
 
-    if (!error) {
-      const ids = (pendentes || []).map((l: any) => l.id)
-      await supabase.from('lancamentos').update({ fatura_paga: true }).in('id', ids)
+    if (error) {
+      console.error('Erro ao registrar pagamento de fatura:', error)
+      setErroFatura(error.message || 'Não foi possível registrar o pagamento. Tente novamente.')
+      setErroFaturaCartaoId(cartaoId)
+      setPagandoFatura(null)
+      return
+    }
+
+    // Marca as compras originais como pagas. Se isso falhar, o débito acima fica "órfão"
+    // (dinheiro já saiu, mas os itens continuam pendentes) — nesse caso desfazemos o
+    // lançamento de pagamento pra não cobrar em duplicidade numa nova tentativa.
+    const ids = pendentes.map((l: any) => l.id)
+    const { error: erroUpdate, count } = await supabase.from('lancamentos')
+      .update({ fatura_paga: true }, { count: 'exact' }).in('id', ids)
+
+    if (erroUpdate || count !== ids.length) {
+      console.error('Erro ao marcar itens da fatura como pagos:', erroUpdate, { esperado: ids.length, atualizado: count })
+      await supabase.from('lancamentos').delete().eq('id', lancamentoPagamento.id)
+      setErroFatura('O pagamento não pôde ser concluído (falha ao atualizar os itens da fatura). Nada foi debitado — verifique as permissões (RLS) da tabela de lançamentos e tente novamente.')
+      setErroFaturaCartaoId(cartaoId)
+      setPagandoFatura(null)
       await carregarLancamentos(fid)
       await carregarFaturasPendentes(fid, contas)
+      return
     }
+
+    await carregarLancamentos(fid)
+    await carregarFaturasPendentes(fid, contas)
     setPagandoFatura(null)
   }
 
@@ -948,12 +995,13 @@ export default function MovimentosPage() {
           <span style={{ fontSize: isMob ? '13px' : '15px', fontWeight: 700, color: '#0B3B2E', letterSpacing: '-0.2px' }}>Faturas de Cartão</span>
         </div>
 
-        {/* Resumo: comprometido no cartão vs. saldo disponível pra cobrir */}
-        {totalFaturasPendentes > 0 && (() => {
+        {/* Resumo: comprometido no cartão vs. saldo disponível pra cobrir — sempre aparece,
+            mesmo com R$ 0,00 nas faturas, pra não parecer que a funcionalidade sumiu */}
+        {(() => {
           const disponivel = Math.max(saldoDisponivelCartao, 0)
-          const base       = saldoDisponivelCartao > 0 ? saldoDisponivelCartao : totalFaturasPendentes
-          const pct        = Math.round((totalFaturasPendentes / base) * 100)
-          const excedido    = totalFaturasPendentes > saldoDisponivelCartao
+          const base       = saldoDisponivelCartao > 0 ? saldoDisponivelCartao : (totalFaturasPendentes || 1)
+          const pct        = totalFaturasPendentes > 0 ? Math.round((totalFaturasPendentes / base) * 100) : 0
+          const excedido    = totalFaturasPendentes > 0 && totalFaturasPendentes > saldoDisponivelCartao
           const alerta      = !excedido && pct >= 80
           const cor         = excedido ? '#EF4444' : alerta ? '#F59E0B' : '#10B981'
           return (
@@ -1023,6 +1071,16 @@ export default function MovimentosPage() {
                     <Pencil size={13} color="#64748B" strokeWidth={1.75} />
                   </button>
                 </div>
+                {erroFatura && erroFaturaCartaoId === c.id && (
+                  <div style={{
+                    display: 'flex', alignItems: 'flex-start', gap: '8px',
+                    backgroundColor: '#FEF2F2', border: '1px solid #FECACA', borderTop: '1px solid #FECACA',
+                    borderRadius: '0', padding: '10px 14px', margin: 0,
+                  }}>
+                    <AlertTriangle size={14} color="#DC2626" strokeWidth={2} style={{ flexShrink: 0, marginTop: '1px' }} />
+                    <p style={{ fontSize: '11.5px', color: '#B91C1C', margin: 0, lineHeight: 1.4 }}>{erroFatura}</p>
+                  </div>
+                )}
                 {expandido && (
                   <div style={{ borderTop: '1px solid #F1F5F9' }}>
                     <p style={{ padding: '8px 14px 0', fontSize: '10.5px', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
