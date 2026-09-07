@@ -651,6 +651,23 @@ export default function MovimentosPage() {
         await removerAporteDoLancamento(editando.id)
         if (posicaoParaAporte) await aplicarAporteEmPosicao(posicaoParaAporte, editando.id, valorNum, dataFinal)
         if (editando.meta_id) await ajustarValorAtualMeta(editando.meta_id, valorNum - Number(editando.valor))
+
+        // Propaga pras demais parcelas da mesma compra (nome, categoria, conta) — mas NÃO
+        // valor, data nem fatura_paga, que são legitimamente diferentes/individuais por parcela.
+        if (editando.grupo_parcela_id) {
+          const novoPrefixo = (observacao || '').replace(/\s*Parcela\s+\d+\/\d+\s*$/i, '').trim()
+          const { data: irmas } = await supabase.from('lancamentos').select('id, descricao')
+            .eq('grupo_parcela_id', editando.grupo_parcela_id).neq('id', editando.id)
+          for (const irma of irmas || []) {
+            const tailMatch = (irma.descricao || '').match(/Parcela\s+\d+\/\d+\s*$/i)
+            const tail = tailMatch ? tailMatch[0] : ''
+            const novaDescricao = novoPrefixo ? `${novoPrefixo} ${tail}`.trim() : (tail || null)
+            await supabase.from('lancamentos').update({
+              categoria, membro: membroForm, conta_id: contaSelecionadaId || null,
+              descricao: novaDescricao,
+            }).eq('id', irma.id)
+          }
+        }
       }
       setSalvando(false)
       if (!error) { setModalOpen(false); await carregarLancamentos(fid); await carregarFaturasPendentes(fid, contas); await carregarSaldoContaReal(fid, contas) }
@@ -678,6 +695,7 @@ export default function MovimentosPage() {
       }
 
       const inserts = []
+      const grupoParcelaId = crypto.randomUUID()
       for (let i = 0; i < n; i++) {
         const d = new Date(anoBase, mesBase + i, dia)
         const dataStr = dataLocalISO(d)
@@ -688,6 +706,7 @@ export default function MovimentosPage() {
           dizimar: false, empresa_id: empresaId,
           conta_id: contaSelecionadaId || null,
           fatura_paga: faturaPagaValor,
+          grupo_parcela_id: grupoParcelaId,
           descricao: `${observacao ? observacao + ' ' : ''}Parcela ${i + 1}/${n}`,
         })
       }
