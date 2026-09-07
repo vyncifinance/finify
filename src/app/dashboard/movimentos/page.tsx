@@ -620,10 +620,13 @@ export default function MovimentosPage() {
     const contaEscolhida = contas.find(c => c.id === contaSelecionadaId)
     const faturaPagaValor = tipo === 'despesa' ? (contaEscolhida?.tipo !== 'cartao_credito') : true
 
-    // Mesma regra pra criar ou editar: compra em cartão de crédito depois do fechamento vai
-    // pra fatura do mês seguinte, com a data final seguindo o dia de vencimento do cartão.
+    // Regra de fechamento só se aplica ao CRIAR um lançamento novo, quando "dataLanc" é a
+    // data real da compra digitada agora. Ao EDITAR, o formulário já foi preenchido com a
+    // data de vencimento da fatura em que o item está (não a data da compra original) — se
+    // reaplicássemos a mesma regra aqui, empurraríamos a fatura mais um mês pra frente a
+    // cada edição (bug: item "sumia" da tela porque ia parar silenciosamente no mês seguinte).
     let dataFinal = dataLanc
-    if (tipo === 'despesa' && contaEscolhida?.tipo === 'cartao_credito' && contaEscolhida.dia_vencimento) {
+    if (!editando && tipo === 'despesa' && contaEscolhida?.tipo === 'cartao_credito' && contaEscolhida.dia_vencimento) {
       const dataCompra = new Date(dataLanc + 'T12:00:00')
       let mesFatura = dataCompra.getMonth()
       if (contaEscolhida.dia_fechamento && dataCompra.getDate() > contaEscolhida.dia_fechamento) {
