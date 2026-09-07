@@ -137,7 +137,6 @@ export default function MovimentosPage() {
   const [saldoContaReal, setSaldoContaReal] = useState<number | null>(null)
   const [modalSaldoContaOpen, setModalSaldoContaOpen] = useState(false)
   const [saldoInicialInput, setSaldoInicialInput] = useState('')
-  const [dataReferenciaInput, setDataReferenciaInput] = useState('')
   const [salvandoSaldoConta, setSalvandoSaldoConta] = useState(false)
   const [pagandoFatura, setPagandoFatura] = useState<string | null>(null)
   const [erroFatura, setErroFatura] = useState('')
@@ -395,27 +394,21 @@ export default function MovimentosPage() {
     setFaturasPendentes(totais)
   }
 
-  // Saldo real da conta corrente = saldo inicial + tudo que entrou/saiu dela desde a data
-  // de referência. Só conta lançamentos com conta_id = conta corrente (compras no cartão só
-  // afetam isso quando a fatura é paga, via o lançamento consolidado "Pagamento de fatura").
+  // Saldo da conta = exatamente o número que você digitar, sem somar nenhum lançamento.
+  // Simples assim de propósito — você atualiza esse valor quando quiser (olhando o extrato
+  // real do banco), e a gente só compara ele direto com a fatura pendente.
   async function carregarSaldoContaReal(fid: string, listaContas: any[]) {
     const contaCorrente = listaContas.find((c: any) => c.tipo === 'corrente')
-    if (!contaCorrente || contaCorrente.data_referencia == null) { setSaldoContaReal(null); return }
-    const { data, error } = await supabase.from('lancamentos').select('tipo, valor')
-      .eq('familia_id', fid).eq('conta_id', contaCorrente.id).gte('data', contaCorrente.data_referencia)
-    if (error) { console.error('Erro ao calcular saldo real da conta:', error); return }
-    const movimentado = (data || []).reduce((s: number, l: any) =>
-      s + (l.tipo === 'receita' ? Number(l.valor) : -Number(l.valor)), 0)
-    setSaldoContaReal(Number(contaCorrente.saldo_inicial || 0) + movimentado)
+    if (!contaCorrente || contaCorrente.saldo_inicial == null) { setSaldoContaReal(null); return }
+    setSaldoContaReal(Number(contaCorrente.saldo_inicial))
   }
 
   async function handleSalvarSaldoConta() {
     const contaCorrente = contas.find(c => c.tipo === 'corrente')
-    if (!contaCorrente || !dataReferenciaInput) return
+    if (!contaCorrente || !saldoInicialInput) return
     setSalvandoSaldoConta(true)
     const payload = {
-      saldo_inicial: saldoInicialInput ? Number(saldoInicialInput.replace(',', '.')) : 0,
-      data_referencia: dataReferenciaInput,
+      saldo_inicial: Number(saldoInicialInput.replace(',', '.')),
     }
     const { data: contaAtualizada, error } = await supabase.from('contas')
       .update(payload).eq('id', contaCorrente.id).select().single()
@@ -425,7 +418,7 @@ export default function MovimentosPage() {
       await carregarSaldoContaReal(familiaIdRef.current, novasContas)
       setModalSaldoContaOpen(false)
     } else {
-      console.error('Erro ao salvar saldo inicial da conta:', error)
+      console.error('Erro ao salvar saldo da conta:', error)
     }
     setSalvandoSaldoConta(false)
   }
@@ -433,7 +426,6 @@ export default function MovimentosPage() {
   function abrirModalSaldoConta() {
     const contaCorrente = contas.find(c => c.tipo === 'corrente')
     setSaldoInicialInput(contaCorrente?.saldo_inicial != null ? String(contaCorrente.saldo_inicial) : '')
-    setDataReferenciaInput(contaCorrente?.data_referencia || dataLocalISO(new Date()))
     setModalSaldoContaOpen(true)
   }
 
@@ -2302,18 +2294,16 @@ export default function MovimentosPage() {
               </button>
             </div>
             <p style={{ fontSize: '12px', color: '#64748B', margin: '0 0 16px', lineHeight: 1.4 }}>
-              Informe quanto você tinha na conta em uma data certa (olhando o extrato real do banco).
-              A partir daí, o Finify soma/subtrai automaticamente tudo que for lançado na conta corrente.
+              Digite quanto você tem na conta agora, olhando o extrato real do banco. É esse número,
+              exatamente como digitado, que vai ser comparado com a fatura pendente do cartão — sem
+              somar nem subtrair nenhum lançamento automaticamente. Atualize aqui sempre que quiser.
             </p>
-            <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Saldo nessa data</p>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Saldo atual</p>
             <input type="text" inputMode="decimal" value={saldoInicialInput} onChange={e => setSaldoInicialInput(e.target.value)}
               placeholder="Ex: 4922,75"
-              style={{ width: '100%', height: '44px', padding: '0 14px', borderRadius: '12px', border: '1px solid #E2E8F0', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box', marginBottom: '12px' }} />
-            <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Data desse saldo</p>
-            <input type="date" value={dataReferenciaInput} onChange={e => setDataReferenciaInput(e.target.value)}
               style={{ width: '100%', height: '44px', padding: '0 14px', borderRadius: '12px', border: '1px solid #E2E8F0', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box', marginBottom: '16px' }} />
-            <button onClick={handleSalvarSaldoConta} disabled={salvandoSaldoConta || !dataReferenciaInput}
-              style={{ width: '100%', height: '46px', borderRadius: '12px', border: 'none', backgroundColor: '#0E3B2E', color: '#fff', fontSize: '14px', fontWeight: 600, cursor: salvandoSaldoConta || !dataReferenciaInput ? 'not-allowed' : 'pointer', opacity: salvandoSaldoConta || !dataReferenciaInput ? 0.6 : 1 }}>
+            <button onClick={handleSalvarSaldoConta} disabled={salvandoSaldoConta || !saldoInicialInput}
+              style={{ width: '100%', height: '46px', borderRadius: '12px', border: 'none', backgroundColor: '#0E3B2E', color: '#fff', fontSize: '14px', fontWeight: 600, cursor: salvandoSaldoConta || !saldoInicialInput ? 'not-allowed' : 'pointer', opacity: salvandoSaldoConta || !saldoInicialInput ? 0.6 : 1 }}>
               {salvandoSaldoConta ? 'Salvando...' : 'Salvar'}
             </button>
           </div>
