@@ -143,7 +143,7 @@ export default function MovimentosPage() {
   const [erroFatura, setErroFatura] = useState('')
   const [erroFaturaCartaoId, setErroFaturaCartaoId] = useState<string | null>(null)
   const [cartaoDetalhado, setCartaoDetalhado] = useState<string | null>(null)
-  const [despesasFixasAberto, setDespesasFixasAberto] = useState(true)
+  const [despesasFixasAberto, setDespesasFixasAberto] = useState(false)
   const [itensCartaoDetalhe, setItensCartaoDetalhe] = useState<any[]>([])
   const [carregandoDetalheCartao, setCarregandoDetalheCartao] = useState(false)
   const [faturasPendentes, setFaturasPendentes] = useState<Record<string, number>>({})
