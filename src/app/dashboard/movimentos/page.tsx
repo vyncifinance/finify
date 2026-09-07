@@ -131,6 +131,14 @@ export default function MovimentosPage() {
   const [editandoCartaoId, setEditandoCartaoId] = useState<string | null>(null)
   const [confirmDeleteCartao, setConfirmDeleteCartao] = useState(false)
   const [deletandoCartao, setDeletandoCartao] = useState(false)
+  // Saldo real da conta corrente: saldo inicial (o que já tinha antes do Finify) + tudo
+  // que entrou/saiu da própria conta corrente desde a data de referência — número literal,
+  // pra comparar direto com a fatura pendente, sem entrar na conta de resultado/despesas fixas.
+  const [saldoContaReal, setSaldoContaReal] = useState<number | null>(null)
+  const [modalSaldoContaOpen, setModalSaldoContaOpen] = useState(false)
+  const [saldoInicialInput, setSaldoInicialInput] = useState('')
+  const [dataReferenciaInput, setDataReferenciaInput] = useState('')
+  const [salvandoSaldoConta, setSalvandoSaldoConta] = useState(false)
   const [pagandoFatura, setPagandoFatura] = useState<string | null>(null)
   const [erroFatura, setErroFatura] = useState('')
   const [erroFaturaCartaoId, setErroFaturaCartaoId] = useState<string | null>(null)
@@ -163,6 +171,9 @@ export default function MovimentosPage() {
   }, [mesRef])
   useEffect(() => {
     if (familiaIdRef.current) carregarFaturasPendentes(familiaIdRef.current, contas)
+  }, [contas])
+  useEffect(() => {
+    if (familiaIdRef.current) carregarSaldoContaReal(familiaIdRef.current, contas)
   }, [contas])
   useEffect(() => {
     setLimiteDias(15)
@@ -219,7 +230,7 @@ export default function MovimentosPage() {
       setContas(contasData || [])
       const contaCorrente = (contasData || []).find((c: any) => c.tipo === 'corrente')
       if (contaCorrente) setContaSelecionadaId(contaCorrente.id)
-      await carregarFaturasPendentes(fid, contasData || [])
+      await carregarFaturasPendentes(fid, contasData || []); await carregarSaldoContaReal(fid, contasData || [])
 
       // Restaura o último contexto usado nesse dispositivo (se ainda existir)
       let contexto: { tipo: 'pessoal' | 'empresa'; empresaId?: string; nome: string } = { tipo: 'pessoal', nome: nomeFam }
@@ -384,6 +395,48 @@ export default function MovimentosPage() {
     setFaturasPendentes(totais)
   }
 
+  // Saldo real da conta corrente = saldo inicial + tudo que entrou/saiu dela desde a data
+  // de referência. Só conta lançamentos com conta_id = conta corrente (compras no cartão só
+  // afetam isso quando a fatura é paga, via o lançamento consolidado "Pagamento de fatura").
+  async function carregarSaldoContaReal(fid: string, listaContas: any[]) {
+    const contaCorrente = listaContas.find((c: any) => c.tipo === 'corrente')
+    if (!contaCorrente || contaCorrente.data_referencia == null) { setSaldoContaReal(null); return }
+    const { data, error } = await supabase.from('lancamentos').select('tipo, valor')
+      .eq('familia_id', fid).eq('conta_id', contaCorrente.id).gte('data', contaCorrente.data_referencia)
+    if (error) { console.error('Erro ao calcular saldo real da conta:', error); return }
+    const movimentado = (data || []).reduce((s: number, l: any) =>
+      s + (l.tipo === 'receita' ? Number(l.valor) : -Number(l.valor)), 0)
+    setSaldoContaReal(Number(contaCorrente.saldo_inicial || 0) + movimentado)
+  }
+
+  async function handleSalvarSaldoConta() {
+    const contaCorrente = contas.find(c => c.tipo === 'corrente')
+    if (!contaCorrente || !dataReferenciaInput) return
+    setSalvandoSaldoConta(true)
+    const payload = {
+      saldo_inicial: saldoInicialInput ? Number(saldoInicialInput.replace(',', '.')) : 0,
+      data_referencia: dataReferenciaInput,
+    }
+    const { data: contaAtualizada, error } = await supabase.from('contas')
+      .update(payload).eq('id', contaCorrente.id).select().single()
+    if (!error && contaAtualizada) {
+      const novasContas = contas.map(c => c.id === contaCorrente.id ? contaAtualizada : c)
+      setContas(novasContas)
+      await carregarSaldoContaReal(familiaIdRef.current, novasContas)
+      setModalSaldoContaOpen(false)
+    } else {
+      console.error('Erro ao salvar saldo inicial da conta:', error)
+    }
+    setSalvandoSaldoConta(false)
+  }
+
+  function abrirModalSaldoConta() {
+    const contaCorrente = contas.find(c => c.tipo === 'corrente')
+    setSaldoInicialInput(contaCorrente?.saldo_inicial != null ? String(contaCorrente.saldo_inicial) : '')
+    setDataReferenciaInput(contaCorrente?.data_referencia || dataLocalISO(new Date()))
+    setModalSaldoContaOpen(true)
+  }
+
   async function handleCriarCartao() {
     if (!novoCartaoNome.trim()) return
     setSalvandoCartao(true)
@@ -533,12 +586,12 @@ export default function MovimentosPage() {
       setErroFaturaCartaoId(cartaoId)
       setPagandoFatura(null)
       await carregarLancamentos(fid)
-      await carregarFaturasPendentes(fid, contas)
+      await carregarFaturasPendentes(fid, contas); await carregarSaldoContaReal(fid, contas)
       return
     }
 
     await carregarLancamentos(fid)
-    await carregarFaturasPendentes(fid, contas)
+    await carregarFaturasPendentes(fid, contas); await carregarSaldoContaReal(fid, contas)
     setPagandoFatura(null)
   }
 
@@ -597,7 +650,7 @@ export default function MovimentosPage() {
         if (editando.meta_id) await ajustarValorAtualMeta(editando.meta_id, valorNum - Number(editando.valor))
       }
       setSalvando(false)
-      if (!error) { setModalOpen(false); await carregarLancamentos(fid); await carregarFaturasPendentes(fid, contas) }
+      if (!error) { setModalOpen(false); await carregarLancamentos(fid); await carregarFaturasPendentes(fid, contas); await carregarSaldoContaReal(fid, contas) }
     } else if (parcelado && tipo === 'despesa') {
       // Lançamento parcelado — cria N lançamentos. Aporte automático em posição não se aplica
       // aqui (compra parcelada não é, na prática, um aporte de investimento recorrente).
@@ -637,7 +690,7 @@ export default function MovimentosPage() {
       }
       const { error } = await supabase.from('lancamentos').insert(inserts)
       setSalvando(false)
-      if (!error) { setModalOpen(false); await carregarLancamentos(fid); await carregarFaturasPendentes(fid, contas) }
+      if (!error) { setModalOpen(false); await carregarLancamentos(fid); await carregarFaturasPendentes(fid, contas); await carregarSaldoContaReal(fid, contas) }
     } else {
       // Despesa "Investimentos" alocada pra uma meta usa o mesmo fluxo único do botão
       // "Aportar" da tela de Metas — trata meta automática, data de hoje, descrição padrão etc.
@@ -674,7 +727,7 @@ export default function MovimentosPage() {
         await aplicarAporteEmPosicao(posicaoParaAporte, novoLancamento.id, valorNum, dataFinal)
       }
       setSalvando(false)
-      if (!error) { setModalOpen(false); await carregarLancamentos(fid); await carregarFaturasPendentes(fid, contas) }
+      if (!error) { setModalOpen(false); await carregarLancamentos(fid); await carregarFaturasPendentes(fid, contas); await carregarSaldoContaReal(fid, contas) }
     }
   }
 
@@ -693,7 +746,7 @@ export default function MovimentosPage() {
     if (!error) {
       setLancamentos(prev => prev.filter((l: any) => l.id !== editando.id))
       setModalOpen(false)
-      await carregarFaturasPendentes(familiaIdRef.current, contas)
+      await carregarFaturasPendentes(familiaIdRef.current, contas); await carregarSaldoContaReal(familiaIdRef.current, contas)
     }
   }
 
@@ -802,7 +855,7 @@ export default function MovimentosPage() {
         await recarregarDespesasFixas(fid)
       }
       await carregarLancamentos(fid)
-      await carregarFaturasPendentes(fid, contas)
+      await carregarFaturasPendentes(fid, contas); await carregarSaldoContaReal(fid, contas)
     } else {
       console.error('Erro ao registrar pagamento:', error)
       setDfErro(error.message || 'Não foi possível registrar o pagamento. Tente novamente.')
@@ -1039,6 +1092,59 @@ export default function MovimentosPage() {
                   </p>
                 </div>
               )}
+            </div>
+          )
+        })()}
+
+        {/* Saldo real da conta corrente vs. fatura pendente — número literal, sem entrar na
+            conta de resultado/despesas fixas pendentes do card acima. */}
+        {(() => {
+          const contaCorrente = contas.find((c: any) => c.tipo === 'corrente')
+          if (!contaCorrente) return null
+          if (saldoContaReal === null) {
+            return (
+              <button onClick={abrirModalSaldoConta} style={{
+                width: '100%', textAlign: 'left', backgroundColor: '#F8FAFC', border: '1px dashed #CBD5E1',
+                borderRadius: isMob ? '14px' : '16px', padding: isMob ? '14px' : '18px',
+                marginBottom: '10px', cursor: 'pointer',
+              }}>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>
+                  Definir saldo da conta
+                </span>
+                <p style={{ fontSize: '11.5px', color: '#94A3B8', margin: '4px 0 0' }}>
+                  Configure o saldo inicial pra comparar direto com a fatura pendente do cartão.
+                </p>
+              </button>
+            )
+          }
+          const excedidoConta = saldoContaReal < totalFaturasPendentes
+          return (
+            <div style={{
+              backgroundColor: '#fff', border: '1px solid #E2E8F0',
+              borderRadius: isMob ? '14px' : '16px', padding: isMob ? '14px' : '18px',
+              marginBottom: '10px',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Saldo em conta vs. fatura
+                </span>
+                <button onClick={abrirModalSaldoConta} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}>
+                  <Pencil size={13} strokeWidth={2} />
+                </button>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: isMob ? '13px' : '14px', fontWeight: 700, color: '#0F172A' }}>
+                  {fmt(saldoContaReal)} <span style={{ fontSize: '11.5px', fontWeight: 500, color: '#94A3B8' }}>em conta</span>
+                </span>
+                <span style={{ fontSize: isMob ? '13px' : '14px', fontWeight: 700, color: '#0F172A' }}>
+                  {fmt(totalFaturasPendentes)} <span style={{ fontSize: '11.5px', fontWeight: 500, color: '#94A3B8' }}>na fatura</span>
+                </span>
+              </div>
+              <p style={{ fontSize: '12px', fontWeight: 600, color: excedidoConta ? '#DC2626' : '#059669', margin: '10px 0 0' }}>
+                {excedidoConta
+                  ? `Falta ${fmt(totalFaturasPendentes - saldoContaReal)} pra cobrir a fatura`
+                  : `Sobra ${fmt(saldoContaReal - totalFaturasPendentes)} depois de cobrir a fatura`}
+              </p>
             </div>
           )
         })()}
@@ -2215,6 +2321,38 @@ export default function MovimentosPage() {
           </div>
         </div>
       )}
+
+      {/* Modal Saldo em Conta */}
+      {modalSaldoContaOpen && (
+        <div onClick={e => { if (e.target === e.currentTarget) setModalSaldoContaOpen(false) }}
+          style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.5)' }}>
+          <div style={{ width: isMobile ? '100%' : '380px', backgroundColor: '#fff', borderRadius: isMobile ? '28px 28px 0 0' : '20px', padding: '24px' }}>
+            {isMobile && <div style={{ width: '40px', height: '4px', borderRadius: '2px', backgroundColor: '#E2E8F0', margin: '-8px auto 16px' }} />}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', margin: 0 }}>Saldo da conta</h2>
+              <button onClick={() => setModalSaldoContaOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}>
+                <X size={20} strokeWidth={2} />
+              </button>
+            </div>
+            <p style={{ fontSize: '12px', color: '#64748B', margin: '0 0 16px', lineHeight: 1.4 }}>
+              Informe quanto você tinha na conta em uma data certa (olhando o extrato real do banco).
+              A partir daí, o Finify soma/subtrai automaticamente tudo que for lançado na conta corrente.
+            </p>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Saldo nessa data</p>
+            <input type="text" inputMode="decimal" value={saldoInicialInput} onChange={e => setSaldoInicialInput(e.target.value)}
+              placeholder="Ex: 4922,75"
+              style={{ width: '100%', height: '44px', padding: '0 14px', borderRadius: '12px', border: '1px solid #E2E8F0', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box', marginBottom: '12px' }} />
+            <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Data desse saldo</p>
+            <input type="date" value={dataReferenciaInput} onChange={e => setDataReferenciaInput(e.target.value)}
+              style={{ width: '100%', height: '44px', padding: '0 14px', borderRadius: '12px', border: '1px solid #E2E8F0', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box', marginBottom: '16px' }} />
+            <button onClick={handleSalvarSaldoConta} disabled={salvandoSaldoConta || !dataReferenciaInput}
+              style={{ width: '100%', height: '46px', borderRadius: '12px', border: 'none', backgroundColor: '#0E3B2E', color: '#fff', fontSize: '14px', fontWeight: 600, cursor: salvandoSaldoConta || !dataReferenciaInput ? 'not-allowed' : 'pointer', opacity: salvandoSaldoConta || !dataReferenciaInput ? 0.6 : 1 }}>
+              {salvandoSaldoConta ? 'Salvando...' : 'Salvar'}
+            </button>
+          </div>
+        </div>
+      )}
     </>
   )
 }
+
