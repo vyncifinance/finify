@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import {
-  LayoutDashboard, ArrowLeftRight, Target, User, LogOut, Menu, ChevronLeft, ChevronRight, TrendingUp, Eye, EyeOff, Route, HelpCircle
+  LayoutDashboard, ArrowLeftRight, Target, User, LogOut, Menu, ChevronLeft, ChevronRight, TrendingUp, Eye, EyeOff, Route, HelpCircle, CalendarClock
 } from 'lucide-react'
 
 // Portal (desktop, acessado pelo computador) — sidebar completa
@@ -14,6 +14,7 @@ const NAV = [
   { href: '/dashboard',               icon: LayoutDashboard, label: 'Dashboard'     },
   { href: '/dashboard/linha-do-tempo',icon: Route,           label: 'Linha do Tempo'},
   { href: '/dashboard/movimentos',    icon: ArrowLeftRight,  label: 'Movimentos'    },
+  { href: '/dashboard/previsao',      icon: CalendarClock,   label: 'Previsão'      },
   { href: '/dashboard/metas',         icon: Target,          label: 'Metas'         },
   { href: '/dashboard/investimentos', icon: TrendingUp,      label: 'Investimentos' },
   { href: '/dashboard/perfil',        icon: User,            label: 'Perfil'        },
@@ -23,6 +24,7 @@ const NAV = [
 const NAV_MOBILE = [
   { href: '/dashboard',               icon: LayoutDashboard, label: 'Dashboard'     },
   { href: '/dashboard/movimentos',    icon: ArrowLeftRight,  label: 'Movimentos'    },
+  { href: '/dashboard/previsao',      icon: CalendarClock,   label: 'Previsão'      },
   { href: '/dashboard/metas',         icon: Target,          label: 'Metas'         },
   { href: '/dashboard/investimentos', icon: TrendingUp,      label: 'Investimentos' },
   { href: '/dashboard/perfil',        icon: User,            label: 'Perfil'        },
