@@ -366,6 +366,29 @@ export default function PrevisaoPage() {
               </div>
 
               <div style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '18px', padding: '18px' }}>
+                <h3 style={{ fontSize: '13.5px', fontWeight: 700, color: '#0F172A', margin: '0 0 2px' }}>Estimativa de receitas</h3>
+                <p style={{ fontSize: '11.5px', color: '#94A3B8', margin: '0 0 14px' }}>Média real dos últimos {HISTORICO_MESES} meses, por origem — inclui salário lançado normalmente, sem precisar cadastrar como receita fixa.</p>
+                {resultado.categoriasReceita.filter(c => c.mediaVariavel > 1).length === 0 ? (
+                  <p style={{ fontSize: '12.5px', color: '#94A3B8', textAlign: 'center', padding: '16px 0' }}>Ainda não há histórico de receita suficiente pra estimar.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {resultado.categoriasReceita.filter(c => c.mediaVariavel > 1).slice(0, 8).map(c => {
+                      const Icon = ICONES_CAT[c.categoria] || MoreHorizontal
+                      return (
+                        <div key={c.categoria} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{ width: '26px', height: '26px', borderRadius: '8px', backgroundColor: COR_POSITIVO + '18', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <Icon size={13} color={COR_POSITIVO} strokeWidth={1.75} />
+                          </div>
+                          <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#0F172A', flex: 1 }}>{c.categoria}</span>
+                          <span style={{ fontSize: '12.5px', fontWeight: 600, color: COR_POSITIVO }}>~{fmtOculto(c.mediaVariavel, ocultar)}/mês</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '18px', padding: '18px' }}>
                 <h3 style={{ fontSize: '13.5px', fontWeight: 700, color: '#0F172A', margin: '0 0 2px' }}>Estimativa de gastos variáveis</h3>
                 <p style={{ fontSize: '11.5px', color: '#94A3B8', margin: '0 0 14px' }}>Média real dos últimos {HISTORICO_MESES} meses, por categoria — repetida em todos os meses futuros.</p>
                 {resultado.categorias.filter(c => c.mediaVariavel > 1).length === 0 ? (
@@ -394,8 +417,9 @@ export default function PrevisaoPage() {
               <Info size={14} color="#94A3B8" strokeWidth={1.75} style={{ flexShrink: 0, marginTop: '1px' }} />
               <p style={{ fontSize: '11.5px', color: '#94A3B8', margin: 0, lineHeight: 1.5 }}>
                 Esta previsão soma o que já está lançado (parcelas e compras no cartão com data futura), suas despesas e receitas
-                fixas cadastradas em Movimentos, e uma estimativa de gasto variável baseada na sua média real recente. Não considera
-                aportes em metas nem variações sazonais — quanto mais distante o mês, menos precisa tende a ser a estimativa.
+                fixas cadastradas em Movimentos, e uma estimativa de receita e de gasto variável baseada na sua média real dos
+                últimos {HISTORICO_MESES} meses — inclusive salário lançado manualmente todo mês, sem precisar virar receita fixa.
+                Não considera aportes em metas nem variações sazonais — quanto mais distante o mês, menos precisa tende a ser a estimativa.
               </p>
             </div>
           </>

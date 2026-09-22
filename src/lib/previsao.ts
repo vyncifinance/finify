@@ -43,6 +43,7 @@ export type MesPrevisto = {
   chave: string // "2026-12"
   receitaConhecida: number
   receitaFixaProjetada: number
+  receitaVariavelEstimada: number
   receitaPrevista: number
   despesaConhecida: number
   despesaFixaProjetada: number
@@ -73,6 +74,7 @@ export type CompromissoFixo = {
 export type ResultadoPrevisao = {
   meses: MesPrevisto[]
   categorias: CategoriaEstimativa[]
+  categoriasReceita: CategoriaEstimativa[]
   compromissosFixos: CompromissoFixo[]
 }
 
@@ -112,46 +114,57 @@ export function calcularPrevisao({
   const validos = lancamentos.filter(l => contarComoDespesa(l, idsCartoes))
 
   // ── 1. Histórico: média real dos últimos `mesesHistorico` meses fechados (antes do mês
-  // atual), por categoria de despesa. Divide só pelos meses que de fato têm lançamento —
-  // mesma lógica já usada no Dashboard pra não distorcer com meses "vazios" de antes de
-  // o usuário começar a usar o app.
+  // atual), por categoria — tanto de despesa quanto de receita. Divide só pelos meses que
+  // de fato têm lançamento daquele tipo — mesma lógica já usada no Dashboard pra não
+  // distorcer com meses "vazios" de antes de o usuário começar a usar o app.
+  //
+  // Isso cobre o caso mais comum de receita: salário lançado à mão todo mês como uma
+  // "Receita" normal (categoria Salário), sem passar pelo cadastro de "receita fixa" em
+  // Movimentos. Sem essa média, a previsão só enxergaria receita se ela estivesse
+  // cadastrada como fixa ou já lançada com data futura — e ficaria zerada pra quase todo
+  // mundo.
   const chavesHistorico: string[] = []
   for (let i = mesesHistorico; i >= 1; i--) {
     const ref = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1)
     chavesHistorico.push(chaveMes(ref.getFullYear(), ref.getMonth()))
   }
 
-  const totalPorCategoriaPorMes: Record<string, Record<string, number>> = {}
-  const fixoPorCategoriaPorMes: Record<string, Record<string, number>> = {}
-  const mesesComDado = new Set<string>()
+  const totalPorCategoriaPorMes: Record<'despesa' | 'receita', Record<string, Record<string, number>>> = { despesa: {}, receita: {} }
+  const fixoPorCategoriaPorMes: Record<'despesa' | 'receita', Record<string, Record<string, number>>> = { despesa: {}, receita: {} }
+  const mesesComDado: Record<'despesa' | 'receita', Set<string>> = { despesa: new Set(), receita: new Set() }
 
   validos
-    .filter(l => l.tipo === 'despesa' && !CATEGORIAS_ALOCACAO.has(l.categoria))
+    .filter(l => !(l.tipo === 'despesa' && CATEGORIAS_ALOCACAO.has(l.categoria)))
     .forEach(l => {
       const chave = chaveDoLancamento(l.data)
       if (!chavesHistorico.includes(chave)) return
-      mesesComDado.add(chave)
-      totalPorCategoriaPorMes[chave] = totalPorCategoriaPorMes[chave] || {}
-      totalPorCategoriaPorMes[chave][l.categoria] = (totalPorCategoriaPorMes[chave][l.categoria] || 0) + Number(l.valor)
+      const tipo = l.tipo
+      mesesComDado[tipo].add(chave)
+      totalPorCategoriaPorMes[tipo][chave] = totalPorCategoriaPorMes[tipo][chave] || {}
+      totalPorCategoriaPorMes[tipo][chave][l.categoria] = (totalPorCategoriaPorMes[tipo][chave][l.categoria] || 0) + Number(l.valor)
       if (l.despesa_fixa_id) {
-        fixoPorCategoriaPorMes[chave] = fixoPorCategoriaPorMes[chave] || {}
-        fixoPorCategoriaPorMes[chave][l.categoria] = (fixoPorCategoriaPorMes[chave][l.categoria] || 0) + Number(l.valor)
+        fixoPorCategoriaPorMes[tipo][chave] = fixoPorCategoriaPorMes[tipo][chave] || {}
+        fixoPorCategoriaPorMes[tipo][chave][l.categoria] = (fixoPorCategoriaPorMes[tipo][chave][l.categoria] || 0) + Number(l.valor)
       }
     })
 
-  const qtdMesesComDado = Math.max(mesesComDado.size, 1)
-  const todasCategorias = new Set<string>()
-  Object.values(totalPorCategoriaPorMes).forEach(porCat => Object.keys(porCat).forEach(c => todasCategorias.add(c)))
+  function construirCategorias(tipo: 'despesa' | 'receita'): CategoriaEstimativa[] {
+    const qtd = Math.max(mesesComDado[tipo].size, 1)
+    const todas = new Set<string>()
+    Object.values(totalPorCategoriaPorMes[tipo]).forEach(porCat => Object.keys(porCat).forEach(c => todas.add(c)))
+    return Array.from(todas).map(categoria => {
+      const somaTotal = chavesHistorico.reduce((s, chave) => s + (totalPorCategoriaPorMes[tipo][chave]?.[categoria] || 0), 0)
+      const somaFixa = chavesHistorico.reduce((s, chave) => s + (fixoPorCategoriaPorMes[tipo][chave]?.[categoria] || 0), 0)
+      const mediaTotal = somaTotal / qtd
+      const mediaFixa = somaFixa / qtd
+      return { categoria, mediaTotal, mediaFixa, mediaVariavel: Math.max(mediaTotal - mediaFixa, 0) }
+    }).sort((a, b) => b.mediaVariavel - a.mediaVariavel)
+  }
 
-  const categorias: CategoriaEstimativa[] = Array.from(todasCategorias).map(categoria => {
-    const somaTotal = chavesHistorico.reduce((s, chave) => s + (totalPorCategoriaPorMes[chave]?.[categoria] || 0), 0)
-    const somaFixa = chavesHistorico.reduce((s, chave) => s + (fixoPorCategoriaPorMes[chave]?.[categoria] || 0), 0)
-    const mediaTotal = somaTotal / qtdMesesComDado
-    const mediaFixa = somaFixa / qtdMesesComDado
-    return { categoria, mediaTotal, mediaFixa, mediaVariavel: Math.max(mediaTotal - mediaFixa, 0) }
-  }).sort((a, b) => b.mediaVariavel - a.mediaVariavel)
-
+  const categorias = construirCategorias('despesa')
+  const categoriasReceita = construirCategorias('receita')
   const estimativaVariavelTotal = categorias.reduce((s, c) => s + c.mediaVariavel, 0)
+  const estimativaReceitaVariavelTotal = categoriasReceita.reduce((s, c) => s + c.mediaVariavel, 0)
 
   // ── 2. Compromissos fixos ativos (despesas_fixas) — o mesmo conjunto todo mês,
   // usado tanto pra projetar valores futuros quanto pra listar de forma transparente
@@ -205,7 +218,8 @@ export function calcularPrevisao({
       else despesaFixaProjetada += valor
     })
 
-    const receitaPrevista = receitaConhecida + receitaFixaProjetada
+    const receitaVariavelEstimada = estimativaReceitaVariavelTotal
+    const receitaPrevista = receitaConhecida + receitaFixaProjetada + receitaVariavelEstimada
     const despesaVariavelEstimada = estimativaVariavelTotal
     const despesaPrevista = despesaConhecida + despesaFixaProjetada + despesaVariavelEstimada
     const saldoMes = receitaPrevista - despesaPrevista
@@ -218,13 +232,13 @@ export function calcularPrevisao({
 
     meses.push({
       ano, mes, chave,
-      receitaConhecida, receitaFixaProjetada, receitaPrevista,
+      receitaConhecida, receitaFixaProjetada, receitaVariavelEstimada, receitaPrevista,
       despesaConhecida, despesaFixaProjetada, despesaVariavelEstimada, despesaPrevista,
       saldoMes, saldoAcumulado, status,
     })
   }
 
-  return { meses, categorias, compromissosFixos }
+  return { meses, categorias, categoriasReceita, compromissosFixos }
 }
 
 // Simulador — "dá pra gastar R$ X a mais nesse mês?"
