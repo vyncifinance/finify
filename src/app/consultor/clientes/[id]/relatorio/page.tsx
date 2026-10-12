@@ -88,7 +88,9 @@ export default function RelatorioPage() {
     setConsultoria(consultoriaData)
     const fid = consultoriaData.familia_id
 
-    const { data: contasData } = await supabase.from('contas').select('id, tipo').eq('familia_id', fid)
+    // Mesmo corte dos lançamentos lidos abaixo (empresa_id null): sem cartão de CNPJ aqui.
+    const { data: contasData } = await supabase.from('contas').select('id, tipo')
+      .eq('familia_id', fid).is('empresa_id', null)
     const idsCartoes = new Set((contasData || []).filter((c: any) => c.tipo === 'cartao_credito').map((c: any) => c.id))
     const contarComoDespesa = (l: any) => {
       if (l.categoria === 'Cartão de Crédito' && !idsCartoes.has(l.conta_id)) return false

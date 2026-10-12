@@ -224,13 +224,6 @@ export default function MovimentosPage() {
         .order('created_at', { ascending: false })
       setMetas(metasData || [])
 
-      const { data: contasData } = await supabase.from('contas')
-        .select('*').eq('familia_id', fid).order('created_at', { ascending: true })
-      setContas(contasData || [])
-      const contaCorrente = (contasData || []).find((c: any) => c.tipo === 'corrente')
-      if (contaCorrente) setContaSelecionadaId(contaCorrente.id)
-      await carregarFaturasPendentes(fid, contasData || []); await carregarSaldoContaReal(fid, contasData || [])
-
       // Restaura o último contexto usado nesse dispositivo (se ainda existir)
       let contexto: { tipo: 'pessoal' | 'empresa'; empresaId?: string; nome: string } = { tipo: 'pessoal', nome: nomeFam }
       try {
@@ -245,6 +238,9 @@ export default function MovimentosPage() {
       } catch {}
       setContextoAtivo(contexto)
 
+      // As contas precisam ser carregadas DEPOIS de resolver o contexto, porque agora
+      // elas dependem dele — um cartão de CNPJ não existe no fluxo pessoal.
+      await recarregarContas(fid, contexto)
       await carregarLancamentos(fid, profile.nome, nomeFam, contexto)
       await recarregarDespesasFixas(fid, contexto)
     }
@@ -255,8 +251,27 @@ export default function MovimentosPage() {
     setContextoAtivo(novo)
     setContextoAberto(false)
     try { localStorage.setItem('finify_contexto', JSON.stringify(novo)) } catch {}
+    recarregarContas(familiaIdRef.current, novo)
     carregarLancamentos(familiaIdRef.current, membroAtual, familiaNome, novo)
     recarregarDespesasFixas(familiaIdRef.current, novo)
+  }
+
+  // Contas e cartões seguem o contexto, igual a lancamentos e despesas_fixas.
+  // Sem isso, o cartão cadastrado no CNPJ aparecia na tela da família e a fatura
+  // dele era comparada com o saldo da conta corrente pessoal.
+  async function recarregarContas(fid: string, contexto?: { tipo: 'pessoal' | 'empresa'; empresaId?: string }) {
+    if (!fid) return
+    const ctx = contexto || contextoAtivo
+    let query = supabase.from('contas').select('*').eq('familia_id', fid)
+    query = ctx.tipo === 'empresa' && ctx.empresaId
+      ? query.eq('empresa_id', ctx.empresaId)
+      : query.is('empresa_id', null)
+    const { data } = await query.order('created_at', { ascending: true })
+    const lista = data || []
+    setContas(lista)
+    const contaCorrente = lista.find((c: any) => c.tipo === 'corrente')
+    setContaSelecionadaId(contaCorrente?.id || '')
+    // As faturas pendentes e o saldo são recalculados pelos efeitos que observam `contas`.
   }
 
   async function recarregarDespesasFixas(fid: string, contexto?: { tipo: 'pessoal' | 'empresa'; empresaId?: string }) {
@@ -446,8 +461,12 @@ export default function MovimentosPage() {
         fecharModalCartao()
       }
     } else {
+      // O cartão nasce no contexto em que foi criado: dentro de uma empresa ele fica
+      // vinculado ao CNPJ e não aparece mais no fluxo pessoal.
       const { data: novaConta, error } = await supabase.from('contas').insert({
-        familia_id: familiaIdRef.current, tipo: 'cartao_credito', ...payload,
+        familia_id: familiaIdRef.current, tipo: 'cartao_credito',
+        empresa_id: contextoAtivo.tipo === 'empresa' ? contextoAtivo.empresaId : null,
+        ...payload,
       }).select().single()
       if (!error && novaConta) {
         setContas(prev => [...prev, novaConta])

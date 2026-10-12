@@ -87,7 +87,10 @@ export default function PrevisaoPage() {
     const fid = profile.familia_id
     setFamiliaId(fid)
 
-    const { data: contasData } = await supabase.from('contas').select('id, tipo').eq('familia_id', fid)
+    // Esta tela é só do fluxo pessoal (fixas e lançamentos abaixo já usam empresa_id null),
+    // então as contas/cartões também precisam excluir os que pertencem a uma empresa.
+    const { data: contasData } = await supabase.from('contas').select('id, tipo')
+      .eq('familia_id', fid).is('empresa_id', null)
     setContas(contasData || [])
 
     const { data: fixasData } = await supabase.from('despesas_fixas').select('*')

@@ -92,7 +92,10 @@ export default function ConsultorClienteDetalhePage() {
     const fid = consultoriaData.familia_id
     setFamiliaId(fid)
 
-    const { data: contasData } = await supabase.from('contas').select('id, tipo').eq('familia_id', fid)
+    // Os lançamentos lidos abaixo são só os pessoais (empresa_id null); as contas/cartões
+    // precisam do mesmo corte, senão um cartão de CNPJ entra no diagnóstico da família.
+    const { data: contasData } = await supabase.from('contas').select('id, tipo')
+      .eq('familia_id', fid).is('empresa_id', null)
     const idsCartoes = new Set((contasData || []).filter((c: any) => c.tipo === 'cartao_credito').map((c: any) => c.id))
     const contarComoDespesa = contarComoDespesaFactory(idsCartoes)
 

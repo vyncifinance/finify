@@ -184,7 +184,11 @@ export default function DashboardPage() {
     const ctx = contexto || contextoAtivo
     const ehEmpresa = ctx.tipo === 'empresa' && !!ctx.empresaId
 
-    const { data: contasData } = await supabase.from('contas').select('*').eq('familia_id', fid)
+    // Contas/cartões seguem o contexto, igual a lancamentos e despesas_fixas: um cartão
+    // cadastrado no CNPJ não pode entrar no fluxo pessoal (nem sua fatura no resumo da família).
+    let queryContas = supabase.from('contas').select('*').eq('familia_id', fid)
+    queryContas = ehEmpresa ? queryContas.eq('empresa_id', ctx.empresaId) : queryContas.is('empresa_id', null)
+    const { data: contasData } = await queryContas
     const listaContas = contasData || []
     setContas(listaContas)
     const idsCartoes = new Set(listaContas.filter((c: any) => c.tipo === 'cartao_credito').map((c: any) => c.id))
