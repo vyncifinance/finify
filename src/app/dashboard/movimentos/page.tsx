@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import OrcamentosSection from './OrcamentosSection'
 import { aportarEmMeta } from '@/lib/metaAportes'
+import { calcularPosicaoMes, corComprometimento } from '@/lib/posicaoMes'
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
@@ -53,6 +54,20 @@ function dataLocalISO(d: Date): string {
   return `${ano}-${mes}-${dia}`
 }
 
+// Domingo da semana a que a data pertence — a chave de agrupamento da lista.
+function inicioSemana(dataStr: string) {
+  const d = new Date(dataStr + 'T12:00:00')
+  d.setDate(d.getDate() - d.getDay())
+  return dataLocalISO(d)
+}
+
+function labelSemana(ini: Date, fim: Date) {
+  if (ini.getMonth() === fim.getMonth()) {
+    return `${ini.getDate()} a ${fim.getDate()} de ${MESES[ini.getMonth()]}`
+  }
+  return `${ini.getDate()} de ${MESES[ini.getMonth()]} a ${fim.getDate()} de ${MESES[fim.getMonth()]}`
+}
+
 function formatDiaLabel(dataStr: string) {
   const hoje  = new Date()
   const ontem = new Date(); ontem.setDate(hoje.getDate() - 1)
@@ -83,8 +98,12 @@ export default function MovimentosPage() {
   const [filtro, setFiltro]             = useState<'todos'|'receita'|'despesa'>('todos')
   const [filtroMembro, setFiltroMembro] = useState('todos')
   const [filtroCategoria, setFiltroCategoria] = useState('todos')
-  const [diaOverride, setDiaOverride] = useState<Record<string, boolean>>({})
-  const [limiteDias, setLimiteDias] = useState(15)
+  // Filtros saíram do corpo da tela (duas fileiras de pílulas) para um painel.
+  const [filtrosAbertos, setFiltrosAbertos] = useState(false)
+  // Qual painel de pendência está aberto. Antes, Despesas Fixas e Faturas eram
+  // duas seções sempre visíveis acima da lista.
+  const [painelAberto, setPainelAberto] = useState<'fixas' | 'cartoes' | null>(null)
+  const [semanaOverride, setSemanaOverride] = useState<Record<string, boolean>>({})
   const [busca, setBusca]               = useState('')
   const [membros, setMembros]           = useState<string[]>([])
   const [membrosFamilia, setMembrosFamilia] = useState<string[]>([])
@@ -142,7 +161,6 @@ export default function MovimentosPage() {
   const [erroFatura, setErroFatura] = useState('')
   const [erroFaturaCartaoId, setErroFaturaCartaoId] = useState<string | null>(null)
   const [cartaoDetalhado, setCartaoDetalhado] = useState<string | null>(null)
-  const [despesasFixasAberto, setDespesasFixasAberto] = useState(false)
   const [itensCartaoDetalhe, setItensCartaoDetalhe] = useState<any[]>([])
   const [carregandoDetalheCartao, setCarregandoDetalheCartao] = useState(false)
   const [faturasPendentes, setFaturasPendentes] = useState<Record<string, number>>({})
@@ -175,8 +193,8 @@ export default function MovimentosPage() {
     if (familiaIdRef.current) carregarSaldoContaReal(familiaIdRef.current, contas)
   }, [contas])
   useEffect(() => {
-    setLimiteDias(15)
-    setDiaOverride({})
+    // Trocou de mês ou de filtro: volta pro estado recolhido padrão.
+    setSemanaOverride({})
   }, [mesRef, filtro, filtroMembro, filtroCategoria, busca])
   useEffect(() => {
     setCartaoDetalhado(null)
@@ -958,17 +976,40 @@ export default function MovimentosPage() {
   })
   const diasOrdenados = Object.keys(grupos).sort((a, b) => b.localeCompare(a))
 
-  // Só o dia mais recente vem aberto por padrão — os outros ficam recolhidos numa faixa
-  // fina (data + total), só expandindo quando clicado. Evita lista gigante de cara.
-  function diaEstaExpandido(dia: string, idx: number) {
-    if (dia in diaOverride) return diaOverride[dia]
-    return idx === 0
+  // A lista é agrupada por SEMANA e vem recolhida. Um mês com muitos lançamentos
+  // virava uma lista interminável; assim a tela cabe de uma vez e você abre só a
+  // semana que quer olhar. A semana corrente vem aberta — é onde está o que você
+  // acabou de lançar. Semana começa no domingo, como no calendário brasileiro.
+  const semanaAtualKey = inicioSemana(dataLocalISO(new Date()))
+
+  function semanaEstaAberta(key: string) {
+    if (key in semanaOverride) return semanaOverride[key]
+    return key === semanaAtualKey
   }
-  function toggleDia(dia: string, idx: number) {
-    setDiaOverride(prev => ({ ...prev, [dia]: !diaEstaExpandido(dia, idx) }))
+  function toggleSemana(key: string) {
+    setSemanaOverride(prev => ({ ...prev, [key]: !semanaEstaAberta(key) }))
   }
-  const diasVisiveis = diasOrdenados.slice(0, limiteDias)
-  const temMaisDias   = diasOrdenados.length > limiteDias
+
+  const semanas = (() => {
+    const mapa: Record<string, string[]> = {}
+    diasOrdenados.forEach(dia => {
+      const k = inicioSemana(dia)
+      if (!mapa[k]) mapa[k] = []
+      mapa[k].push(dia)
+    })
+    return Object.keys(mapa).sort((a, b) => b.localeCompare(a)).map(k => {
+      const dias = mapa[k]
+      const itens = dias.flatMap(d => grupos[d])
+      // Mesmo critério do total do dia: compra de cartão ainda não faturada
+      // não entra no total da semana.
+      const total = itens
+        .filter((l: any) => l.tipo === 'receita' || l.fatura_paga !== false)
+        .reduce((s: number, l: any) => s + (l.tipo === 'receita' ? Number(l.valor) : -Number(l.valor)), 0)
+      const ini = new Date(k + 'T12:00:00')
+      const fim = new Date(ini); fim.setDate(ini.getDate() + 6)
+      return { key: k, dias, qtd: itens.length, total, label: labelSemana(ini, fim), atual: k === semanaAtualKey }
+    })
+  })()
 
   const totalRec = lancamentos.filter(l => l.tipo === 'receita').reduce((s, l) => s + Number(l.valor), 0)
   // Aportes em investimento/meta não contam como despesa de consumo — mesma regra já aplicada
@@ -994,29 +1035,86 @@ export default function MovimentosPage() {
     ? (tipo === 'despesa' ? CATEGORIAS_EMPRESA_DESPESA : CATEGORIAS_EMPRESA_RECEITA)
     : (tipo === 'despesa' ? CATEGORIAS_DESPESA : CATEGORIAS_RECEITA)
 
+  const cartoes = contas.filter((c: any) => c.tipo === 'cartao_credito')
+
+  // A conta do bloco principal vive em src/lib/posicaoMes.ts de propósito:
+  // Dashboard e Linha do Tempo leem os mesmos lançamentos e precisam do mesmo
+  // cálculo (regra de consistência entre telas do CLAUDE.md).
+  const posicao = calcularPosicaoMes({
+    receitas: totalRec,
+    despesas: totalDes,
+    fixasNaoLancadas: totalDespesasFixasPendentes,
+    faturasPendentes: totalFaturasPendentes,
+    saldoConta: saldoContaReal,
+  })
+
+  const filtrosAtivos = [
+    filtro !== 'todos',
+    filtroMembro !== 'todos',
+    filtroCategoria !== 'todos',
+    !!busca.trim(),
+  ].filter(Boolean).length
+
+  function limparFiltros() {
+    setFiltro('todos')
+    setFiltroMembro('todos')
+    setFiltroCategoria('todos')
+    setBusca('')
+  }
+
+  // Só o que exige ação do usuário. Cada item abre o painel correspondente.
+  const pendencias = (() => {
+    const itens: any[] = []
+    const algumaAtrasada = fixasDespesas.some((f: any) => f.atrasada)
+    if (totalDespesasFixasPendentes > 0) {
+      itens.push({
+        key: 'fixas',
+        Icon: Repeat,
+        titulo: algumaAtrasada ? 'Despesa fixa em atraso' : 'Despesas fixas em aberto',
+        valor: fmt(totalDespesasFixasPendentes),
+        detalhe: algumaAtrasada ? 'venceu e não foi paga' : 'a pagar neste mês',
+        alerta: algumaAtrasada,
+        painel: 'fixas' as const,
+      })
+    }
+    cartoes.forEach((c: any) => {
+      const pend = faturasPendentes[c.id] || 0
+      if (pend <= 0) return
+      itens.push({
+        key: `cartao-${c.id}`,
+        Icon: CreditCard,
+        titulo: `Fatura ${c.nome}`,
+        valor: fmt(pend),
+        detalhe: c.dia_vencimento ? `vence dia ${c.dia_vencimento}` : 'na fatura atual',
+        alerta: false,
+        painel: 'cartoes' as const,
+      })
+    })
+    return itens
+  })()
+
   // Seção "Despesas Fixas" — compartilhada entre mobile e desktop
   const despesasFixasSection = (isMob: boolean) => (
     <div style={{ marginBottom: isMob ? '16px' : '24px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-        <button onClick={() => setDespesasFixasAberto(!despesasFixasAberto)}
-          style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-          <Repeat size={isMob ? 14 : 16} color="#64748B" strokeWidth={1.75} />
+        {/* Sem colapso interno: quem abre e fecha esta seção agora é o painel
+            de pendências. Dois níveis de recolher na mesma coisa confundia. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Repeat size={isMob ? 14 : 16} color="#6B7280" strokeWidth={1.75} />
           <span style={{ fontSize: isMob ? '13px' : '15px', fontWeight: 700, color: '#0B3B2E', letterSpacing: '-0.2px' }}>Despesas Fixas</span>
           {totalDespesasFixasPendentes > 0 && (
-            <span style={{ fontSize: '11px', fontWeight: 700, color: '#EF4444', backgroundColor: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.25)', padding: '5px 12px', borderRadius: '999px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#B91C1C', backgroundColor: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.25)', padding: '5px 12px', borderRadius: '999px', fontVariantNumeric: 'tabular-nums' }}>
               {fmt(totalDespesasFixasPendentes)} a pagar
             </span>
           )}
-          <ChevronDown size={16} color="#94A3B8" strokeWidth={2} style={{ transform: despesasFixasAberto ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
-        </button>
+        </div>
         <button onClick={abrirDfModalNovo} className="df-new-btn"
           style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 600, color: '#0B3B2E', background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: '10px', padding: '6px 12px', cursor: 'pointer' }}>
           <Plus size={14} strokeWidth={2.5} /> Nova
         </button>
       </div>
 
-      {despesasFixasAberto && (
-      fixasDespesas.length === 0 ? (
+      {fixasDespesas.length === 0 ? (
         <div style={{ backgroundColor: '#fff', border: '1px solid #ECEFF3', borderRadius: '20px', padding: '24px', textAlign: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 12px 40px rgba(0,0,0,0.07)' }}>
           <p style={{ fontSize: '13px', color: '#94A3B8', margin: 0 }}>Nenhuma despesa fixa cadastrada.</p>
         </div>
@@ -1059,7 +1157,6 @@ export default function MovimentosPage() {
             )
           })}
         </div>
-      )
       )}
     </div>
   )
@@ -1204,6 +1301,473 @@ export default function MovimentosPage() {
       </div>
     )
   }
+
+  // ── Blocos compartilhados entre desktop e mobile ──────────────────────────
+  // Desktop e mobile chamam as MESMAS funções de propósito. O layout antigo
+  // tinha dois blocos de JSX independentes e eles já tinham divergido: o card
+  // "Resultado" era âmbar no desktop e verde/vermelho no mobile.
+
+  // Bloco principal: um número lidera, em vez de três cards de peso igual.
+  // Separa competência (o que o mês produziu) de caixa (o que ainda sai da conta).
+  const blocoPosicao = (isMob: boolean) => (
+    <div style={{
+      background: 'linear-gradient(180deg, #06261F 0%, #0A342A 50%, #0D3F31 100%)',
+      borderRadius: isMob ? '22px' : '24px',
+      padding: isMob ? '22px 20px' : '26px 24px',
+      boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 12px 40px rgba(6,38,31,0.18)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '9px' }}>
+        <p style={{ margin: 0, fontSize: '10.5px', fontWeight: 700, color: 'rgba(255,255,255,0.62)', textTransform: 'uppercase', letterSpacing: '0.09em' }}>
+          Resultado de {MESES[mesRef.getMonth()]}
+        </p>
+        {isMob && (
+          <div style={{ display: 'flex', gap: '2px', flexShrink: 0 }}>
+            <button onClick={() => mudarMes(-1)} aria-label="Mês anterior"
+              style={{ width: '26px', height: '26px', border: 'none', borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+              <ChevronLeft size={14} color="#fff" strokeWidth={2} />
+            </button>
+            <button onClick={() => mudarMes(1)} aria-label="Mês seguinte"
+              style={{ width: '26px', height: '26px', border: 'none', borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+              <ChevronRight size={14} color="#fff" strokeWidth={2} />
+            </button>
+          </div>
+        )}
+      </div>
+
+      <p style={{ margin: 0, fontSize: isMob ? '34px' : '40px', fontWeight: 700, color: '#fff', letterSpacing: isMob ? '-1.3px' : '-1.6px', lineHeight: 1.05, fontVariantNumeric: 'tabular-nums' }}>
+        {loading ? '...' : `${posicao.resultado >= 0 ? '+' : '-'} ${fmt(Math.abs(posicao.resultado))}`}
+      </p>
+
+      <div style={{ height: '8px', margin: isMob ? '18px 0 8px' : '20px 0 9px', borderRadius: '999px', backgroundColor: 'rgba(255,255,255,0.12)', overflow: 'hidden' }}>
+        <div style={{ width: `${posicao.pctComprometido}%`, height: '8px', borderRadius: '999px', backgroundColor: corComprometimento(posicao.pctComprometido), transition: 'width 0.2s' }} />
+      </div>
+      <p style={{ margin: isMob ? '0 0 14px' : '0 0 18px', fontSize: isMob ? '11.5px' : '12px', color: 'rgba(255,255,255,0.72)' }}>
+        {posicao.pctComprometido}% das receitas já comprometidas
+      </p>
+
+      {isMob ? (
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '13px' }}>
+          {[{ label: 'Receitas', val: posicao.receitas }, { label: 'Despesas', val: posicao.despesas }].map(c => (
+            <div key={c.label} style={{ flex: '1 1 0', minWidth: 0, backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '13px', padding: '11px 12px' }}>
+              <p style={{ margin: '0 0 3px', fontSize: '11px', color: 'rgba(255,255,255,0.72)' }}>{c.label}</p>
+              <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{fmt(c.val)}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '12px', padding: '7px 0' }}>
+            <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.72)' }}>Receitas</span>
+            <span style={{ fontSize: '13.5px', fontWeight: 600, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{fmt(posicao.receitas)}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '12px', padding: '7px 0' }}>
+            <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.72)' }}>Despesas</span>
+            <span style={{ fontSize: '13.5px', fontWeight: 600, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{fmt(posicao.despesas)}</span>
+          </div>
+        </>
+      )}
+
+      {posicao.fixasNaoLancadas > 0 && (
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '12px', padding: isMob ? '0 0 8px' : '7px 0' }}>
+          <span style={{ fontSize: isMob ? '12.5px' : '13px', color: 'rgba(255,255,255,0.72)' }}>Fixas ainda não lançadas</span>
+          <span style={{ fontSize: isMob ? '13px' : '13.5px', fontWeight: 600, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>- {fmt(posicao.fixasNaoLancadas)}</span>
+        </div>
+      )}
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '12px', padding: isMob ? '0' : '9px 0 0' }}>
+        <span style={{ fontSize: isMob ? '12.5px' : '13px', fontWeight: 600, color: '#58D68D' }}>Resultado projetado</span>
+        <span style={{ fontSize: isMob ? '14.5px' : '15px', fontWeight: 700, color: '#58D68D', fontVariantNumeric: 'tabular-nums' }}>
+          {loading ? '...' : `${posicao.resultadoProjetado >= 0 ? '' : '- '}${fmt(Math.abs(posicao.resultadoProjetado))}`}
+        </span>
+      </div>
+
+      {posicao.aSairDaConta > 0 && (
+        <>
+          <div style={{ height: '1px', margin: isMob ? '15px 0 12px' : '18px 0 14px', backgroundColor: 'rgba(255,255,255,0.12)' }} />
+          <p style={{ margin: isMob ? '0 0 10px' : '0 0 11px', fontSize: isMob ? '10px' : '10.5px', fontWeight: 700, color: 'rgba(255,255,255,0.62)', textTransform: 'uppercase', letterSpacing: '0.09em' }}>
+            O que sai da conta
+          </p>
+          {saldoContaReal !== null && (
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '12px', padding: '0 0 8px' }}>
+              <span style={{ fontSize: isMob ? '12.5px' : '13px', color: 'rgba(255,255,255,0.72)' }}>Saldo em conta</span>
+              <span style={{ fontSize: isMob ? '13px' : '13.5px', fontWeight: 600, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{fmt(saldoContaReal)}</span>
+            </div>
+          )}
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '12px', padding: '0 0 8px' }}>
+            <span style={{ fontSize: isMob ? '12.5px' : '13px', color: 'rgba(255,255,255,0.72)' }}>Fixas + faturas a pagar</span>
+            <span style={{ fontSize: isMob ? '13px' : '13.5px', fontWeight: 600, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{fmt(posicao.aSairDaConta)}</span>
+          </div>
+          {posicao.sobraDepois === null ? (
+            <button onClick={abrirModalSaldoConta}
+              style={{ padding: 0, background: 'none', border: 'none', cursor: 'pointer', fontSize: isMob ? '12.5px' : '13px', fontWeight: 600, color: '#58D68D', textDecoration: 'underline' }}>
+              Definir saldo da conta para comparar
+            </button>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '12px' }}>
+              <span style={{ fontSize: isMob ? '12.5px' : '13px', fontWeight: 600, color: posicao.saldoInsuficiente ? '#FCA5A5' : '#58D68D' }}>
+                {posicao.saldoInsuficiente ? 'Falta para cobrir' : 'Sobra depois disso'}
+              </span>
+              <span style={{ fontSize: isMob ? '14.5px' : '15px', fontWeight: 700, color: posicao.saldoInsuficiente ? '#FCA5A5' : '#58D68D', fontVariantNumeric: 'tabular-nums' }}>
+                {fmt(Math.abs(posicao.sobraDepois))}
+              </span>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+
+  // Pendências: substitui as três seções que antes ficavam sempre abertas
+  // acima da lista. Só o que exige ação aparece, e o painel abre no clique.
+  const cardPendencias = (isMob: boolean) => {
+    if (pendencias.length === 0) return null
+    return (
+      <div style={{ backgroundColor: '#fff', border: '1px solid #ECEFF3', borderRadius: '20px', overflow: 'hidden', boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 12px 40px rgba(0,0,0,0.07)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '16px 20px 13px' }}>
+          <h2 style={{ margin: 0, fontSize: '14.5px', fontWeight: 700, color: '#0B3B2E', letterSpacing: '-0.2px' }}>Precisa de você</h2>
+          <span style={{ minWidth: '20px', height: '20px', padding: '0 6px', boxSizing: 'border-box', borderRadius: '999px', backgroundColor: '#F1F4F7', color: '#374151', fontSize: '11px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {pendencias.length}
+          </span>
+        </div>
+        {pendencias.map((p: any) => (
+          <div key={p.key} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '13px 20px', borderTop: '1px solid #F7F8FA' }}>
+            <span style={{ width: '34px', height: '34px', borderRadius: '10px', backgroundColor: p.alerta ? '#FEF2F2' : '#F7F8FA', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <p.Icon size={16} color={p.alerta ? '#DC2626' : '#6B7280'} strokeWidth={1.75} />
+            </span>
+            <span style={{ flex: '1 1 auto', minWidth: 0 }}>
+              <span style={{ display: 'block', fontSize: '13.5px', fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.titulo}</span>
+              <span style={{ display: 'block', marginTop: '2px', fontSize: '12px', fontWeight: p.alerta ? 600 : 400, color: p.alerta ? '#DC2626' : '#6B7280', fontVariantNumeric: 'tabular-nums' }}>
+                {p.valor} · {p.detalhe}
+              </span>
+            </span>
+            <button onClick={() => setPainelAberto(painelAberto === p.painel ? null : p.painel)} className="df-new-btn"
+              style={{ padding: '7px 13px', border: '1.5px solid #E5E7EB', borderRadius: '10px', backgroundColor: '#fff', cursor: 'pointer', fontSize: '12px', fontWeight: 600, color: '#374151', flexShrink: 0 }}>
+              {painelAberto === p.painel ? 'Fechar' : 'Ver'}
+            </button>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  // O painel que a pendência abre. Reaproveita as seções que já existiam.
+  const painelExpandido = (isMob: boolean) => {
+    if (!painelAberto) return null
+    return (
+      <div style={{ marginTop: isMob ? '14px' : '16px' }}>
+        {painelAberto === 'fixas' && despesasFixasSection(isMob)}
+        {painelAberto === 'cartoes' && faturasCartaoSection(isMob)}
+      </div>
+    )
+  }
+
+  // Lista: o protagonista da tela. Valor em neutro escuro e alinhado
+  // (tabular-nums); cor reservada para receita, que é a exceção.
+  const listaMovimentos = (isMob: boolean) => (
+    <div style={{ backgroundColor: '#fff', border: '1px solid #ECEFF3', borderRadius: isMob ? '18px' : '20px', overflow: 'hidden', boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 12px 40px rgba(0,0,0,0.07)' }}>
+      {loading ? (
+        <p style={{ textAlign: 'center', padding: '64px 0', fontSize: '14px', color: '#94A3B8', margin: 0 }}>Carregando...</p>
+      ) : diasOrdenados.length === 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '64px 0', gap: '12px' }}>
+          <Wallet size={32} color="#E5E7EB" strokeWidth={1} />
+          <p style={{ fontSize: '14px', color: '#94A3B8', margin: 0 }}>
+            {filtrosAtivos > 0 ? 'Nenhum lançamento com esses filtros.' : 'Nenhum lançamento neste período.'}
+          </p>
+          {filtrosAtivos > 0 ? (
+            <button onClick={limparFiltros}
+              style={{ fontSize: '13px', fontWeight: 600, color: '#0B3B2E', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+              Limpar filtros
+            </button>
+          ) : (
+            <button onClick={abrirModalNovo}
+              style={{ fontSize: '13px', fontWeight: 600, color: '#0B3B2E', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+              Registrar o primeiro
+            </button>
+          )}
+        </div>
+      ) : (
+        <>
+          {semanas.map(sem => {
+          const aberta = semanaEstaAberta(sem.key)
+          return (
+          <div key={sem.key}>
+            {/* Faixa da semana. Recolhida por padrão — um mês cheio de
+                lançamentos cabe na tela inteiro antes de você abrir nada. */}
+            <button onClick={() => toggleSemana(sem.key)} className="mov-row"
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px', padding: isMob ? '13px 16px' : '15px 22px', border: 'none', borderBottom: '1px solid #F1F4F7', backgroundColor: aberta ? '#FAFBFC' : '#fff', cursor: 'pointer', textAlign: 'left' }}>
+              <ChevronDown size={16} color="#9CA3AF" strokeWidth={2.25}
+                style={{ flexShrink: 0, transform: aberta ? 'none' : 'rotate(-90deg)', transition: 'transform 0.15s' }} />
+              <span style={{ flex: '1 1 auto', minWidth: 0 }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
+                  <span style={{ fontSize: isMob ? '13.5px' : '14px', fontWeight: 600, color: '#111827', letterSpacing: '-0.1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {sem.label}
+                  </span>
+                  {sem.atual && (
+                    <span style={{ padding: '2px 8px', border: '1px solid rgba(47,179,106,0.25)', backgroundColor: 'rgba(47,179,106,0.12)', borderRadius: '999px', fontSize: '9.5px', fontWeight: 700, color: '#0B3B2E', letterSpacing: '0.04em', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                      ESTA SEMANA
+                    </span>
+                  )}
+                </span>
+                <span style={{ display: 'block', marginTop: '2px', fontSize: isMob ? '11.5px' : '12px', color: '#9CA3AF' }}>
+                  {sem.qtd} {sem.qtd === 1 ? 'lançamento' : 'lançamentos'}
+                </span>
+              </span>
+              <span style={{ fontSize: isMob ? '13.5px' : '14.5px', fontWeight: 600, color: '#111827', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                {sem.total >= 0 ? '+' : '-'} {fmt(Math.abs(sem.total))}
+              </span>
+            </button>
+
+            {aberta && sem.dias.map(dia => {
+            const itens = grupos[dia]
+            const totalDia = itens
+              .filter((l: any) => l.tipo === 'receita' || l.fatura_paga !== false)
+              .reduce((s: number, l: any) => s + (l.tipo === 'receita' ? Number(l.valor) : -Number(l.valor)), 0)
+            return (
+              <div key={dia}>
+                {/* Dia: separador fino, não um card dentro do card */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: isMob ? '10px 16px' : '11px 22px', backgroundColor: '#FAFBFC', borderTop: '1px solid #F1F4F7', borderBottom: '1px solid #F1F4F7' }}>
+                  <span style={{ fontSize: isMob ? '10px' : '10.5px', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.09em' }}>
+                    {formatDiaLabel(dia)}
+                  </span>
+                  <span style={{ fontSize: isMob ? '11px' : '11.5px', fontWeight: 600, color: '#6B7280', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                    {totalDia >= 0 ? '+' : '-'} {fmt(Math.abs(totalDia))}
+                  </span>
+                </div>
+                {itens.map((l: any) => {
+                  const Icon = ICONES_CAT[l.categoria] || (l.tipo === 'receita' ? ArrowDownLeft : ArrowUpRight)
+                  const ehReceita = l.tipo === 'receita'
+                  const cartao = contas.find((c: any) => c.id === l.conta_id && c.tipo === 'cartao_credito')
+                  return (
+                    <button key={l.id} onClick={() => abrirModalEditar(l)} className="mov-row"
+                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: isMob ? '12px' : '14px', padding: isMob ? '12px 16px' : '14px 22px', borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottom: '1px solid #F7F8FA', backgroundColor: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
+                      <span style={{ width: isMob ? '36px' : '38px', height: isMob ? '36px' : '38px', borderRadius: isMob ? '10px' : '11px', backgroundColor: ehReceita ? 'rgba(47,179,106,0.10)' : '#F7F8FA', border: `1px solid ${ehReceita ? 'rgba(47,179,106,0.22)' : '#ECEFF3'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Icon size={isMob ? 16 : 17} color={ehReceita ? '#145A45' : '#6B7280'} strokeWidth={1.75} />
+                      </span>
+                      <span style={{ flex: '1 1 auto', minWidth: 0 }}>
+                        {/* Título é a observação; a categoria desce pro apoio, porque
+                            vinte linhas dizendo "Alimentação" não informam nada. */}
+                        <span style={{ display: 'block', fontSize: isMob ? '13.5px' : '14px', fontWeight: 600, color: '#111827', letterSpacing: '-0.1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {l.descricao || l.categoria}
+                        </span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px', minWidth: 0 }}>
+                          <span style={{ fontSize: isMob ? '11.5px' : '12px', color: '#9CA3AF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {l.descricao ? `${l.categoria} · ` : ''}{l.membro?.split(' ')[0]} · {l.hora}
+                          </span>
+                          {cartao && (
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '2px 7px', border: '1px solid #E5E7EB', borderRadius: '6px', fontSize: '10px', fontWeight: 600, color: '#6B7280', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                              <CreditCard size={10} color="#9CA3AF" strokeWidth={2} />
+                              {cartao.nome}
+                            </span>
+                          )}
+                        </span>
+                      </span>
+                      <span style={{ fontSize: isMob ? '14px' : '15px', fontWeight: ehReceita ? 700 : 600, color: ehReceita ? '#145A45' : '#111827', fontVariantNumeric: 'tabular-nums', textAlign: 'right', minWidth: isMob ? 'auto' : '118px', flexShrink: 0 }}>
+                        {ehReceita ? '+' : '-'} {fmt(Number(l.valor))}
+                      </span>
+                      {isMob ? (
+                        <Pencil size={13} color="#CBD5E1" strokeWidth={1.75} style={{ flexShrink: 0 }} />
+                      ) : (
+                        <span style={{ width: '30px', height: '30px', border: '1px solid #ECEFF3', backgroundColor: '#fff', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <Pencil size={13} color="#9CA3AF" strokeWidth={1.75} />
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )
+            })}
+          </div>
+          )
+          })}
+        </>
+      )}
+    </div>
+  )
+
+  // Chips do que está filtrado agora. Só aparecem quando há filtro — em vez das
+  // duas fileiras de pílulas permanentes do layout antigo.
+  const chipsFiltroAtivo = () => {
+    if (filtrosAtivos === 0) return null
+    const chips: { label: string; limpar: () => void }[] = []
+    if (filtro !== 'todos') chips.push({ label: filtro === 'receita' ? 'Receitas' : 'Despesas', limpar: () => setFiltro('todos') })
+    if (filtroMembro !== 'todos') chips.push({ label: filtroMembro.split(' ')[0], limpar: () => setFiltroMembro('todos') })
+    if (filtroCategoria !== 'todos') chips.push({ label: filtroCategoria, limpar: () => setFiltroCategoria('todos') })
+    if (busca.trim()) chips.push({ label: `"${busca.trim()}"`, limpar: () => setBusca('') })
+    return (
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '7px', marginBottom: '14px' }}>
+        <span style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em', marginRight: '2px' }}>Filtrando por</span>
+        {chips.map(c => (
+          <button key={c.label} onClick={c.limpar}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 9px 5px 11px', border: '1px solid rgba(47,179,106,0.25)', backgroundColor: 'rgba(47,179,106,0.12)', borderRadius: '999px', cursor: 'pointer', fontSize: '11.5px', fontWeight: 600, color: '#0B3B2E', maxWidth: '180px' }}>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.label}</span>
+            <X size={12} strokeWidth={2.5} style={{ flexShrink: 0 }} />
+          </button>
+        ))}
+        <button onClick={limparFiltros}
+          style={{ padding: '5px 4px', border: 'none', background: 'none', cursor: 'pointer', fontSize: '11.5px', fontWeight: 600, color: '#6B7280', textDecoration: 'underline' }}>
+          Limpar
+        </button>
+      </div>
+    )
+  }
+
+  // Segmentado de tipo, igual nos dois tamanhos.
+  const segmentadoTipo = (isMob: boolean) => (
+    <div style={{ display: 'flex', gap: '2px', padding: '3px', backgroundColor: '#F1F4F7', borderRadius: isMob ? '12px' : '11px' }}>
+      {[{ key: 'todos', label: 'Todos' }, { key: 'receita', label: 'Receitas' }, { key: 'despesa', label: 'Despesas' }].map(f => {
+        const ativo = filtro === f.key
+        return (
+          <button key={f.key} onClick={() => { setFiltro(f.key as any); setFiltroCategoria('todos') }}
+            style={{ flex: isMob ? '1 1 0' : undefined, padding: isMob ? '8px 0' : '7px 15px', border: 'none', borderRadius: isMob ? '9px' : '8px', backgroundColor: ativo ? '#fff' : 'transparent', boxShadow: ativo ? '0 1px 2px rgba(15,23,42,0.08)' : 'none', fontSize: '12.5px', fontWeight: ativo ? 600 : 500, color: ativo ? '#0F172A' : '#6B7280', cursor: 'pointer' }}>
+            {f.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+
+  // Painel de filtros: membro, categoria e busca saem do corpo da tela e entram
+  // aqui. Membro continua de seleção única, como na lógica de filtragem.
+  const painelFiltrosContent = (isMob: boolean) => (
+    <>
+      {isMob && <div style={{ width: '40px', height: '4px', borderRadius: '2px', backgroundColor: '#E2E8F0', margin: '12px auto 4px', flexShrink: 0 }} />}
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '16px 22px 14px', borderBottom: '1px solid #F1F4F7', flexShrink: 0 }}>
+        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0B3B2E', letterSpacing: '-0.3px' }}>Filtros</h2>
+        {filtrosAtivos > 0 && (
+          <span style={{ minWidth: '19px', height: '19px', padding: '0 5px', boxSizing: 'border-box', borderRadius: '999px', backgroundColor: '#0B3B2E', color: '#fff', fontSize: '10.5px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {filtrosAtivos}
+          </span>
+        )}
+        <span style={{ flex: '1 1 10px' }} />
+        {filtrosAtivos > 0 && (
+          <button onClick={limparFiltros}
+            style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 600, color: '#6B7280', textDecoration: 'underline' }}>
+            Limpar tudo
+          </button>
+        )}
+        <button onClick={() => setFiltrosAbertos(false)} aria-label="Fechar filtros"
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}>
+          <X size={20} strokeWidth={2} />
+        </button>
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 22px 18px' }}>
+        <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.09em', margin: '0 0 8px' }}>Tipo</p>
+        <div style={{ marginBottom: '18px' }}>{segmentadoTipo(true)}</div>
+
+        {membros.length > 0 && (
+          <>
+            <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.09em', margin: '0 0 8px' }}>Quem lançou</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '18px' }}>
+              {membros.map(m => {
+                const ativo = filtroMembro === m
+                const qtd = lancamentos.filter((l: any) => l.membro === m).length
+                return (
+                  <button key={m} onClick={() => setFiltroMembro(ativo ? 'todos' : m)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 13px', border: `1.5px solid ${ativo ? '#2FB36A' : '#E5E7EB'}`, backgroundColor: ativo ? 'rgba(47,179,106,0.08)' : '#FAFAFA', borderRadius: '12px', cursor: 'pointer', textAlign: 'left' }}>
+                    <span style={{ flex: '1 1 auto', minWidth: 0, fontSize: '13px', fontWeight: ativo ? 600 : 500, color: ativo ? '#0B3B2E' : '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m}</span>
+                    <span style={{ fontSize: '11.5px', color: ativo ? '#6B7280' : '#9CA3AF', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{qtd}</span>
+                    {ativo && <Check size={15} color="#145A45" strokeWidth={2.5} style={{ flexShrink: 0 }} />}
+                  </button>
+                )
+              })}
+            </div>
+          </>
+        )}
+
+        {categoriasPresentes.length > 0 && (
+          <>
+            <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.09em', margin: '0 0 8px' }}>Categoria</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '18px' }}>
+              {categoriasPresentes.map(c => {
+                const Icon = ICONES_CAT[c] || MoreHorizontal
+                const ativo = filtroCategoria === c
+                return (
+                  <button key={c} onClick={() => setFiltroCategoria(ativo ? 'todos' : c)} className="df-chip"
+                    style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 11px', border: `1.5px solid ${ativo ? '#2FB36A' : '#E5E7EB'}`, backgroundColor: ativo ? 'rgba(47,179,106,0.08)' : '#fff', borderRadius: '999px', cursor: 'pointer', fontSize: '11.5px', fontWeight: ativo ? 600 : 500, color: ativo ? '#0B3B2E' : '#6B7280' }}>
+                    <Icon size={12} strokeWidth={1.75} color={ativo ? '#2FB36A' : '#9CA3AF'} />
+                    {c}
+                  </button>
+                )
+              })}
+            </div>
+          </>
+        )}
+
+        <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.09em', margin: '0 0 8px' }}>Observação</p>
+        <div style={{ position: 'relative' }}>
+          <Search size={15} color="#9CA3AF" strokeWidth={1.75} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
+          <input type="text" value={busca} onChange={e => setBusca(e.target.value)} className="df-input"
+            placeholder="Ex: geladeira, viagem, farmácia..."
+            style={{ width: '100%', height: '52px', padding: '0 14px 0 38px', boxSizing: 'border-box', border: '1.5px solid #E5E7EB', borderRadius: '13px', backgroundColor: '#FAFAFA', fontSize: '13.5px', color: '#111827', outline: 'none' }} />
+        </div>
+      </div>
+
+      <div style={{ padding: '14px 22px 20px', borderTop: '1px solid #F1F4F7', backgroundColor: '#fff', flexShrink: 0 }}>
+        <button onClick={() => setFiltrosAbertos(false)} className="df-cta"
+          style={{ width: '100%', height: '56px', border: 'none', borderRadius: '16px', background: 'linear-gradient(135deg, #07271F 0%, #145A45 100%)', boxShadow: '0 4px 16px rgba(11,59,46,0.3)', cursor: 'pointer', fontSize: '15px', fontWeight: 600, color: '#fff' }}>
+          Ver {filtrados.length} {filtrados.length === 1 ? 'lançamento' : 'lançamentos'}
+        </button>
+      </div>
+    </>
+  )
+
+  const botaoFiltros = (isMob: boolean) => (
+    <button onClick={() => setFiltrosAbertos(true)} className="df-new-btn"
+      style={{ display: 'flex', alignItems: 'center', gap: '8px', height: isMob ? '36px' : '44px', padding: isMob ? '0 12px' : '0 15px', border: '1.5px solid #E5E7EB', backgroundColor: '#fff', borderRadius: isMob ? '11px' : '13px', cursor: 'pointer', fontSize: '13.5px', fontWeight: 600, color: '#374151', flexShrink: 0, position: 'relative' }}>
+      <Filter size={15} color="#6B7280" strokeWidth={1.75} />
+      {!isMob && 'Filtros'}
+      {filtrosAtivos > 0 && (
+        <span style={{ minWidth: '19px', height: '19px', padding: '0 5px', boxSizing: 'border-box', borderRadius: '999px', backgroundColor: '#0B3B2E', color: '#fff', fontSize: '10.5px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', position: isMob ? 'absolute' : 'static', top: isMob ? '-5px' : undefined, right: isMob ? '-5px' : undefined }}>
+          {filtrosAtivos}
+        </span>
+      )}
+    </button>
+  )
+
+  const seletorContexto = (isMob: boolean) => (
+    <div style={{ position: 'relative', flex: isMob ? '1 1 auto' : '0 0 auto', minWidth: 0 }}>
+      <button onClick={() => setContextoAbertoHeader(!contextoAbertoHeader)}
+        style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: isMob ? 0 : '8px 12px 8px 10px', marginLeft: isMob ? 0 : '-10px', border: 'none', background: 'transparent', borderRadius: '11px', cursor: 'pointer', textAlign: 'left', maxWidth: '100%' }}>
+        <span style={{ width: '30px', height: '30px', borderRadius: '9px', background: 'linear-gradient(135deg, #145A45 0%, #2FB36A 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 2px 8px rgba(47,179,106,0.35)' }}>
+          {contextoAtivo.tipo === 'empresa'
+            ? <Building2 size={15} color="#fff" strokeWidth={2} />
+            : <Users size={15} color="#fff" strokeWidth={2} />}
+        </span>
+        <span style={{ flex: '1 1 auto', minWidth: 0 }}>
+          <span style={{ display: 'block', fontSize: isMob ? '14px' : '14.5px', fontWeight: 600, color: '#0F172A', letterSpacing: '-0.2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {contextoAtivo.nome || familiaNome || 'Fluxo Patrimonial'}
+          </span>
+          {isMob && <span style={{ display: 'block', fontSize: '11px', color: '#9CA3AF' }}>{mesLabel}</span>}
+        </span>
+        <ChevronDown size={14} color="#9CA3AF" strokeWidth={2} style={{ flexShrink: 0, transform: contextoAbertoHeader ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+      </button>
+
+      {contextoAbertoHeader && (
+        <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '8px', width: '250px', backgroundColor: '#fff', borderRadius: '14px', border: '1px solid #ECEFF3', boxShadow: '0 12px 32px rgba(15,23,42,0.16)', zIndex: 30, overflow: 'hidden' }}>
+          <button onClick={() => { trocarContexto({ tipo: 'pessoal', nome: familiaNome }); setContextoAbertoHeader(false) }}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+            <Users size={15} color="#6B7280" strokeWidth={1.75} />
+            <span style={{ flex: 1, fontSize: '13.5px', color: '#0F172A' }}>{familiaNome}</span>
+            {contextoAtivo.tipo === 'pessoal' && <Check size={15} color="#145A45" strokeWidth={2.5} />}
+          </button>
+          {empresas.map((emp: any) => (
+            <button key={emp.id} onClick={() => { trocarContexto({ tipo: 'empresa', empresaId: emp.id, nome: emp.nome }); setContextoAbertoHeader(false) }}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', background: 'none', border: 'none', borderTop: '1px solid #F7F8FA', cursor: 'pointer', textAlign: 'left' }}>
+              <Building2 size={15} color="#145A45" strokeWidth={1.75} />
+              <span style={{ flex: 1, fontSize: '13.5px', color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{emp.nome}</span>
+              {contextoAtivo.tipo === 'empresa' && contextoAtivo.empresaId === emp.id && <Check size={15} color="#145A45" strokeWidth={2.5} />}
+            </button>
+          ))}
+          <a href="/dashboard/perfil"
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', borderTop: '1px solid #F7F8FA', textDecoration: 'none', color: '#145A45', fontSize: '13.5px', fontWeight: 600 }}>
+            <Plus size={15} strokeWidth={2.5} /> Adicionar empresa (CNPJ)
+          </a>
+        </div>
+      )}
+    </div>
+  )
 
 
   const dfModalContent = (isMob: boolean) => (
@@ -1729,85 +2293,29 @@ export default function MovimentosPage() {
       `}</style>
 
       {/* ── MOBILE ── */}
-      <div className="lg:hidden" style={{ backgroundColor: '#F8FAFC', minHeight: '100vh', paddingBottom: '100px' }}>
-        <div style={{
-          backgroundColor: '#0E3B2E', padding: '20px 20px 36px',
-          border: contextoAtivo.tipo === 'empresa' ? '1.5px solid rgba(47,179,106,0.4)' : 'none',
-          borderTop: 'none', borderLeft: 'none', borderRight: 'none',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
-              <button onClick={() => setContextoAbertoHeader(!contextoAbertoHeader)}
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', padding: 0, maxWidth: '100%' }}>
-                <h1 style={{ fontSize: '18px', fontWeight: 600, color: '#fff', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {contextoAtivo.nome || 'Fluxo Patrimonial'}
-                </h1>
-                {contextoAtivo.tipo === 'empresa' && (
-                  <span style={{ fontSize: '9.5px', fontWeight: 700, color: '#0E3B2E', backgroundColor: '#58D68D', padding: '2px 6px', borderRadius: '999px', flexShrink: 0 }}>PJ</span>
-                )}
-                <ChevronDown size={14} color="rgba(255,255,255,0.6)" style={{ transform: contextoAbertoHeader ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }} />
-              </button>
-              <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>{mesLabel}</p>
+      <div className="lg:hidden" style={{ backgroundColor: '#F7F9FB', minHeight: '100vh', paddingBottom: '100px' }}>
 
-              {contextoAbertoHeader && (
-                <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '8px', width: '240px', backgroundColor: '#fff', borderRadius: '14px', border: '1px solid #E2E8F0', boxShadow: '0 12px 32px rgba(0,0,0,0.2)', zIndex: 20, overflow: 'hidden' }}>
-                  <button onClick={() => { trocarContexto({ tipo: 'pessoal', nome: familiaNome }); setContextoAbertoHeader(false) }}
-                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
-                    <Users size={15} color="#64748B" strokeWidth={1.75} />
-                    <span style={{ flex: 1, fontSize: '13.5px', color: '#0F172A' }}>{familiaNome}</span>
-                    {contextoAtivo.tipo === 'pessoal' && <Check size={15} color="#145A45" strokeWidth={2.5} />}
-                  </button>
-                  {empresas.map((emp: any) => (
-                    <button key={emp.id} onClick={() => { trocarContexto({ tipo: 'empresa', empresaId: emp.id, nome: emp.nome }); setContextoAbertoHeader(false) }}
-                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', background: 'none', border: 'none', borderTop: '1px solid #F1F5F9', cursor: 'pointer', textAlign: 'left' }}>
-                      <Building2 size={15} color="#145A45" strokeWidth={1.75} />
-                      <span style={{ flex: 1, fontSize: '13.5px', color: '#0F172A' }}>{emp.nome}</span>
-                      {contextoAtivo.tipo === 'empresa' && contextoAtivo.empresaId === emp.id && <Check size={15} color="#145A45" strokeWidth={2.5} />}
-                    </button>
-                  ))}
-                  <a href="/dashboard/perfil"
-                    style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', borderTop: '1px solid #F1F5F9', textDecoration: 'none', color: '#145A45', fontSize: '13.5px', fontWeight: 600 }}>
-                    <Plus size={15} strokeWidth={2.5} /> Adicionar empresa (CNPJ)
-                  </a>
-                </div>
-              )}
-            </div>
-            <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-              <button onClick={() => mudarMes(-1)} style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.1)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                <ChevronLeft size={16} color="#fff" />
-              </button>
-              <button onClick={() => mudarMes(1)} style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.1)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                <ChevronRight size={16} color="#fff" />
-              </button>
-            </div>
+        {/* Barra de comando branca. O header verde chapado com cards flutuando
+            saiu: era o padrão mais reconhecível da tela e empurrava a lista
+            para baixo da dobra. */}
+        <div style={{ backgroundColor: '#fff', borderBottom: '1px solid #ECEFF3', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {seletorContexto(true)}
+          {botaoFiltros(true)}
+        </div>
+
+        <div style={{ padding: '16px' }}>
+          {blocoPosicao(true)}
+        </div>
+
+        {pendencias.length > 0 && (
+          <div style={{ padding: '0 16px 16px' }}>
+            {cardPendencias(true)}
+            {painelExpandido(true)}
           </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '8px', padding: '0 16px', marginTop: '-20px', marginBottom: '16px' }}>
-          {[
-            { label: 'Receitas',  val: totalRec,  cor: '#10B981', bg: '#ECFDF5', Icon: ArrowDownLeft },
-            { label: 'Despesas',  val: totalDes,  cor: '#EF4444', bg: '#FEF2F2', Icon: ArrowUpRight  },
-            { label: 'Resultado', val: resultado, cor: resultado >= 0 ? '#10B981' : '#EF4444', bg: resultado >= 0 ? '#ECFDF5' : '#FEF2F2', Icon: Wallet },
-          ].map(c => (
-            <div key={c.label} style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-              <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: c.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
-                <c.Icon size={14} color={c.cor} strokeWidth={1.75} />
-              </div>
-              <p style={{ fontSize: '11px', fontWeight: 500, color: '#64748B', marginBottom: '4px' }}>{c.label}</p>
-              <p style={{ fontSize: '13px', fontWeight: 600, color: c.cor, lineHeight: 1.2 }}>
-                {loading ? '...' : `R$ ${Math.abs(c.val).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        <div style={{ padding: '0 16px' }}>
-          {despesasFixasSection(true)}
-          {faturasCartaoSection(true)}
-        </div>
+        )}
 
         {contextoAtivo.tipo === 'pessoal' && !loading && familiaId && (
-          <div style={{ padding: '0 16px' }}>
+          <div style={{ padding: '0 16px 16px' }}>
             <OrcamentosSection
               supabase={supabase}
               familiaId={familiaId}
@@ -1819,382 +2327,114 @@ export default function MovimentosPage() {
           </div>
         )}
 
-        <div style={{ padding: '0 16px 10px' }}>
-          <div style={{ position: 'relative' }}>
-            <Search size={15} color="#94A3B8" strokeWidth={1.75} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
-            <input
-              type="text" value={busca} onChange={e => setBusca(e.target.value)}
-              placeholder="Buscar por observação..."
-              style={{ width: '100%', height: '42px', paddingLeft: '38px', paddingRight: busca ? '38px' : '14px', borderRadius: '12px', border: '1px solid #E2E8F0', backgroundColor: '#fff', fontSize: '13px', color: '#0F172A', outline: 'none', boxSizing: 'border-box' }} />
-            {busca && (
-              <button onClick={() => setBusca('')}
-                style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}>
-                <X size={15} strokeWidth={2} />
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: '8px', padding: '0 16px 8px', overflowX: 'auto' }}>
-          {[{ key: 'todos', label: 'Todos' }, { key: 'receita', label: 'Receitas' }, { key: 'despesa', label: 'Despesas' }].map(f => (
-            <button key={f.key} onClick={() => { setFiltro(f.key as any); setFiltroCategoria('todos') }}
-              style={{ padding: '6px 16px', borderRadius: '999px', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap', border: `1px solid ${filtro === f.key ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: filtro === f.key ? '#0E3B2E' : '#fff', color: filtro === f.key ? '#fff' : '#64748B', cursor: 'pointer' }}>
-              {f.label}
-            </button>
-          ))}
-          {membros.map(m => (
-            <button key={m} onClick={() => setFiltroMembro(filtroMembro === m ? 'todos' : m)}
-              style={{ padding: '6px 16px', borderRadius: '999px', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap', border: `1px solid ${filtroMembro === m ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: filtroMembro === m ? '#0E3B2E' : '#fff', color: filtroMembro === m ? '#fff' : '#64748B', cursor: 'pointer' }}>
-              {m.split(' ')[0]}
-            </button>
-          ))}
-        </div>
-
-        {categoriasPresentes.length > 0 && (
-          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', padding: '0 16px 12px' }}>
-            {categoriasPresentes.map(c => {
-              const Icon = ICONES_CAT[c] || MoreHorizontal
-              const ativo = filtroCategoria === c
-              return (
-                <button key={c} onClick={() => setFiltroCategoria(ativo ? 'todos' : c)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 12px', borderRadius: '999px', fontSize: '11.5px', fontWeight: 600, whiteSpace: 'nowrap', border: `1px solid ${ativo ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: ativo ? '#0E3B2E' : '#fff', color: ativo ? '#fff' : '#64748B', cursor: 'pointer' }}>
-                  <Icon size={12} strokeWidth={1.75} color={ativo ? '#fff' : '#94A3B8'} />
-                  {c}
-                </button>
-              )
-            })}
-          </div>
-        )}
-
         <div style={{ padding: '0 16px' }}>
-          {loading ? (
-            <p style={{ textAlign: 'center', padding: '64px 0', fontSize: '14px', color: '#94A3B8' }}>Carregando...</p>
-          ) : diasOrdenados.length === 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '64px 0', gap: '12px' }}>
-              <Wallet size={32} color="#E2E8F0" strokeWidth={1} />
-              <p style={{ fontSize: '14px', color: '#94A3B8' }}>Nenhum lançamento neste período.</p>
-            </div>
-          ) : diasVisiveis.map((dia, idx) => {
-            const itens    = grupos[dia]
-            const totalDia = itens.filter((l: any) => l.tipo === 'receita' || l.fatura_paga !== false).reduce((s, l) => s + (l.tipo === 'receita' ? Number(l.valor) : -Number(l.valor)), 0)
-            const expandido = diaEstaExpandido(dia, idx)
-            return (
-              <div key={dia} style={{ marginBottom: '10px' }}>
-                {expandido ? (
-                  <button onClick={() => toggleDia(dia, idx)}
-                    style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', padding: '0 4px', background: 'none', border: 'none', cursor: 'pointer' }}>
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      {formatDiaLabel(dia)}
-                    </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ fontSize: '11px', fontWeight: 600, color: totalDia >= 0 ? '#10B981' : '#EF4444' }}>
-                        {totalDia >= 0 ? '+' : '-'} {fmt(Math.abs(totalDia))}
-                      </span>
-                      <ChevronDown size={14} color="#94A3B8" style={{ transform: 'rotate(180deg)', transition: 'transform 0.15s' }} />
-                    </span>
-                  </button>
-                ) : (
-                  <button onClick={() => toggleDia(dia, idx)}
-                    style={{ display: 'flex', width: '100%', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#fff', border: '1px solid #E2E8F0', borderRadius: '14px', cursor: 'pointer' }}>
-                    <div style={{ width: '38px', height: '38px', borderRadius: '50%', backgroundColor: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Calendar size={16} color="#64748B" strokeWidth={1.75} />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
-                      <p style={{ fontSize: '13.5px', fontWeight: 600, color: '#0F172A', margin: 0 }}>{formatDiaLabel(dia)}</p>
-                      <p style={{ fontSize: '12px', color: '#94A3B8', margin: '1px 0 0' }}>{itens.length} lançamento{itens.length > 1 ? 's' : ''}</p>
-                    </div>
-                    <span style={{ fontSize: '13px', fontWeight: 600, color: totalDia >= 0 ? '#10B981' : '#EF4444', flexShrink: 0 }}>
-                      {totalDia >= 0 ? '+' : '-'} {fmt(Math.abs(totalDia))}
-                    </span>
-                    <ChevronDown size={16} color="#CBD5E1" strokeWidth={2} style={{ flexShrink: 0 }} />
-                  </button>
-                )}
-                {expandido && (
-                  <div style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', overflow: 'hidden' }}>
-                    {itens.map((l: any, i: number) => {
-                      const Icon = ICONES_CAT[l.categoria] || (l.tipo === 'receita' ? ArrowDownLeft : ArrowUpRight)
-                      return (
-                        <button key={l.id} onClick={() => abrirModalEditar(l)}
-                          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderTop: i > 0 ? '1px solid #F1F5F9' : 'none', backgroundColor: 'transparent', border: i > 0 ? '1px solid #F1F5F9' : 'none', borderLeft: 'none', borderRight: 'none', borderBottom: 'none', cursor: 'pointer', textAlign: 'left' }}>
-                          <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: l.tipo === 'receita' ? '#ECFDF5' : '#FEF2F2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            <Icon size={16} color={l.tipo === 'receita' ? '#10B981' : '#EF4444'} strokeWidth={1.75} />
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <p style={{ fontSize: '14px', fontWeight: 500, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{l.categoria}</p>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <p style={{ fontSize: '12px', color: '#94A3B8', margin: 0 }}>{l.membro?.split(' ')[0]} · {l.hora}</p>
-                              {l.descricao && <AlignLeft size={10} color="#94A3B8" strokeWidth={1.75} />}
-                            </div>
-                          </div>
-                          <p style={{ fontSize: '14px', fontWeight: 600, color: l.tipo === 'receita' ? '#10B981' : '#EF4444', flexShrink: 0, margin: 0 }}>
-                            {l.tipo === 'receita' ? '+' : '-'} {fmt(Number(l.valor))}
-                          </p>
-                          <div style={{ width: '28px', height: '28px', borderRadius: '8px', backgroundColor: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            <Pencil size={12} color="#64748B" strokeWidth={1.75} />
-                          </div>
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            )
-          })}
-          {temMaisDias && (
-            <button onClick={() => setLimiteDias(prev => prev + 15)}
-              style={{ width: '100%', height: '44px', borderRadius: '12px', border: '1px solid #E2E8F0', backgroundColor: '#fff', color: '#0E3B2E', fontSize: '13px', fontWeight: 600, cursor: 'pointer', marginBottom: '8px' }}>
-              Carregar mais
-            </button>
-          )}
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '11px' }}>
+            <h1 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0F172A', letterSpacing: '-0.3px' }}>Movimentos</h1>
+            <span style={{ fontSize: '12px', color: '#9CA3AF' }}>
+              {loading ? '' : `${filtrados.length} ${filtrados.length === 1 ? 'lançamento' : 'lançamentos'}`}
+            </span>
+          </div>
+
+          <div style={{ marginBottom: '14px' }}>{segmentadoTipo(true)}</div>
+          {chipsFiltroAtivo()}
+          {listaMovimentos(true)}
         </div>
 
-        <button onClick={abrirModalNovo}
-          style={{ position: 'fixed', bottom: '80px', right: '24px', width: '56px', height: '56px', borderRadius: '50%', backgroundColor: '#0E3B2E', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 8px 24px rgba(14,59,46,0.4)', zIndex: 40 }}>
-          <Plus size={24} color="#fff" strokeWidth={2} />
+        <button onClick={abrirModalNovo} aria-label="Novo lançamento" className="mov-cta"
+          style={{ position: 'fixed', bottom: '80px', right: '24px', width: '56px', height: '56px', borderRadius: '50%', background: 'linear-gradient(135deg, #07271F 0%, #145A45 100%)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 8px 24px rgba(11,59,46,0.4)', zIndex: 40 }}>
+          <Plus size={24} color="#fff" strokeWidth={2.25} />
         </button>
       </div>
 
       {/* ── DESKTOP ── */}
-      <div className="hidden lg:block p-8 max-w-[1440px] mx-auto" style={{ backgroundColor: '#F7F9FB' }}>
-        <div className="flex items-center justify-between mb-6">
-          <div style={{ position: 'relative' }}>
-            <button onClick={() => setContextoAbertoHeader(!contextoAbertoHeader)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 10px', marginLeft: '-10px', borderRadius: '10px',
-                backgroundColor: contextoAtivo.tipo === 'empresa' ? 'rgba(20,90,69,0.06)' : 'transparent',
-              }}>
-              <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', letterSpacing: '-0.5px' }}>{contextoAtivo.nome || 'Fluxo Patrimonial'}</h1>
-              {contextoAtivo.tipo === 'empresa' && (
-                <span style={{ fontSize: '11px', fontWeight: 700, color: '#145A45', backgroundColor: '#D1FAE5', padding: '3px 9px', borderRadius: '999px' }}>PJ</span>
-              )}
-              <ChevronDown size={18} color="#94A3B8" style={{ transform: contextoAbertoHeader ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
-            </button>
-            <p className="text-sm mt-1" style={{ color: '#64748B' }}>Acompanhe receitas e despesas{contextoAtivo.tipo === 'pessoal' && familiaNome ? ` da família ${familiaNome}` : ''}</p>
+      <div className="hidden lg:block" style={{ backgroundColor: '#F7F9FB', minHeight: '100vh' }}>
 
-            {contextoAbertoHeader && (
-              <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '6px', width: '260px', backgroundColor: '#fff', borderRadius: '14px', border: '1px solid #E2E8F0', boxShadow: '0 12px 32px rgba(0,0,0,0.12)', zIndex: 20, overflow: 'hidden' }}>
-                <button onClick={() => { trocarContexto({ tipo: 'pessoal', nome: familiaNome }); setContextoAbertoHeader(false) }}
-                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
-                  <Users size={15} color="#64748B" strokeWidth={1.75} />
-                  <span style={{ flex: 1, fontSize: '13.5px', color: '#0F172A' }}>{familiaNome}</span>
-                  {contextoAtivo.tipo === 'pessoal' && <Check size={15} color="#145A45" strokeWidth={2.5} />}
-                </button>
-                {empresas.map((emp: any) => (
-                  <button key={emp.id} onClick={() => { trocarContexto({ tipo: 'empresa', empresaId: emp.id, nome: emp.nome }); setContextoAbertoHeader(false) }}
-                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', background: 'none', border: 'none', borderTop: '1px solid #F1F5F9', cursor: 'pointer', textAlign: 'left' }}>
-                    <Building2 size={15} color="#145A45" strokeWidth={1.75} />
-                    <span style={{ flex: 1, fontSize: '13.5px', color: '#0F172A' }}>{emp.nome}</span>
-                    {contextoAtivo.tipo === 'empresa' && contextoAtivo.empresaId === emp.id && <Check size={15} color="#145A45" strokeWidth={2.5} />}
-                  </button>
-                ))}
-                <a href="/dashboard/perfil"
-                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', borderTop: '1px solid #F1F5F9', textDecoration: 'none', color: '#145A45', fontSize: '13.5px', fontWeight: 600 }}>
-                  <Plus size={15} strokeWidth={2.5} /> Adicionar empresa (CNPJ)
-                </a>
+        <div style={{ backgroundColor: '#fff', borderBottom: '1px solid #ECEFF3', padding: '0 40px' }}>
+          <div style={{ maxWidth: '1360px', margin: '0 auto', minHeight: '68px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '16px', padding: '12px 0', boxSizing: 'border-box' }}>
+            {seletorContexto(false)}
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '2px', padding: '3px', backgroundColor: '#F1F4F7', borderRadius: '11px' }}>
+              <button onClick={() => mudarMes(-1)} aria-label="Mês anterior"
+                style={{ width: '30px', height: '30px', border: 'none', background: 'transparent', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                <ChevronLeft size={15} color="#6B7280" strokeWidth={2} />
+              </button>
+              <span style={{ minWidth: '118px', textAlign: 'center', fontSize: '13px', fontWeight: 600, color: '#0F172A' }}>{mesLabel}</span>
+              <button onClick={() => mudarMes(1)} aria-label="Mês seguinte"
+                style={{ width: '30px', height: '30px', border: 'none', background: 'transparent', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                <ChevronRight size={15} color="#6B7280" strokeWidth={2} />
+              </button>
+            </div>
+
+            <div style={{ flex: '1 1 40px' }} />
+
+            {botaoFiltros(false)}
+
+            <button onClick={abrirModalNovo} className="mov-cta"
+              style={{ display: 'flex', alignItems: 'center', gap: '7px', height: '44px', padding: '0 18px', border: 'none', borderRadius: '14px', background: 'linear-gradient(135deg, #07271F 0%, #145A45 100%)', boxShadow: '0 4px 16px rgba(11,59,46,0.3)', cursor: 'pointer', fontSize: '13.5px', fontWeight: 600, color: '#fff', flexShrink: 0 }}>
+              <Plus size={16} strokeWidth={2.5} /> Novo lançamento
+            </button>
+          </div>
+        </div>
+
+        <div style={{ maxWidth: '1360px', margin: '0 auto', padding: '28px 40px 64px', boxSizing: 'border-box', display: 'flex', flexWrap: 'wrap', gap: '28px', alignItems: 'flex-start' }}>
+
+          {/* Coluna principal: a lista é o protagonista */}
+          <div style={{ flex: '999 1 580px', minWidth: 0 }}>
+            {painelAberto && (
+              <div style={{ marginBottom: '24px' }}>
+                {painelAberto === 'fixas' && despesasFixasSection(false)}
+                {painelAberto === 'cartoes' && faturasCartaoSection(false)}
               </div>
             )}
-          </div>
-          <button onClick={abrirModalNovo} className="mov-cta"
-            style={{
-              display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 22px', borderRadius: '14px',
-              fontSize: '14px', fontWeight: 600, color: '#fff', border: 'none', cursor: 'pointer',
-              background: 'linear-gradient(135deg, #07271F 0%, #145A45 100%)',
-              boxShadow: '0 4px 16px rgba(11,59,46,0.3)', transition: 'all 0.15s ease',
-            }}>
-            <Plus size={16} strokeWidth={2.5} /> Novo lançamento
-          </button>
-        </div>
 
-        <div className="flex items-center justify-center gap-4 mb-6">
-          <button onClick={() => mudarMes(-1)} className="w-9 h-9 rounded-full flex items-center justify-center border" style={{ borderColor: '#E2E8F0', color: '#64748B', backgroundColor: '#fff', cursor: 'pointer' }}>
-            <ChevronLeft size={16} />
-          </button>
-          <span className="text-sm font-semibold min-w-[140px] text-center" style={{ color: '#0F172A' }}>{mesLabel}</span>
-          <button onClick={() => mudarMes(1)} className="w-9 h-9 rounded-full flex items-center justify-center border" style={{ borderColor: '#E2E8F0', color: '#64748B', backgroundColor: '#fff', cursor: 'pointer' }}>
-            <ChevronRight size={16} />
-          </button>
-        </div>
-
-        <div className="grid grid-cols-3 gap-5 mb-6">
-          {[
-            { label: 'Receitas', val: totalRec, cor: '#10B981', bg: '#ECFDF5', Icon: ArrowDownLeft },
-            { label: 'Despesas', val: totalDes, cor: '#EF4444', bg: '#FEF2F2', Icon: ArrowUpRight },
-            { label: 'Resultado do mês', val: resultado, cor: '#F59E0B', bg: '#FFFBEB', Icon: Wallet },
-          ].map(c => (
-            <div key={c.label} className="rounded-[20px] p-6" style={{
-              backgroundColor: '#fff', border: '1px solid rgba(15,23,42,0.06)',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 12px 40px rgba(0,0,0,0.07)', transition: 'all 0.2s ease',
-            }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px) scale(1.01)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 16px 48px rgba(15,23,42,0.08)' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'none'; (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 6px rgba(0,0,0,0.04), 0 12px 40px rgba(0,0,0,0.07)' }}>
-              <div className="w-11 h-11 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: c.bg }}>
-                <c.Icon size={19} color={c.cor} strokeWidth={1.75} />
-              </div>
-              <p className="text-sm font-medium mb-1" style={{ color: '#64748B' }}>{c.label}</p>
-              <p className="text-[30px] font-bold" style={{ color: c.cor, letterSpacing: '-0.5px' }}>{loading ? '...' : fmt(c.val)}</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '12px', marginBottom: '16px' }}>
+              <h1 style={{ margin: 0, fontSize: '21px', fontWeight: 700, color: '#0F172A', letterSpacing: '-0.5px' }}>Movimentos</h1>
+              <span style={{ fontSize: '13px', color: '#9CA3AF' }}>
+                {loading ? '' : `${filtrados.length} ${filtrados.length === 1 ? 'lançamento' : 'lançamentos'} em ${mesLabel}`}
+              </span>
+              <div style={{ flex: '1 1 20px' }} />
+              {segmentadoTipo(false)}
             </div>
-          ))}
-        </div>
 
-        {despesasFixasSection(false)}
-        {faturasCartaoSection(false)}
-
-        {contextoAtivo.tipo === 'pessoal' && !loading && familiaId && (
-          <OrcamentosSection
-            supabase={supabase}
-            familiaId={familiaId}
-            mesRef={mesRef}
-            lancamentos={lancamentos}
-            contas={contas}
-          />
-        )}
-
-        <div className="flex items-center gap-3 mb-5 flex-wrap">
-          <div className="flex items-center gap-1 p-1 rounded-xl" style={{ backgroundColor: '#F1F5F9' }}>
-            {[{ key: 'todos', label: 'Todos' }, { key: 'receita', label: 'Receitas' }, { key: 'despesa', label: 'Despesas' }].map(f => (
-              <button key={f.key} onClick={() => { setFiltro(f.key as any); setFiltroCategoria('todos') }}
-                className="px-4 py-2 rounded-lg text-sm font-medium"
-                style={{ backgroundColor: filtro === f.key ? '#fff' : 'transparent', color: filtro === f.key ? '#0F172A' : '#64748B', boxShadow: filtro === f.key ? '0 1px 3px rgba(0,0,0,0.08)' : 'none', border: 'none', cursor: 'pointer' }}>
-                {f.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-1 p-1 rounded-xl" style={{ backgroundColor: '#F1F5F9' }}>
-            <button onClick={() => setFiltroMembro('todos')}
-              className="px-4 py-2 rounded-lg text-sm font-medium"
-              style={{ backgroundColor: filtroMembro === 'todos' ? '#fff' : 'transparent', color: filtroMembro === 'todos' ? '#0F172A' : '#64748B', boxShadow: filtroMembro === 'todos' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none', border: 'none', cursor: 'pointer' }}>
-              Todos os membros
-            </button>
-            {membros.map(m => (
-              <button key={m} onClick={() => setFiltroMembro(m)}
-                className="px-4 py-2 rounded-lg text-sm font-medium"
-                style={{ backgroundColor: filtroMembro === m ? '#fff' : 'transparent', color: filtroMembro === m ? '#0F172A' : '#64748B', boxShadow: filtroMembro === m ? '0 1px 3px rgba(0,0,0,0.08)' : 'none', border: 'none', cursor: 'pointer' }}>
-                {m}
-              </button>
-            ))}
+            {chipsFiltroAtivo()}
+            {listaMovimentos(false)}
           </div>
 
-          <div style={{ position: 'relative', marginLeft: 'auto', minWidth: '260px' }}>
-            <Search size={15} color="#94A3B8" strokeWidth={1.75} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
-            <input
-              type="text" value={busca} onChange={e => setBusca(e.target.value)}
-              placeholder="Buscar por observação..."
-              style={{ width: '100%', height: '38px', paddingLeft: '38px', paddingRight: busca ? '38px' : '14px', borderRadius: '10px', border: '1px solid #E2E8F0', backgroundColor: '#fff', fontSize: '13px', color: '#0F172A', outline: 'none', boxSizing: 'border-box' }} />
-            {busca && (
-              <button onClick={() => setBusca('')}
-                style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}>
-                <X size={15} strokeWidth={2} />
-              </button>
+          {/* Coluna de apoio: resumo e o que exige ação saem do caminho da lista */}
+          <div style={{ flex: '1 1 340px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {blocoPosicao(false)}
+            {cardPendencias(false)}
+
+            {contextoAtivo.tipo === 'pessoal' && !loading && familiaId && (
+              <OrcamentosSection
+                supabase={supabase}
+                familiaId={familiaId}
+                mesRef={mesRef}
+                lancamentos={lancamentos}
+                contas={contas}
+              />
             )}
           </div>
-        </div>
-
-        {categoriasPresentes.length > 0 && (
-          <div className="flex items-center gap-2 flex-wrap mb-5">
-            {categoriasPresentes.map(c => {
-              const Icon = ICONES_CAT[c] || MoreHorizontal
-              const ativo = filtroCategoria === c
-              return (
-                <button key={c} onClick={() => setFiltroCategoria(ativo ? 'todos' : c)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
-                  style={{ border: `1px solid ${ativo ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: ativo ? '#0E3B2E' : '#fff', color: ativo ? '#fff' : '#64748B', cursor: 'pointer' }}>
-                  <Icon size={12} strokeWidth={1.75} color={ativo ? '#fff' : '#94A3B8'} />
-                  {c}
-                </button>
-              )
-            })}
-          </div>
-        )}
-
-        <div className="rounded-[20px] overflow-hidden" style={{
-          backgroundColor: '#fff', border: '1px solid rgba(15,23,42,0.06)',
-          boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 12px 40px rgba(0,0,0,0.07)',
-        }}>
-          {loading ? (
-            <p className="text-sm text-center py-16" style={{ color: '#94A3B8' }}>Carregando...</p>
-          ) : diasOrdenados.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 gap-3">
-              <Wallet size={32} color="#E2E8F0" strokeWidth={1} />
-              <p className="text-sm" style={{ color: '#94A3B8' }}>Nenhum lançamento neste período.</p>
-              <button onClick={abrirModalNovo} className="text-sm font-semibold hover:underline" style={{ color: '#0F766E', background: 'none', border: 'none', cursor: 'pointer' }}>Registrar primeiro lançamento →</button>
-            </div>
-          ) : diasVisiveis.map((dia, idx) => {
-            const itens    = grupos[dia]
-            const totalDia = itens.filter((l: any) => l.tipo === 'receita' || l.fatura_paga !== false).reduce((s, l) => s + (l.tipo === 'receita' ? Number(l.valor) : -Number(l.valor)), 0)
-            const expandido = diaEstaExpandido(dia, idx)
-            return (
-              <div key={dia} style={{ borderBottom: !expandido ? '1px solid #F1F5F9' : 'none' }}>
-                {expandido ? (
-                  <button onClick={() => toggleDia(dia, idx)}
-                    className="w-full flex items-center justify-between px-6 py-3"
-                    style={{ backgroundColor: '#F8FAFC', border: 'none', cursor: 'pointer' }}>
-                    <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#64748B' }}>
-                      {formatDiaLabel(dia)}
-                    </span>
-                    <span className="flex items-center gap-2">
-                      <span className="text-xs font-semibold" style={{ color: totalDia >= 0 ? '#10B981' : '#EF4444' }}>
-                        {totalDia >= 0 ? '+' : '-'} {fmt(Math.abs(totalDia))}
-                      </span>
-                      <ChevronDown size={14} color="#94A3B8" style={{ transform: 'rotate(180deg)', transition: 'transform 0.15s' }} />
-                    </span>
-                  </button>
-                ) : (
-                  <button onClick={() => toggleDia(dia, idx)}
-                    className="w-full flex items-center gap-3 px-6 py-4 hover:bg-gray-50"
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
-                    <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#F1F5F9' }}>
-                      <Calendar size={15} color="#64748B" strokeWidth={1.75} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>{formatDiaLabel(dia)}</p>
-                      <p className="text-xs" style={{ color: '#94A3B8' }}>{itens.length} lançamento{itens.length > 1 ? 's' : ''}</p>
-                    </div>
-                    <span className="text-sm font-semibold flex-shrink-0" style={{ color: totalDia >= 0 ? '#10B981' : '#EF4444' }}>
-                      {totalDia >= 0 ? '+' : '-'} {fmt(Math.abs(totalDia))}
-                    </span>
-                    <ChevronDown size={16} color="#CBD5E1" strokeWidth={2} style={{ flexShrink: 0 }} />
-                  </button>
-                )}
-                {expandido && itens.map((l: any) => {
-                  const Icon = ICONES_CAT[l.categoria] || (l.tipo === 'receita' ? ArrowDownLeft : ArrowUpRight)
-                  return (
-                    <button key={l.id} onClick={() => abrirModalEditar(l)}
-                      className="w-full flex items-center gap-3 px-6 py-3.5 border-t text-left mov-row"
-                      style={{ borderColor: '#F1F5F9', background: 'none', cursor: 'pointer' }}>
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-                        style={{ backgroundColor: l.tipo === 'receita' ? '#ECFDF5' : '#FEF2F2' }}>
-                        <Icon size={15} color={l.tipo === 'receita' ? '#10B981' : '#EF4444'} strokeWidth={1.75} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate" style={{ color: '#0F172A' }}>{l.categoria}</p>
-                        <div className="flex items-center gap-2">
-                          <p className="text-xs" style={{ color: '#94A3B8' }}>{l.membro} · {l.hora}</p>
-                          {l.descricao && <AlignLeft size={11} color="#94A3B8" strokeWidth={1.75} />}
-                          {l.descricao && <p className="text-xs truncate" style={{ color: '#94A3B8', maxWidth: '200px' }}>{l.descricao}</p>}
-                        </div>
-                      </div>
-                      <p className="font-semibold text-sm flex-shrink-0" style={{ color: l.tipo === 'receita' ? '#10B981' : '#EF4444' }}>
-                        {l.tipo === 'receita' ? '+' : '-'} {fmt(Number(l.valor))}
-                      </p>
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                        style={{ backgroundColor: '#F1F5F9' }}>
-                        <Pencil size={12} color="#64748B" strokeWidth={1.75} />
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-            )
-          })}
-          {temMaisDias && (
-            <button onClick={() => setLimiteDias(prev => prev + 15)}
-              className="w-full py-3 text-sm font-semibold hover:bg-gray-50"
-              style={{ color: '#0E3B2E', background: 'none', border: 'none', borderTop: '1px solid #F1F5F9', cursor: 'pointer' }}>
-              Carregar mais
-            </button>
-          )}
         </div>
       </div>
+
+      {/* Painel de filtros — bottom sheet no mobile, modal no desktop */}
+      {filtrosAbertos && isMobile && (
+        <div onClick={e => { if (e.target === e.currentTarget) setFiltrosAbertos(false) }}
+          style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', backgroundColor: 'rgba(6,38,31,0.45)' }}>
+          <div style={{ width: '100%', backgroundColor: '#fff', borderRadius: '28px 28px 0 0', display: 'flex', flexDirection: 'column', maxHeight: 'calc(85vh - 65px)', marginBottom: '65px' }}>
+            {painelFiltrosContent(true)}
+          </div>
+        </div>
+      )}
+      {filtrosAbertos && !isMobile && (
+        <div onClick={e => { if (e.target === e.currentTarget) setFiltrosAbertos(false) }}
+          style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(6,38,31,0.45)' }}>
+          <div style={{ width: '520px', backgroundColor: '#fff', borderRadius: '24px', display: 'flex', flexDirection: 'column', maxHeight: '90vh', margin: 'auto', boxShadow: '0 24px 64px rgba(6,38,31,0.32)' }}>
+            {painelFiltrosContent(false)}
+          </div>
+        </div>
+      )}
 
       {/* Modal Mobile */}
       {modalOpen && isMobile && (
