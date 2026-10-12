@@ -103,6 +103,8 @@ export default function MovimentosPage() {
   // Qual painel de pendência está aberto. Antes, Despesas Fixas e Faturas eram
   // duas seções sempre visíveis acima da lista.
   const [painelAberto, setPainelAberto] = useState<'fixas' | 'cartoes' | null>(null)
+  // No modal, a categoria começa nas mais usadas; isto abre a lista completa.
+  const [categoriasTodas, setCategoriasTodas] = useState(false)
   const [semanaOverride, setSemanaOverride] = useState<Record<string, boolean>>({})
   const [busca, setBusca]               = useState('')
   const [membros, setMembros]           = useState<string[]>([])
@@ -944,6 +946,7 @@ export default function MovimentosPage() {
   const fixasDespesas = fixasDoMes.filter((f: any) => f.tipo === 'despesa')
   const fixasReceitas = fixasDoMes.filter((f: any) => f.tipo === 'receita')
   const totalDespesasFixasPendentes = fixasDespesas.filter((f: any) => !f.pago).reduce((s: number, f: any) => s + Number(f.valor), 0)
+  const totalReceitasFixasPendentes = fixasReceitas.filter((f: any) => !f.pago).reduce((s: number, f: any) => s + Number(f.valor), 0)
 
   // Fluxo de caixa projetado do mês
   const hojeProj      = new Date()
@@ -1036,6 +1039,27 @@ export default function MovimentosPage() {
     : (tipo === 'despesa' ? CATEGORIAS_DESPESA : CATEGORIAS_RECEITA)
 
   const cartoes = contas.filter((c: any) => c.tipo === 'cartao_credito')
+
+  // Categorias do modal: as que esta família mais usa primeiro, não as 20 em
+  // ordem alfabética. A frequência vem dos lançamentos do mês carregado; sem
+  // histórico, cai na ordem original da lista, que já começa pelas comuns.
+  const categoriasVisiveis = (() => {
+    if (categoriasTodas) return categorias
+    const freq: Record<string, number> = {}
+    lancamentos.forEach((l: any) => {
+      if (l.tipo === tipo) freq[l.categoria] = (freq[l.categoria] || 0) + 1
+    })
+    const lista = categorias.slice()
+      .sort((a, b) => (freq[b] || 0) - (freq[a] || 0) || categorias.indexOf(a) - categorias.indexOf(b))
+      .slice(0, 6)
+    // A categoria selecionada tem que estar sempre visível — senão, ao editar
+    // um lançamento de categoria incomum, o chip marcado não apareceria.
+    if (!lista.includes(categoria) && categorias.includes(categoria)) {
+      lista.pop()
+      lista.unshift(categoria)
+    }
+    return lista
+  })()
 
   // A conta do bloco principal vive em src/lib/posicaoMes.ts de propósito:
   // Dashboard e Linha do Tempo leem os mesmos lançamentos e precisam do mesmo
@@ -1158,6 +1182,62 @@ export default function MovimentosPage() {
           })}
         </div>
       )}
+
+      {/* Receitas fixas. O código já calculava `fixasReceitas` e nunca
+          renderizava — uma receita fixa cadastrada não aparecia em lugar
+          nenhum da tela. */}
+      {fixasReceitas.length > 0 && (
+        <div style={{ marginTop: isMob ? '16px' : '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+            <ArrowDownLeft size={isMob ? 14 : 16} color="#6B7280" strokeWidth={1.75} />
+            <span style={{ fontSize: isMob ? '13px' : '15px', fontWeight: 700, color: '#0B3B2E', letterSpacing: '-0.2px' }}>Receitas Fixas</span>
+            {totalReceitasFixasPendentes > 0 && (
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#6B7280', backgroundColor: '#F7F8FA', border: '1px solid #E5E7EB', padding: '5px 12px', borderRadius: '999px', fontVariantNumeric: 'tabular-nums' }}>
+                {fmt(totalReceitasFixasPendentes)} a receber
+              </span>
+            )}
+          </div>
+
+          <div style={{ backgroundColor: '#fff', border: '1px solid #ECEFF3', borderRadius: '20px', overflow: 'hidden', boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 12px 40px rgba(0,0,0,0.07)' }}>
+            {fixasReceitas.map((rf: any, i: number) => {
+              const Icon = ICONES_CAT[rf.categoria] || MoreHorizontal
+              return (
+                <div key={rf.id} className="df-card"
+                  style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: isMob ? '12px 14px' : '14px 20px', borderTop: i > 0 ? '1px solid #F7F8FA' : 'none' }}>
+                  <button onClick={() => abrirDfModalEditar(rf)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: rf.pago ? 'rgba(47,179,106,0.10)' : '#F7F8FA', border: `1px solid ${rf.pago ? 'rgba(47,179,106,0.22)' : '#ECEFF3'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Icon size={15} color={rf.pago ? '#145A45' : '#6B7280'} strokeWidth={1.75} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rf.nome}</p>
+                        {rf.valor_variavel && (
+                          <span style={{ fontSize: '9.5px', fontWeight: 700, color: '#6B7280', border: '1px solid #E5E7EB', borderRadius: '5px', padding: '1px 5px', flexShrink: 0 }}>VARIÁVEL</span>
+                        )}
+                      </div>
+                      <p style={{ margin: 0, fontSize: '11px', color: '#9CA3AF', fontVariantNumeric: 'tabular-nums' }}>
+                        Entra dia {rf.dia_vencimento} · {rf.valor_variavel && !rf.pago ? '~' : ''}{fmt(Number(rf.valor))}
+                      </p>
+                    </div>
+                  </button>
+                  {rf.pago ? (
+                    <button onClick={() => desfazerPagamento(rf)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 14px', borderRadius: '999px', border: '1px solid rgba(47,179,106,0.25)', backgroundColor: 'rgba(47,179,106,0.12)', color: '#0B3B2E', fontSize: '11px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
+                      <CheckCircle2 size={12} strokeWidth={2} /> Recebido
+                    </button>
+                  ) : (
+                    <button onClick={() => iniciarPagamento(rf)}
+                      style={{ padding: '5px 14px', borderRadius: '999px', border: '1.5px solid #E5E7EB', backgroundColor: '#F7F8FA', color: '#374151', fontSize: '11px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
+                      A receber
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 
@@ -1215,10 +1295,21 @@ export default function MovimentosPage() {
                   {fmt(totalFaturasPendentes)} <span style={{ fontSize: '11.5px', fontWeight: 500, color: '#94A3B8' }}>na fatura</span>
                 </span>
               </div>
-              <p style={{ fontSize: '12px', fontWeight: 600, color: excedidoConta ? '#DC2626' : '#059669', margin: '10px 0 0' }}>
+              {/* Aqui mostra o PESO da fatura sobre o saldo, não um segundo
+                  "sobra": quem responde quanto sobra é o bloco principal, que
+                  já inclui as despesas fixas em aberto. Dois números chamados
+                  "sobra" com escopos diferentes na mesma tela confundia. */}
+              <div style={{ height: '8px', borderRadius: '999px', backgroundColor: '#F1F4F7', overflow: 'hidden', margin: '12px 0 8px' }}>
+                <div style={{
+                  width: `${saldoContaReal > 0 ? Math.min(100, Math.round((totalFaturasPendentes / saldoContaReal) * 100)) : 100}%`,
+                  height: '8px', borderRadius: '999px',
+                  backgroundColor: excedidoConta ? '#EF4444' : '#2FB36A', transition: 'width 0.2s',
+                }} />
+              </div>
+              <p style={{ fontSize: '12px', fontWeight: 600, color: excedidoConta ? '#B91C1C' : '#374151', margin: 0 }}>
                 {excedidoConta
-                  ? `Falta ${fmt(totalFaturasPendentes - saldoContaReal)} pra cobrir a fatura`
-                  : `Sobra ${fmt(saldoContaReal - totalFaturasPendentes)} depois de cobrir a fatura`}
+                  ? `Falta ${fmt(totalFaturasPendentes - saldoContaReal)} pra cobrir as faturas`
+                  : `As faturas usam ${saldoContaReal > 0 ? Math.round((totalFaturasPendentes / saldoContaReal) * 100) : 0}% do saldo da conta`}
               </p>
             </div>
           )
@@ -1286,11 +1377,21 @@ export default function MovimentosPage() {
                           }}>
                             {l.fatura_paga ? 'Pago' : 'Pendente'}
                           </span>
-                          <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#EF4444', flexShrink: 0, minWidth: '70px', textAlign: 'right' }}>
+                          <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#111827', flexShrink: 0, minWidth: '86px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                             {fmt(Number(l.valor))}
                           </span>
                         </button>
                       ))
+                    )}
+                    {/* Total da fatura: o detalhe listava as compras e deixava
+                        a soma por fazer de cabeça. */}
+                    {!carregandoDetalheCartao && itensCartaoDetalhe.length > 0 && (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '11px 14px', borderTop: '1px solid #ECEFF3', backgroundColor: '#F7F8FA' }}>
+                        <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Total da fatura</span>
+                        <span style={{ fontSize: '13.5px', fontWeight: 700, color: '#111827', minWidth: '86px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                          {fmt(itensCartaoDetalhe.reduce((s: number, l: any) => s + Number(l.valor), 0))}
+                        </span>
+                      </div>
                     )}
                   </div>
                 )}
@@ -1934,160 +2035,195 @@ export default function MovimentosPage() {
   )
 
   // Conteúdo do modal compartilhado
-  const modalContent = (isMob: boolean) => (
+  const modalContent = (isMob: boolean) => {
+    const valorNum = valor ? parseFloat(valor.replace(/\./g, '').replace(',', '.')) : 0
+    const contaDoForm = contas.find((c: any) => c.id === contaSelecionadaId)
+    const ehCartao = contaDoForm?.tipo === 'cartao_credito'
+    return (
     <>
-      {/* Drag handle mobile */}
       {isMob && <div style={{ width: '40px', height: '4px', borderRadius: '2px', backgroundColor: '#E2E8F0', margin: '12px auto 4px', flexShrink: 0 }} />}
 
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 24px', borderBottom: '1px solid #F1F5F9', flexShrink: 0 }}>
-        <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#0F172A', margin: 0 }}>
-          {editando ? 'Editar lançamento' : 'Novo lançamento'}
-        </h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {editando && (
-            <button onClick={handleDeletar} disabled={deletando}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, border: 'none', cursor: 'pointer', backgroundColor: confirmDelete ? '#EF4444' : '#FEF2F2', color: confirmDelete ? '#fff' : '#DC2626' }}>
-              <Trash2 size={13} strokeWidth={2} />
-              {deletando ? 'Deletando...' : confirmDelete ? 'Confirmar' : 'Deletar'}
-            </button>
+      {/* Header. O contexto virou uma linha clicável embaixo do título, em vez
+          de uma seção inteira com label em caixa alta. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 22px 14px', borderBottom: '1px solid #F1F4F7', flexShrink: 0 }}>
+        <div style={{ position: 'relative', minWidth: 0 }}>
+          <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0F172A', letterSpacing: '-0.3px' }}>
+            {editando ? 'Editar lançamento' : 'Novo lançamento'}
+          </h2>
+          {!editando && (
+            <>
+              <button type="button" onClick={() => setContextoAberto(!contextoAberto)}
+                style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '3px', padding: 0, border: 'none', background: 'none', cursor: 'pointer' }}>
+                {contextoAtivo.tipo === 'empresa'
+                  ? <Building2 size={13} color="#145A45" strokeWidth={1.75} />
+                  : <Users size={13} color="#9CA3AF" strokeWidth={1.75} />}
+                <span style={{ fontSize: '12.5px', color: '#6B7280' }}>
+                  em <span style={{ fontWeight: 600, color: '#374151' }}>{contextoAtivo.nome}</span>
+                </span>
+                {contextoAtivo.tipo === 'empresa' && (
+                  <span style={{ fontSize: '9.5px', fontWeight: 700, color: '#0B3B2E', backgroundColor: 'rgba(47,179,106,0.12)', border: '1px solid rgba(47,179,106,0.25)', padding: '1px 6px', borderRadius: '999px' }}>PJ</span>
+                )}
+                <ChevronDown size={12} color="#9CA3AF" strokeWidth={2} style={{ transform: contextoAberto ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+              </button>
+              {contextoAberto && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '6px', width: '240px', backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #ECEFF3', boxShadow: '0 12px 32px rgba(15,23,42,0.16)', zIndex: 10, overflow: 'hidden' }}>
+                  <button type="button" onClick={() => { trocarContexto({ tipo: 'pessoal', nome: familiaNome }); handleTipo(tipo); setContextoAberto(false) }}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 13px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                    <Users size={14} color="#6B7280" strokeWidth={1.75} />
+                    <span style={{ flex: 1, fontSize: '13px', color: '#0F172A' }}>{familiaNome}</span>
+                    {contextoAtivo.tipo === 'pessoal' && <Check size={14} color="#145A45" strokeWidth={2.5} />}
+                  </button>
+                  {empresas.map((emp: any) => (
+                    <button key={emp.id} type="button" onClick={() => { trocarContexto({ tipo: 'empresa', empresaId: emp.id, nome: emp.nome }); handleTipo(tipo); setContextoAberto(false) }}
+                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 13px', background: 'none', border: 'none', borderTop: '1px solid #F7F8FA', cursor: 'pointer', textAlign: 'left' }}>
+                      <Building2 size={14} color="#145A45" strokeWidth={1.75} />
+                      <span style={{ flex: 1, fontSize: '13px', color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{emp.nome}</span>
+                      {contextoAtivo.tipo === 'empresa' && contextoAtivo.empresaId === emp.id && <Check size={14} color="#145A45" strokeWidth={2.5} />}
+                    </button>
+                  ))}
+                  <a href="/dashboard/perfil"
+                    style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 13px', borderTop: '1px solid #F7F8FA', textDecoration: 'none', color: '#145A45', fontSize: '13px', fontWeight: 600 }}>
+                    <Plus size={14} strokeWidth={2.5} /> Adicionar empresa (CNPJ)
+                  </a>
+                </div>
+              )}
+            </>
           )}
-          <button onClick={() => setModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}>
-            <X size={20} strokeWidth={2} />
-          </button>
         </div>
+        <span style={{ flex: '1 1 10px' }} />
+        {editando && (
+          <button onClick={handleDeletar} disabled={deletando}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 12px', borderRadius: '10px', fontSize: '12px', fontWeight: 700, border: 'none', cursor: 'pointer', backgroundColor: confirmDelete ? '#DC2626' : 'rgba(239,68,68,0.10)', color: confirmDelete ? '#fff' : '#B91C1C', flexShrink: 0 }}>
+            <Trash2 size={13} strokeWidth={2} />
+            {deletando ? 'Deletando...' : confirmDelete ? 'Confirmar' : 'Deletar'}
+          </button>
+        )}
+        <button onClick={() => setModalOpen(false)} aria-label="Fechar"
+          style={{ width: '30px', height: '30px', background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <X size={18} strokeWidth={2} />
+        </button>
       </div>
 
-      {/* Scroll area */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px 8px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '18px 22px 8px' }}>
 
-        {/* Lançando em — mini-seletor de contexto */}
-        {!editando && (
-          <div style={{ position: 'relative', marginBottom: '14px' }}>
-            <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Lançando em</p>
-            <button type="button" onClick={() => setContextoAberto(!contextoAberto)}
-              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '12px', border: `1.5px solid ${contextoAtivo.tipo === 'empresa' ? 'rgba(20,90,69,0.35)' : '#E2E8F0'}`, backgroundColor: contextoAtivo.tipo === 'empresa' ? '#F0FDF4' : '#F8FAFC', cursor: 'pointer' }}>
-              <div style={{ width: '28px', height: '28px', borderRadius: '8px', flexShrink: 0, backgroundColor: contextoAtivo.tipo === 'empresa' ? '#14574518' : '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {contextoAtivo.tipo === 'empresa'
-                  ? <Building2 size={14} color="#145A45" strokeWidth={1.75} />
-                  : <Users size={14} color="#64748B" strokeWidth={1.75} />}
-              </div>
-              <span style={{ flex: 1, textAlign: 'left', fontSize: '13.5px', fontWeight: 600, color: '#0F172A' }}>{contextoAtivo.nome}</span>
-              {contextoAtivo.tipo === 'empresa' && (
-                <span style={{ fontSize: '10px', fontWeight: 700, color: '#145A45', backgroundColor: '#D1FAE5', padding: '2px 7px', borderRadius: '999px' }}>PJ</span>
-              )}
-              <ChevronDown size={15} color="#94A3B8" strokeWidth={2} style={{ transform: contextoAberto ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
-            </button>
-            {contextoAberto && (
-              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 8px 24px rgba(0,0,0,0.1)', zIndex: 10, overflow: 'hidden' }}>
-                <button type="button" onClick={() => { trocarContexto({ tipo: 'pessoal', nome: familiaNome }); handleTipo(tipo) }}
-                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
-                  <Users size={14} color="#64748B" strokeWidth={1.75} />
-                  <span style={{ flex: 1, fontSize: '13px', color: '#0F172A' }}>{familiaNome}</span>
-                  {contextoAtivo.tipo === 'pessoal' && <Check size={14} color="#145A45" strokeWidth={2.5} />}
-                </button>
-                {empresas.map((emp: any) => (
-                  <button key={emp.id} type="button" onClick={() => { trocarContexto({ tipo: 'empresa', empresaId: emp.id, nome: emp.nome }); handleTipo(tipo) }}
-                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: 'none', border: 'none', borderTop: '1px solid #F1F5F9', cursor: 'pointer', textAlign: 'left' }}>
-                    <Building2 size={14} color="#145A45" strokeWidth={1.75} />
-                    <span style={{ flex: 1, fontSize: '13px', color: '#0F172A' }}>{emp.nome}</span>
-                    {contextoAtivo.tipo === 'empresa' && contextoAtivo.empresaId === emp.id && <Check size={14} color="#145A45" strokeWidth={2.5} />}
-                  </button>
-                ))}
-                <a href="/dashboard/perfil"
-                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderTop: '1px solid #F1F5F9', textDecoration: 'none', color: '#145A45', fontSize: '13px', fontWeight: 600 }}>
-                  <Plus size={14} strokeWidth={2.5} /> Adicionar empresa (CNPJ)
-                </a>
-              </div>
-            )}
+        {/* O VALOR é o herói: é o primeiro campo que a pessoa preenche, então
+            para de ser cinza dentro de uma caixa cinza. */}
+        <div style={{ backgroundColor: '#fff', border: '1.5px solid #2FB36A', boxShadow: '0 0 0 3px rgba(47,179,106,0.12)', borderRadius: '18px', padding: '14px 18px 16px', marginBottom: '14px' }}>
+          <p style={{ margin: '0 0 6px', fontSize: '10.5px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.09em' }}>Valor</p>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+            <span style={{ fontSize: isMob ? '18px' : '20px', fontWeight: 600, color: '#9CA3AF', flexShrink: 0 }}>R$</span>
+            <input
+              type="text" inputMode="numeric" value={valor} autoFocus={!editando}
+              onChange={e => {
+                const digits = e.target.value.replace(/\D/g, '')
+                const num = parseInt(digits || '0', 10)
+                setValor(digits === '' ? '' : (num / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
+              }}
+              placeholder="0,00"
+              style={{ flex: '1 1 auto', minWidth: 0, padding: 0, border: 'none', outline: 'none', backgroundColor: 'transparent', fontFamily: 'inherit', fontSize: isMob ? '32px' : '40px', fontWeight: 700, color: '#111827', letterSpacing: isMob ? '-1.2px' : '-1.6px', fontVariantNumeric: 'tabular-nums' }}
+            />
           </div>
-        )}
-
-        {/* Tipo */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
-          {[{ key: 'despesa', label: 'Despesa', cor: '#EF4444' }, { key: 'receita', label: 'Receita', cor: '#10B981' }].map(t => (
-            <button key={t.key} onClick={() => handleTipo(t.key as any)}
-              style={{ flex: 1, padding: '10px', borderRadius: '12px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', border: `2px solid ${tipo === t.key ? t.cor : '#E2E8F0'}`, backgroundColor: tipo === t.key ? t.cor + '12' : '#fff', color: tipo === t.key ? t.cor : '#64748B' }}>
-              {t.label}
-            </button>
-          ))}
         </div>
 
-        {/* Valor */}
-        <div style={{ backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '6px 16px', marginBottom: '10px', textAlign: 'center' }}>
-          <p style={{ fontSize: '11px', fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>Valor</p>
-          <input
-            type="text" inputMode="numeric" value={valor}
-            onChange={e => {
-              const digits = e.target.value.replace(/\D/g, '')
-              const num = parseInt(digits || '0', 10)
-              setValor(digits === '' ? '' : (num / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
-            }}
-            placeholder="0,00"
-            style={{ width: '100%', textAlign: 'center', fontSize: isMob ? '28px' : '32px', fontWeight: 700, border: 'none', outline: 'none', backgroundColor: 'transparent', color: tipo === 'despesa' ? '#EF4444' : '#10B981' }}
-          />
-        </div>
-
-        {/* Membro */}
-        <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Quem está lançando</p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '6px', marginBottom: '10px' }}>
-          {(membrosFamilia.length ? membrosFamilia : [membroAtual]).map(m => (
-            <button key={m} onClick={() => setMembroForm(m)}
-              style={{ padding: '8px', borderRadius: '12px', fontSize: '14px', fontWeight: 500, cursor: 'pointer', border: `1px solid ${membroForm === m ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: membroForm === m ? '#F0FDF4' : '#fff', color: membroForm === m ? '#0E3B2E' : '#64748B' }}>
-              {m.split(' ')[0]}
-            </button>
-          ))}
-        </div>
-
-        {/* Categoria */}
-        <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Categoria</p>
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
-          {categorias.map(c => {
-            const Icon = ICONES_CAT[c] || MoreHorizontal
+        {/* Tipo: segmentado no verde da marca, com seta indicando direção. A cor
+            deixa de ser o único sinal, então o vermelho berrante sai. */}
+        <div style={{ display: 'flex', gap: '2px', padding: '3px', backgroundColor: '#F1F4F7', borderRadius: '13px', marginBottom: '18px' }}>
+          {[{ key: 'despesa', label: 'Despesa', Icon: ArrowUpRight }, { key: 'receita', label: 'Receita', Icon: ArrowDownLeft }].map(t => {
+            const ativo = tipo === t.key
             return (
-              <button key={c} onClick={() => setCategoria(c)}
-                style={{ padding: '8px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 500, cursor: 'pointer', border: `1px solid ${categoria === c ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: categoria === c ? '#F0FDF4' : '#fff', color: categoria === c ? '#0E3B2E' : '#64748B', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', minWidth: '64px' }}>
-                <Icon size={14} strokeWidth={1.75} color={categoria === c ? '#0E3B2E' : '#94A3B8'} />
-                {c}
+              <button key={t.key} onClick={() => handleTipo(t.key as any)}
+                style={{ flex: '1 1 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px', padding: '11px 0', border: 'none', borderRadius: '10px', backgroundColor: ativo ? '#fff' : 'transparent', boxShadow: ativo ? '0 1px 2px rgba(15,23,42,0.08)' : 'none', cursor: 'pointer', fontSize: '13.5px', fontWeight: ativo ? 600 : 500, color: ativo ? '#0B3B2E' : '#6B7280' }}>
+                <t.Icon size={15} color={ativo ? '#0B3B2E' : '#9CA3AF'} strokeWidth={2} />
+                {t.label}
               </button>
             )
           })}
         </div>
 
-        {/* Conta — só aparece pra despesa */}
+        {/* Categoria: as mais usadas primeiro, não as 20 em ordem alfabética.
+            A parede de categorias ocupava metade do modal. */}
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '10px', marginBottom: '8px' }}>
+          <p style={{ margin: 0, fontSize: '10.5px', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.09em' }}>Categoria</p>
+          {categorias.length > categoriasVisiveis.length || categoriasTodas ? (
+            <button type="button" onClick={() => setCategoriasTodas(!categoriasTodas)}
+              style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 600, color: '#145A45' }}>
+              {categoriasTodas ? 'Ver menos' : `Todas as ${categorias.length}`}
+            </button>
+          ) : null}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isMob ? 2 : 3}, minmax(0, 1fr))`, gap: '7px', marginBottom: '18px' }}>
+          {categoriasVisiveis.map(c => {
+            const Icon = ICONES_CAT[c] || MoreHorizontal
+            const ativo = categoria === c
+            return (
+              <button key={c} onClick={() => setCategoria(c)}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '11px 12px', border: `1.5px solid ${ativo ? '#2FB36A' : '#E5E7EB'}`, backgroundColor: ativo ? 'rgba(47,179,106,0.08)' : '#fff', borderRadius: '12px', cursor: 'pointer', fontSize: '12.5px', fontWeight: ativo ? 600 : 500, color: ativo ? '#0B3B2E' : '#374151', textAlign: 'left' }}>
+                <Icon size={15} strokeWidth={1.75} color={ativo ? '#0B3B2E' : '#9CA3AF'} style={{ flexShrink: 0 }} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c}</span>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Membro: só existe se houver mais de um na família. Com um membro só,
+            era um botão solto ocupando meia largura sem decisão nenhuma. */}
+        {membrosFamilia.length > 1 && (
+          <>
+            <p style={{ margin: '0 0 8px', fontSize: '10.5px', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.09em' }}>Quem está lançando</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '7px', marginBottom: '18px' }}>
+              {membrosFamilia.map(m => {
+                const ativo = membroForm === m
+                return (
+                  <button key={m} onClick={() => setMembroForm(m)}
+                    style={{ padding: '11px', border: `1.5px solid ${ativo ? '#2FB36A' : '#E5E7EB'}`, backgroundColor: ativo ? 'rgba(47,179,106,0.08)' : '#fff', borderRadius: '12px', cursor: 'pointer', fontSize: '13px', fontWeight: ativo ? 600 : 500, color: ativo ? '#0B3B2E' : '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {m.split(' ')[0]}
+                  </button>
+                )
+              })}
+            </div>
+          </>
+        )}
+
+        {/* Pago com — só despesa. É a escolha que decide se vira fatura. */}
         {tipo === 'despesa' && (
-          <div style={{ marginBottom: '10px' }}>
-            <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Conta</p>
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-              {contas.map((c: any) => (
-                <button key={c.id} onClick={() => setContaSelecionadaId(c.id)}
-                  style={{ padding: '8px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 500, cursor: 'pointer', border: `1px solid ${contaSelecionadaId === c.id ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: contaSelecionadaId === c.id ? '#F0FDF4' : '#fff', color: contaSelecionadaId === c.id ? '#0E3B2E' : '#64748B' }}>
-                  {c.nome}
-                </button>
-              ))}
+          <div style={{ marginBottom: '18px' }}>
+            <p style={{ margin: '0 0 8px', fontSize: '10.5px', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.09em' }}>Pago com</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px' }}>
+              {contas.map((c: any) => {
+                const ativo = contaSelecionadaId === c.id
+                return (
+                  <button key={c.id} onClick={() => setContaSelecionadaId(c.id)}
+                    style={{ flex: '1 1 120px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px', padding: '12px 10px', border: `1.5px solid ${ativo ? '#2FB36A' : '#E5E7EB'}`, backgroundColor: ativo ? 'rgba(47,179,106,0.08)' : '#fff', borderRadius: '12px', cursor: 'pointer', fontSize: '12.5px', fontWeight: ativo ? 600 : 500, color: ativo ? '#0B3B2E' : '#374151' }}>
+                    {c.tipo === 'cartao_credito'
+                      ? <CreditCard size={15} color={ativo ? '#0B3B2E' : '#9CA3AF'} strokeWidth={1.75} style={{ flexShrink: 0 }} />
+                      : <Wallet size={15} color={ativo ? '#0B3B2E' : '#9CA3AF'} strokeWidth={1.75} style={{ flexShrink: 0 }} />}
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.nome}</span>
+                  </button>
+                )
+              })}
               <button onClick={() => { setEditandoCartaoId(null); setNovoCartaoNome(''); setNovoCartaoFechamento(''); setNovoCartaoVencimento(''); setNovoCartaoOpen(true) }}
-                style={{ padding: '8px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 500, cursor: 'pointer', border: '1px dashed #CBD5E1', backgroundColor: '#fff', color: '#64748B' }}>
-                + Novo cartão
+                aria-label="Novo cartão"
+                style={{ flex: '0 0 auto', width: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.5px dashed #CBD5E1', backgroundColor: '#fff', borderRadius: '12px', cursor: 'pointer' }}>
+                <Plus size={16} color="#6B7280" strokeWidth={2.25} />
               </button>
             </div>
-            {contaSelecionadaId && contas.find((c: any) => c.id === contaSelecionadaId)?.tipo === 'cartao_credito' && (
+
+            {/* A consequência escrita: a regra de competência não é óbvia na
+                hora de lançar. */}
+            {ehCartao && (
               <>
-                <p style={{ fontSize: '11px', color: '#94A3B8', marginTop: '6px' }}>
-                  Fica pendente até você pagar a fatura desse cartão — não conta no Saldo em conta ainda.
+                <p style={{ margin: '8px 0 0', fontSize: '11.5px', color: '#6B7280', lineHeight: 1.45 }}>
+                  Entra como despesa de {categoria} agora e soma na fatura do {contaDoForm.nome}, que sai da conta quando você pagar.
                 </p>
-                {!parcelado && (() => {
-                  const cartaoForm = contas.find((c: any) => c.id === contaSelecionadaId)
-                  if (!cartaoForm.dia_fechamento || !cartaoForm.dia_vencimento) return null
+                {!parcelado && contaDoForm.dia_fechamento && contaDoForm.dia_vencimento && (() => {
                   const dataCompra = new Date(dataLanc + 'T12:00:00')
-                  const empurrou = dataCompra.getDate() > cartaoForm.dia_fechamento
-                  let mesFatura = dataCompra.getMonth()
-                  if (empurrou) mesFatura += 1
-                  const dataFatura = new Date(dataCompra.getFullYear(), mesFatura, cartaoForm.dia_vencimento)
+                  const empurrou = dataCompra.getDate() > contaDoForm.dia_fechamento
+                  const dataFatura = new Date(dataCompra.getFullYear(), dataCompra.getMonth() + (empurrou ? 1 : 0), contaDoForm.dia_vencimento)
                   return (
-                    <p style={{ fontSize: '11px', color: '#1D4ED8', backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '8px', padding: '6px 10px', marginTop: '6px' }}>
+                    <p style={{ margin: '8px 0 0', fontSize: '11.5px', color: '#374151', backgroundColor: '#F7F8FA', border: '1px solid #ECEFF3', borderRadius: '10px', padding: '8px 11px', lineHeight: 1.45 }}>
                       {empurrou
-                        ? `Compra depois do fechamento (dia ${cartaoForm.dia_fechamento}) — vai pra fatura de ${dataFatura.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}, vencendo dia ${cartaoForm.dia_vencimento}.`
-                        : `Entra na fatura deste mês, vencendo dia ${cartaoForm.dia_vencimento}.`}
+                        ? `Compra depois do fechamento (dia ${contaDoForm.dia_fechamento}) — vai pra fatura de ${dataFatura.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}, vencendo dia ${contaDoForm.dia_vencimento}.`
+                        : `Entra na fatura deste mês, vencendo dia ${contaDoForm.dia_vencimento}.`}
                     </p>
                   )
                 })()}
@@ -2096,65 +2232,69 @@ export default function MovimentosPage() {
           </div>
         )}
 
-        {/* Aporte — só aparece pra despesa categoria Investimentos, com toggle entre
-            aplicar numa posição de Renda Fixa ou alocar pra uma meta */}
+        {/* Aporte — despesa na categoria de investimento, aplicando numa posição
+            de Renda Fixa ou alocando pra uma meta. */}
         {tipo === 'despesa' && ehCategoriaInvestimento(categoria) && (
-          <div style={{ marginBottom: '10px' }}>
-            <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
-              <button onClick={() => setModoAporte('posicao')}
-                style={{ flex: 1, padding: '8px', borderRadius: '10px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: `1.5px solid ${modoAporte === 'posicao' ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: modoAporte === 'posicao' ? '#F0FDF4' : '#fff', color: modoAporte === 'posicao' ? '#0E3B2E' : '#64748B' }}>
-                Renda Fixa
-              </button>
-              <button onClick={() => setModoAporte('meta')}
-                style={{ flex: 1, padding: '8px', borderRadius: '10px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: `1.5px solid ${modoAporte === 'meta' ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: modoAporte === 'meta' ? '#F0FDF4' : '#fff', color: modoAporte === 'meta' ? '#0E3B2E' : '#64748B' }}>
-                Meta
-              </button>
+          <div style={{ marginBottom: '18px' }}>
+            <div style={{ display: 'flex', gap: '2px', padding: '3px', backgroundColor: '#F1F4F7', borderRadius: '12px', marginBottom: '10px' }}>
+              {[{ key: 'posicao', label: 'Renda Fixa' }, { key: 'meta', label: 'Meta' }].map(o => {
+                const ativo = modoAporte === o.key
+                return (
+                  <button key={o.key} onClick={() => setModoAporte(o.key as any)}
+                    style={{ flex: '1 1 0', padding: '9px 0', border: 'none', borderRadius: '9px', backgroundColor: ativo ? '#fff' : 'transparent', boxShadow: ativo ? '0 1px 2px rgba(15,23,42,0.08)' : 'none', cursor: 'pointer', fontSize: '12.5px', fontWeight: ativo ? 600 : 500, color: ativo ? '#0B3B2E' : '#6B7280' }}>
+                    {o.label}
+                  </button>
+                )
+              })}
             </div>
 
             {modoAporte === 'posicao' ? (
               <>
-                <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Aplicar em qual posição?</p>
+                <p style={{ margin: '0 0 8px', fontSize: '10.5px', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.09em' }}>Aplicar em qual posição?</p>
                 {posicoesRF.length === 0 ? (
-                  <p style={{ fontSize: '12px', color: '#94A3B8', backgroundColor: '#F8FAFC', border: '1px solid #F1F5F9', borderRadius: '12px', padding: '10px 12px' }}>
-                    Nenhuma posição de Renda Fixa cadastrada ainda — esse lançamento não vai render em nenhuma posição. Cadastre uma em Investimentos primeiro, se quiser aplicar.
+                  <p style={{ margin: 0, fontSize: '12px', color: '#6B7280', backgroundColor: '#F7F8FA', border: '1px solid #ECEFF3', borderRadius: '12px', padding: '10px 12px', lineHeight: 1.45 }}>
+                    Nenhuma posição de Renda Fixa cadastrada — esse lançamento não vai render em nenhuma posição. Cadastre uma em Investimentos primeiro, se quiser aplicar.
                   </p>
                 ) : (
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: '7px', flexWrap: 'wrap' }}>
                     <button onClick={() => setPosicaoAporteId('')}
-                      style={{ padding: '8px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 500, cursor: 'pointer', border: `1px solid ${posicaoAporteId === '' ? '#94A3B8' : '#E2E8F0'}`, backgroundColor: posicaoAporteId === '' ? '#F1F5F9' : '#fff', color: '#64748B' }}>
+                      style={{ padding: '9px 13px', border: `1.5px solid ${posicaoAporteId === '' ? '#9CA3AF' : '#E5E7EB'}`, backgroundColor: posicaoAporteId === '' ? '#F1F4F7' : '#fff', borderRadius: '11px', cursor: 'pointer', fontSize: '12.5px', fontWeight: 500, color: '#374151' }}>
                       Nenhuma
                     </button>
-                    {posicoesRF.map((p: any) => (
-                      <button key={p.id} onClick={() => setPosicaoAporteId(p.id)}
-                        style={{ padding: '8px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 500, cursor: 'pointer', border: `1px solid ${posicaoAporteId === p.id ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: posicaoAporteId === p.id ? '#F0FDF4' : '#fff', color: posicaoAporteId === p.id ? '#0E3B2E' : '#64748B' }}>
-                        {p.nome}
-                      </button>
-                    ))}
+                    {posicoesRF.map((p: any) => {
+                      const ativo = posicaoAporteId === p.id
+                      return (
+                        <button key={p.id} onClick={() => setPosicaoAporteId(p.id)}
+                          style={{ padding: '9px 13px', border: `1.5px solid ${ativo ? '#2FB36A' : '#E5E7EB'}`, backgroundColor: ativo ? 'rgba(47,179,106,0.08)' : '#fff', borderRadius: '11px', cursor: 'pointer', fontSize: '12.5px', fontWeight: ativo ? 600 : 500, color: ativo ? '#0B3B2E' : '#374151' }}>
+                          {p.nome}
+                        </button>
+                      )
+                    })}
                   </div>
                 )}
               </>
             ) : (
               <>
-                <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Alocar para qual meta?</p>
+                <p style={{ margin: '0 0 8px', fontSize: '10.5px', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.09em' }}>Alocar para qual meta?</p>
                 {metas.length === 0 ? (
-                  <p style={{ fontSize: '12px', color: '#94A3B8', backgroundColor: '#F8FAFC', border: '1px solid #F1F5F9', borderRadius: '12px', padding: '10px 12px' }}>
+                  <p style={{ margin: 0, fontSize: '12px', color: '#6B7280', backgroundColor: '#F7F8FA', border: '1px solid #ECEFF3', borderRadius: '12px', padding: '10px 12px' }}>
                     Nenhuma meta cadastrada ainda. Crie uma na tela de Metas primeiro.
                   </p>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
                     {metas.map((m: any) => {
                       const pctAtual = Math.min(Math.round((Number(m.valor_atual) / Number(m.valor_alvo)) * 100), 100)
                       const selecionada = metaAporteId === m.id
                       return (
                         <button key={m.id} onClick={() => setMetaAporteId(selecionada ? '' : m.id)}
-                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '10px 12px', borderRadius: '12px', cursor: 'pointer', textAlign: 'left', border: `1px solid ${selecionada ? '#0E3B2E' : '#E2E8F0'}`, backgroundColor: selecionada ? '#F0FDF4' : '#fff' }}>
-                          <span style={{ fontSize: '13px', fontWeight: 500, color: selecionada ? '#0E3B2E' : '#0F172A' }}>{m.nome}</span>
-                          <span style={{ fontSize: '11px', color: '#94A3B8', flexShrink: 0 }}>{pctAtual}% de {fmt(Number(m.valor_alvo))}</span>
+                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '11px 13px', border: `1.5px solid ${selecionada ? '#2FB36A' : '#E5E7EB'}`, backgroundColor: selecionada ? 'rgba(47,179,106,0.08)' : '#fff', borderRadius: '12px', cursor: 'pointer', textAlign: 'left' }}>
+                          <span style={{ fontSize: '13px', fontWeight: selecionada ? 600 : 500, color: selecionada ? '#0B3B2E' : '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.nome}</span>
+                          <span style={{ fontSize: '11.5px', color: '#9CA3AF', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{pctAtual}% de {fmt(Number(m.valor_alvo))}</span>
                         </button>
                       )
                     })}
                     {metaAporteId && metas.find((m: any) => m.id === metaAporteId)?.automatica && !editando && (
-                      <p style={{ fontSize: '11px', color: '#94A3B8', backgroundColor: '#F8FAFC', border: '1px solid #F1F5F9', borderRadius: '10px', padding: '8px 10px', marginTop: '2px' }}>
+                      <p style={{ margin: '2px 0 0', fontSize: '11.5px', color: '#6B7280', backgroundColor: '#F7F8FA', border: '1px solid #ECEFF3', borderRadius: '10px', padding: '8px 11px', lineHeight: 1.45 }}>
                         Essa meta é automática — o aporte vai direto pro Patrimônio (Caixa), sem gerar lançamento aqui em Movimentos.
                       </p>
                     )}
@@ -2165,115 +2305,117 @@ export default function MovimentosPage() {
           </div>
         )}
 
-        {/* Data + Dízimo */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', alignItems: 'center' }}>
-          <input type="date" value={dataLanc} onChange={e => setDataLanc(e.target.value)}
-            style={{ flex: 1, padding: '9px 14px', borderRadius: '12px', border: '1px solid #E2E8F0', fontSize: '14px', color: '#0F172A', outline: 'none', boxSizing: 'border-box' }} />
+        {/* Data e, ao lado, a decisão curta do tipo: dízimo na receita,
+            parcelar na despesa. */}
+        <div style={{ display: 'flex', gap: '10px', marginBottom: parcelado ? '8px' : '18px' }}>
+          <div style={{ flex: '1 1 0', minWidth: 0 }}>
+            <p style={{ margin: '0 0 8px', fontSize: '10.5px', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.09em' }}>Data</p>
+            <input type="date" value={dataLanc} onChange={e => setDataLanc(e.target.value)} className="df-input"
+              style={{ width: '100%', height: '52px', padding: '0 14px', boxSizing: 'border-box', border: '1.5px solid #E5E7EB', borderRadius: '13px', backgroundColor: '#FAFAFA', fontFamily: 'inherit', fontSize: '13.5px', color: '#111827', outline: 'none' }} />
+          </div>
+
           {tipo === 'receita' && (
-            <button onClick={() => setDizimar(!dizimar)}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 12px', borderRadius: '12px', border: `1px solid ${dizimar ? '#D1FAE5' : '#E2E8F0'}`, backgroundColor: dizimar ? '#F0FDF4' : '#F8FAFC', cursor: 'pointer', flexShrink: 0 }}>
-              <div style={{ position: 'relative', width: '36px', height: '20px', borderRadius: '10px', backgroundColor: dizimar ? '#10B981' : '#E2E8F0' }}>
-                <div style={{ position: 'absolute', top: '2px', left: dizimar ? '18px' : '2px', width: '16px', height: '16px', borderRadius: '50%', backgroundColor: '#fff', transition: 'left 0.2s' }} />
-              </div>
-              <span style={{ fontSize: '11px', fontWeight: 600, color: dizimar ? '#059669' : '#94A3B8', whiteSpace: 'nowrap' }}>Dízimo</span>
-            </button>
+            <div style={{ flex: '1 1 0', minWidth: 0 }}>
+              <p style={{ margin: '0 0 8px', fontSize: '10.5px', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.09em' }}>Dízimo</p>
+              <button onClick={() => setDizimar(!dizimar)}
+                style={{ width: '100%', height: '52px', display: 'flex', alignItems: 'center', gap: '10px', padding: '0 14px', boxSizing: 'border-box', border: `1.5px solid ${dizimar ? '#2FB36A' : '#E5E7EB'}`, backgroundColor: dizimar ? 'rgba(47,179,106,0.08)' : '#FAFAFA', borderRadius: '13px', cursor: 'pointer', textAlign: 'left' }}>
+                <span style={{ position: 'relative', width: '38px', height: '21px', borderRadius: '999px', backgroundColor: dizimar ? '#2FB36A' : '#E5E7EB', flexShrink: 0, transition: 'background-color 0.2s' }}>
+                  <span style={{ position: 'absolute', top: '2px', left: dizimar ? '19px' : '2px', width: '17px', height: '17px', borderRadius: '50%', backgroundColor: '#fff', transition: 'left 0.2s' }} />
+                </span>
+                <span style={{ fontSize: '13px', fontWeight: dizimar ? 600 : 500, color: dizimar ? '#0B3B2E' : '#6B7280' }}>{dizimar ? 'Sim' : 'Não'}</span>
+              </button>
+            </div>
+          )}
+
+          {tipo === 'despesa' && !editando && (
+            <div style={{ flex: '1 1 0', minWidth: 0 }}>
+              <p style={{ margin: '0 0 8px', fontSize: '10.5px', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.09em' }}>Parcelar</p>
+              <button onClick={() => setParcelado(!parcelado)}
+                style={{ width: '100%', height: '52px', display: 'flex', alignItems: 'center', gap: '10px', padding: '0 14px', boxSizing: 'border-box', border: `1.5px solid ${parcelado ? '#2FB36A' : '#E5E7EB'}`, backgroundColor: parcelado ? 'rgba(47,179,106,0.08)' : '#FAFAFA', borderRadius: '13px', cursor: 'pointer', textAlign: 'left' }}>
+                <span style={{ position: 'relative', width: '38px', height: '21px', borderRadius: '999px', backgroundColor: parcelado ? '#2FB36A' : '#E5E7EB', flexShrink: 0, transition: 'background-color 0.2s' }}>
+                  <span style={{ position: 'absolute', top: '2px', left: parcelado ? '19px' : '2px', width: '17px', height: '17px', borderRadius: '50%', backgroundColor: '#fff', transition: 'left 0.2s' }} />
+                </span>
+                <span style={{ fontSize: '13px', fontWeight: parcelado ? 600 : 500, color: parcelado ? '#0B3B2E' : '#6B7280' }}>{parcelado ? `${numParcelas}x` : 'Não'}</span>
+              </button>
+            </div>
           )}
         </div>
 
-        {/* Parcelado — só despesa e novo lançamento */}
-        {tipo === 'despesa' && !editando && (
-          <div style={{ marginBottom: '10px' }}>
-            <button onClick={() => setParcelado(!parcelado)}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '10px 14px', borderRadius: '12px', border: `1px solid ${parcelado ? '#3B82F6' : '#E2E8F0'}`, backgroundColor: parcelado ? '#EFF6FF' : '#F8FAFC', cursor: 'pointer', marginBottom: parcelado ? '8px' : '0' }}>
-              <div style={{ position: 'relative', width: '36px', height: '20px', borderRadius: '10px', backgroundColor: parcelado ? '#3B82F6' : '#E2E8F0', flexShrink: 0 }}>
-                <div style={{ position: 'absolute', top: '2px', left: parcelado ? '18px' : '2px', width: '16px', height: '16px', borderRadius: '50%', backgroundColor: '#fff', transition: 'left 0.2s' }} />
+        {/* Parcelado aberto. O valor informado é o TOTAL. */}
+        {tipo === 'despesa' && !editando && parcelado && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px', padding: '13px 14px', backgroundColor: 'rgba(47,179,106,0.06)', border: '1.5px solid rgba(47,179,106,0.25)', borderRadius: '13px', marginBottom: '18px' }}>
+            <div>
+              <p style={{ margin: '0 0 6px', fontSize: '11px', fontWeight: 600, color: '#0B3B2E' }}>Nº de parcelas</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
+                <button onClick={() => setNumParcelas(String(Math.max(2, parseInt(numParcelas) - 1)))} aria-label="Menos uma parcela"
+                  style={{ width: '30px', height: '30px', border: '1.5px solid #E5E7EB', backgroundColor: '#fff', borderRadius: '9px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0B3B2E', fontSize: '16px', fontWeight: 700 }}>-</button>
+                <span style={{ minWidth: '34px', textAlign: 'center', fontSize: '17px', fontWeight: 700, color: '#0B3B2E', fontVariantNumeric: 'tabular-nums' }}>{numParcelas}x</span>
+                <button onClick={() => setNumParcelas(String(Math.min(48, parseInt(numParcelas) + 1)))} aria-label="Mais uma parcela"
+                  style={{ width: '30px', height: '30px', border: '1.5px solid #E5E7EB', backgroundColor: '#fff', borderRadius: '9px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0B3B2E', fontSize: '16px', fontWeight: 700 }}>+</button>
               </div>
-              <div>
-                <p style={{ fontSize: '13px', fontWeight: 600, color: parcelado ? '#1D4ED8' : '#0F172A', margin: 0 }}>Compra parcelada</p>
-                <p style={{ fontSize: '11px', color: '#94A3B8', margin: 0 }}>Divide o valor em parcelas mensais</p>
+            </div>
+            <div>
+              <p style={{ margin: '0 0 6px', fontSize: '11px', fontWeight: 600, color: '#0B3B2E' }}>Dia de vencimento</p>
+              {ehCartao && contaDoForm.dia_vencimento ? (
+                <div style={{ height: '30px', display: 'flex', alignItems: 'center', padding: '0 10px', boxSizing: 'border-box', border: '1.5px solid #E5E7EB', backgroundColor: '#fff', borderRadius: '9px', fontSize: '13px', fontWeight: 700, color: '#0B3B2E' }}>
+                  Dia {contaDoForm.dia_vencimento}
+                  <span style={{ fontWeight: 500, color: '#9CA3AF', fontSize: '11px', marginLeft: '5px' }}>(do cartão)</span>
+                </div>
+              ) : (
+                <input type="number" min="1" max="31" value={diaParcela} onChange={e => setDiaParcela(e.target.value)}
+                  style={{ width: '100%', height: '30px', padding: '0 10px', boxSizing: 'border-box', border: '1.5px solid #E5E7EB', backgroundColor: '#fff', borderRadius: '9px', fontFamily: 'inherit', fontSize: '15px', fontWeight: 700, color: '#0B3B2E', outline: 'none', fontVariantNumeric: 'tabular-nums' }} />
+              )}
+            </div>
+            {ehCartao && contaDoForm.dia_fechamento && (
+              <div style={{ gridColumn: '1 / -1', fontSize: '11.5px', color: '#374151', backgroundColor: '#fff', border: '1.5px solid rgba(47,179,106,0.25)', borderRadius: '10px', padding: '8px 11px', lineHeight: 1.45 }}>
+                {new Date(dataLanc + 'T12:00:00').getDate() > contaDoForm.dia_fechamento
+                  ? `Compra depois do fechamento (dia ${contaDoForm.dia_fechamento}) — a 1ª parcela cai na fatura do mês seguinte.`
+                  : `Compra antes do fechamento (dia ${contaDoForm.dia_fechamento}) — a 1ª parcela entra na fatura deste mês.`}
               </div>
-            </button>
-            {parcelado && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '10px 14px', backgroundColor: '#EFF6FF', borderRadius: '12px', border: '1px solid #BFDBFE' }}>
-                <div>
-                  <p style={{ fontSize: '11px', fontWeight: 600, color: '#1D4ED8', marginBottom: '4px' }}>Nº de parcelas</p>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <button onClick={() => setNumParcelas(String(Math.max(2, parseInt(numParcelas) - 1)))}
-                      style={{ width: '28px', height: '28px', borderRadius: '8px', border: '1px solid #BFDBFE', backgroundColor: '#fff', cursor: 'pointer', fontSize: '16px', color: '#1D4ED8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>-</button>
-                    <span style={{ fontSize: '18px', fontWeight: 700, color: '#1D4ED8', minWidth: '24px', textAlign: 'center' }}>{numParcelas}x</span>
-                    <button onClick={() => setNumParcelas(String(Math.min(48, parseInt(numParcelas) + 1)))}
-                      style={{ width: '28px', height: '28px', borderRadius: '8px', border: '1px solid #BFDBFE', backgroundColor: '#fff', cursor: 'pointer', fontSize: '16px', color: '#1D4ED8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
-                  </div>
-                </div>
-                <div>
-                  <p style={{ fontSize: '11px', fontWeight: 600, color: '#1D4ED8', marginBottom: '4px' }}>Dia de vencimento</p>
-                  {(() => {
-                    const contaForm = contas.find(c => c.id === contaSelecionadaId)
-                    if (contaForm?.tipo === 'cartao_credito' && contaForm.dia_vencimento) {
-                      return (
-                        <div style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #BFDBFE', backgroundColor: '#fff', fontSize: '13px', fontWeight: 700, color: '#1D4ED8' }}>
-                          Dia {contaForm.dia_vencimento} <span style={{ fontWeight: 500, color: '#64748B', fontSize: '11px' }}>(do cartão)</span>
-                        </div>
-                      )
-                    }
-                    return (
-                      <input type="number" min="1" max="31" value={diaParcela} onChange={e => setDiaParcela(e.target.value)}
-                        style={{ width: '100%', padding: '6px 10px', borderRadius: '8px', border: '1px solid #BFDBFE', fontSize: '16px', fontWeight: 700, color: '#1D4ED8', outline: 'none', backgroundColor: '#fff', boxSizing: 'border-box' }} />
-                    )
-                  })()}
-                </div>
-                {(() => {
-                  const contaForm = contas.find(c => c.id === contaSelecionadaId)
-                  if (contaForm?.tipo === 'cartao_credito' && contaForm.dia_fechamento) {
-                    const diaCompra = new Date(dataLanc + 'T12:00:00').getDate()
-                    const empurrou = diaCompra > contaForm.dia_fechamento
-                    return (
-                      <div style={{ gridColumn: '1 / -1', fontSize: '11px', color: '#1D4ED8', backgroundColor: '#fff', padding: '6px 10px', borderRadius: '8px', border: '1px solid #BFDBFE' }}>
-                        {empurrou
-                          ? `Compra depois do fechamento (dia ${contaForm.dia_fechamento}) — a 1ª parcela cai na fatura do mês seguinte.`
-                          : `Compra antes do fechamento (dia ${contaForm.dia_fechamento}) — a 1ª parcela entra na fatura deste mês.`}
-                      </div>
-                    )
-                  }
-                  return null
-                })()}
-                {valor && (
-                  <div style={{ gridColumn: '1 / -1', padding: '8px', backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #BFDBFE', textAlign: 'center' }}>
-                    <p style={{ fontSize: '12px', color: '#64748B', margin: 0 }}>
-                      {numParcelas}x de <strong style={{ color: '#1D4ED8' }}>
-                        {fmt(parseFloat(valor.replace(/\./g, '').replace(',', '.')) / parseInt(numParcelas))}
-                      </strong>
-                    </p>
-                  </div>
-                )}
+            )}
+            {valor && (
+              <div style={{ gridColumn: '1 / -1', padding: '9px', backgroundColor: '#fff', border: '1.5px solid rgba(47,179,106,0.25)', borderRadius: '10px', textAlign: 'center' }}>
+                <p style={{ margin: 0, fontSize: '12.5px', color: '#374151' }}>
+                  {numParcelas}x de <strong style={{ color: '#0B3B2E', fontVariantNumeric: 'tabular-nums' }}>{fmt(valorNum / parseInt(numParcelas))}</strong>
+                </p>
               </div>
             )}
           </div>
         )}
 
-        {/* Observação */}
-        <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Observação (opcional)</p>
-        <textarea value={observacao} onChange={e => setObservacao(e.target.value)}
-          placeholder="Ex: Geladeira Samsung, comprada no Extra..."
-          rows={2}
-          style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1px solid #E2E8F0', fontSize: '13px', color: '#0F172A', outline: 'none', resize: 'none', fontFamily: 'inherit', boxSizing: 'border-box', marginBottom: '8px' }} />
+        {/* Observação: explicitamente o que vira o título na lista */}
+        <p style={{ margin: '0 0 8px', fontSize: '10.5px', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.09em' }}>Observação</p>
+        <textarea value={observacao} onChange={e => setObservacao(e.target.value)} className="df-input"
+          placeholder="Mercado do mês" rows={2}
+          style={{ width: '100%', padding: '12px 14px', boxSizing: 'border-box', border: '1.5px solid #E5E7EB', borderRadius: '13px', backgroundColor: '#FAFAFA', fontFamily: 'inherit', fontSize: '13px', color: '#111827', outline: 'none', resize: 'none' }} />
+        <p style={{ margin: '6px 0 0', fontSize: '11px', color: '#9CA3AF', lineHeight: 1.45 }}>
+          Vira o título da linha na lista. Em branco, a lista mostra a categoria.
+        </p>
 
         {confirmDelete && (
-          <p style={{ fontSize: '12px', color: '#EF4444', textAlign: 'center', marginBottom: '4px' }}>
+          <p style={{ margin: '10px 0 0', fontSize: '12px', fontWeight: 600, color: '#B91C1C', textAlign: 'center' }}>
             Toque em "Confirmar" para deletar permanentemente.
           </p>
         )}
       </div>
 
-      {/* Botão fixo */}
-      <div style={{ padding: '12px 20px 20px', borderTop: '1px solid #F1F5F9', backgroundColor: '#fff', flexShrink: 0 }}>
-        <button onClick={handleSalvar} disabled={salvando || !valor}
-          style={{ width: '100%', height: '48px', borderRadius: '12px', border: 'none', fontSize: '15px', fontWeight: 600, color: '#fff', cursor: salvando || !valor ? 'not-allowed' : 'pointer', backgroundColor: '#0E3B2E', opacity: salvando || !valor ? 0.6 : 1 }}>
-          {salvando ? 'Salvando...' : editando ? 'Salvar alterações' : parcelado ? `Criar ${numParcelas} parcelas` : 'Registrar lançamento'}
+      <div style={{ padding: '14px 22px 20px', borderTop: '1px solid #F1F4F7', backgroundColor: '#fff', flexShrink: 0 }}>
+        <button onClick={handleSalvar} disabled={salvando || !valor} className="df-cta"
+          style={{ width: '100%', height: '56px', border: 'none', borderRadius: '16px', background: 'linear-gradient(135deg, #07271F 0%, #145A45 100%)', boxShadow: '0 4px 16px rgba(11,59,46,0.3)', cursor: salvando || !valor ? 'not-allowed' : 'pointer', fontSize: '15px', fontWeight: 600, color: '#fff', opacity: salvando || !valor ? 0.45 : 1 }}>
+          {salvando
+            ? 'Salvando...'
+            : editando
+              ? 'Salvar alterações'
+              : parcelado
+                ? `Criar ${numParcelas} parcelas`
+                : valor
+                  ? `Registrar ${fmt(valorNum)}`
+                  : 'Registrar lançamento'}
         </button>
       </div>
     </>
-  )
+    )
+  }
 
   return (
     <>
