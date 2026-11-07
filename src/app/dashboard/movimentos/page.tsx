@@ -438,19 +438,37 @@ export default function MovimentosPage() {
     setSaldoContaReal(Number(contaCorrente.saldo_inicial))
   }
 
+  // Cria a conta corrente se ela ainda não existir.
+  //
+  // Nada no app criava uma conta do tipo 'corrente' — oito lugares procuravam por ela e
+  // nenhum a inseria. As contas que existem hoje foram criadas direto no banco. Quem se
+  // cadastra depois fica sem: não consegue definir o saldo, não consegue pagar fatura de
+  // cartão, e nada vem pré-selecionado em "Pago com". Esta função salvava em silêncio
+  // quando não achava a conta, então o usuário digitava o saldo e nada acontecia.
   async function handleSalvarSaldoConta() {
-    const contaCorrente = contas.find(c => c.tipo === 'corrente')
-    if (!contaCorrente || !saldoInicialInput) return
+    if (!saldoInicialInput) return
     setSalvandoSaldoConta(true)
-    const payload = {
-      saldo_inicial: Number(saldoInicialInput.replace(',', '.')),
-    }
-    const { data: contaAtualizada, error } = await supabase.from('contas')
-      .update(payload).eq('id', contaCorrente.id).select().single()
-    if (!error && contaAtualizada) {
-      const novasContas = contas.map(c => c.id === contaCorrente.id ? contaAtualizada : c)
+    const saldo = Number(saldoInicialInput.replace(',', '.'))
+    if (isNaN(saldo)) { setSalvandoSaldoConta(false); return }
+
+    const contaCorrente = contas.find(c => c.tipo === 'corrente')
+    const { data: contaSalva, error } = contaCorrente
+      ? await supabase.from('contas')
+          .update({ saldo_inicial: saldo }).eq('id', contaCorrente.id).select().single()
+      : await supabase.from('contas').insert({
+          familia_id: familiaIdRef.current,
+          empresa_id: contextoAtivo.tipo === 'empresa' ? contextoAtivo.empresaId : null,
+          nome: 'Conta Corrente', tipo: 'corrente', saldo_inicial: saldo,
+        }).select().single()
+
+    if (!error && contaSalva) {
+      const novasContas = contaCorrente
+        ? contas.map(c => c.id === contaCorrente.id ? contaSalva : c)
+        : [...contas, contaSalva]
       setContas(novasContas)
+      if (!contaCorrente) setContaSelecionadaId(contaSalva.id)
       await carregarSaldoContaReal(familiaIdRef.current, novasContas)
+      await carregarFaturasPendentes(familiaIdRef.current, novasContas)
       setModalSaldoContaOpen(false)
     } else {
       console.error('Erro ao salvar saldo da conta:', error)
@@ -550,7 +568,7 @@ export default function MovimentosPage() {
     const fid = familiaIdRef.current
     const contaCorrente = contas.find(c => c.tipo === 'corrente')
     if (!contaCorrente) {
-      setErroFatura('Nenhuma conta corrente encontrada para debitar o pagamento.')
+      setErroFatura('Você ainda não tem conta corrente. Toque em "Conta" ali em cima, informe o saldo, e ela é criada.')
       setErroFaturaCartaoId(cartaoId)
       setPagandoFatura(null)
       return
@@ -570,11 +588,18 @@ export default function MovimentosPage() {
 
     // Mesma lógica do card: só quita o que é da fatura atual (mesmo antes do vencimento
     // chegar) — parcela de fatura realmente futura fica pra ser paga na hora dela.
+    //
+    // O corte é pelo dia de FECHAMENTO, igual a carregarFaturasPendentes e a handleSalvar.
+    // Usar o vencimento aqui (como estava) descompassava do valor mostrado no card: entre o
+    // fechamento e o vencimento, o card já contava a fatura seguinte e este filtro ainda não,
+    // então o botão "Pagar fatura" encontrava total zero e saía em silêncio — o usuário via
+    // um valor a pagar e o clique não fazia nada.
     const hoje = new Date()
     let pendentes = todosPendentes || []
     if (cartao?.dia_vencimento) {
+      const diaCorte = cartao.dia_fechamento || cartao.dia_vencimento
       let vencimentoAtual = new Date(hoje.getFullYear(), hoje.getMonth(), cartao.dia_vencimento)
-      if (hoje.getDate() > cartao.dia_vencimento) {
+      if (hoje.getDate() > diaCorte) {
         vencimentoAtual = new Date(hoje.getFullYear(), hoje.getMonth() + 1, cartao.dia_vencimento)
       }
       const vencimentoAtualStr = dataLocalISO(vencimentoAtual)
@@ -582,7 +607,13 @@ export default function MovimentosPage() {
     }
 
     const total = pendentes.reduce((s: number, l: any) => s + Number(l.valor), 0)
-    if (total <= 0) { setPagandoFatura(null); return }
+    // Nada a quitar: antes saía em silêncio e o clique parecia não funcionar.
+    if (total <= 0) {
+      setErroFatura('Não há nada em aberto nesta fatura para pagar agora.')
+      setErroFaturaCartaoId(cartaoId)
+      setPagandoFatura(null)
+      return
+    }
 
     const agora = new Date()
     const hora  = `${String(agora.getHours()).padStart(2,'0')}:${String(agora.getMinutes()).padStart(2,'0')}`
@@ -1550,6 +1581,44 @@ export default function MovimentosPage() {
     )
   }
 
+  // Acesso PERMANENTE aos painéis de fixas e cartões.
+  //
+  // Sem esta barra, o único jeito de abrir esses painéis era pelo card
+  // "Precisa de você" — que some quando não há nada a pagar. Como o botão
+  // "+ Nova" das despesas fixas vive DENTRO do painel, isso criava um beco:
+  // quem não tinha nenhuma fixa cadastrada não conseguia cadastrar a
+  // primeira, e quem pagava tudo no mês perdia o acesso ao painel, inclusive
+  // para desfazer um pagamento marcado por engano.
+  const barraGerenciar = (isMob: boolean) => {
+    const temConta = contas.some((c: any) => c.tipo === 'corrente')
+    const itens = [
+      { key: 'fixas' as const, Icon: Repeat, label: isMob ? 'Fixas' : 'Despesas fixas', qtd: fixasDoMes.length, acao: () => setPainelAberto(painelAberto === 'fixas' ? null : 'fixas'), ativo: painelAberto === 'fixas', alerta: false },
+      { key: 'cartoes' as const, Icon: CreditCard, label: 'Cartões', qtd: cartoes.length, acao: () => setPainelAberto(painelAberto === 'cartoes' ? null : 'cartoes'), ativo: painelAberto === 'cartoes', alerta: false },
+      // Sem conta corrente não dá pra pagar fatura nem comparar saldo, e não havia
+      // caminho nenhum no app pra criar uma. Fica marcada até existir.
+      { key: 'conta' as const, Icon: Wallet, label: 'Conta', qtd: 0, acao: abrirModalSaldoConta, ativo: modalSaldoContaOpen, alerta: !temConta },
+    ]
+    return (
+      <div style={{ display: 'flex', gap: '8px' }}>
+        {itens.map(b => (
+          <button key={b.key} onClick={b.acao} className="df-new-btn"
+            style={{ flex: '1 1 0', minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px', padding: isMob ? '11px 8px' : '12px 10px', border: `1.5px solid ${b.ativo ? '#2FB36A' : b.alerta ? '#FDBA74' : '#E5E7EB'}`, backgroundColor: b.ativo ? 'rgba(47,179,106,0.08)' : b.alerta ? '#FFFBEB' : '#fff', borderRadius: '13px', cursor: 'pointer', fontSize: '12.5px', fontWeight: 600, color: b.ativo ? '#0B3B2E' : b.alerta ? '#92400E' : '#374151' }}>
+            <b.Icon size={15} color={b.ativo ? '#0B3B2E' : b.alerta ? '#B45309' : '#9CA3AF'} strokeWidth={1.75} style={{ flexShrink: 0 }} />
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.label}</span>
+            {b.qtd > 0 && (
+              <span style={{ minWidth: '19px', height: '19px', padding: '0 5px', boxSizing: 'border-box', borderRadius: '999px', backgroundColor: b.ativo ? 'rgba(47,179,106,0.18)' : '#F1F4F7', color: b.ativo ? '#0B3B2E' : '#6B7280', fontSize: '10.5px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+                {b.qtd}
+              </span>
+            )}
+            {b.alerta && (
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#F59E0B', flexShrink: 0 }} />
+            )}
+          </button>
+        ))}
+      </div>
+    )
+  }
+
   // O painel que a pendência abre. Reaproveita as seções que já existiam.
   const painelExpandido = (isMob: boolean) => {
     if (!painelAberto) return null
@@ -2449,12 +2518,13 @@ export default function MovimentosPage() {
           {blocoPosicao(true)}
         </div>
 
-        {pendencias.length > 0 && (
-          <div style={{ padding: '0 16px 16px' }}>
-            {cardPendencias(true)}
-            {painelExpandido(true)}
-          </div>
-        )}
+        {/* A barra fica fora do `pendencias.length > 0`: ela precisa existir
+            justamente quando NÃO há pendência, que é quando o card some. */}
+        <div style={{ padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {cardPendencias(true)}
+          {barraGerenciar(true)}
+          {painelExpandido(true)}
+        </div>
 
         {contextoAtivo.tipo === 'pessoal' && !loading && familiaId && (
           <div style={{ padding: '0 16px 16px' }}>
@@ -2546,6 +2616,7 @@ export default function MovimentosPage() {
           <div style={{ flex: '1 1 340px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {blocoPosicao(false)}
             {cardPendencias(false)}
+            {barraGerenciar(false)}
 
             {contextoAtivo.tipo === 'pessoal' && !loading && familiaId && (
               <OrcamentosSection
@@ -2689,7 +2760,9 @@ export default function MovimentosPage() {
           <div style={{ width: isMobile ? '100%' : '380px', backgroundColor: '#fff', borderRadius: isMobile ? '28px 28px 0 0' : '20px', padding: '24px' }}>
             {isMobile && <div style={{ width: '40px', height: '4px', borderRadius: '2px', backgroundColor: '#E2E8F0', margin: '-8px auto 16px' }} />}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', margin: 0 }}>Saldo da conta</h2>
+              <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', margin: 0 }}>
+                {contas.some((c: any) => c.tipo === 'corrente') ? 'Saldo da conta' : 'Criar conta corrente'}
+              </h2>
               <button onClick={() => setModalSaldoContaOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}>
                 <X size={20} strokeWidth={2} />
               </button>
