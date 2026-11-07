@@ -1117,10 +1117,14 @@ export default function MovimentosPage() {
     setBusca('')
   }
 
-  // Só o que exige ação do usuário. Cada item abre o painel correspondente.
+  // Uma linha por assunto — fixas, cartões, conta — mostrando o que está pendente
+  // quando há algo, e o estado calmo quando não há. O card inteiro é renderizado
+  // sempre: ele é o único caminho até os painéis, e se sumisse quando está tudo em
+  // dia, voltaria o beco de não conseguir cadastrar a primeira despesa fixa.
   const pendencias = (() => {
     const itens: any[] = []
     const algumaAtrasada = fixasDespesas.some((f: any) => f.atrasada)
+
     if (totalDespesasFixasPendentes > 0) {
       itens.push({
         key: 'fixas',
@@ -1129,21 +1133,61 @@ export default function MovimentosPage() {
         valor: fmt(totalDespesasFixasPendentes),
         detalhe: algumaAtrasada ? 'venceu e não foi paga' : 'a pagar neste mês',
         alerta: algumaAtrasada,
+        pendente: true,
+        painel: 'fixas' as const,
+      })
+    } else {
+      itens.push({
+        key: 'fixas',
+        Icon: Repeat,
+        titulo: 'Despesas fixas',
+        valor: fixasDoMes.length > 0 ? `${fixasDoMes.length} cadastrada${fixasDoMes.length > 1 ? 's' : ''}` : 'nenhuma cadastrada',
+        detalhe: fixasDoMes.length > 0 ? 'tudo pago neste mês' : 'aluguel, escola, assinaturas',
+        alerta: false,
+        pendente: false,
         painel: 'fixas' as const,
       })
     }
-    cartoes.forEach((c: any) => {
-      const pend = faturasPendentes[c.id] || 0
-      if (pend <= 0) return
+
+    const cartoesComFatura = cartoes.filter((c: any) => (faturasPendentes[c.id] || 0) > 0)
+    cartoesComFatura.forEach((c: any) => {
       itens.push({
         key: `cartao-${c.id}`,
         Icon: CreditCard,
         titulo: `Fatura ${c.nome}`,
-        valor: fmt(pend),
+        valor: fmt(faturasPendentes[c.id]),
         detalhe: c.dia_vencimento ? `vence dia ${c.dia_vencimento}` : 'na fatura atual',
         alerta: false,
+        pendente: true,
         painel: 'cartoes' as const,
       })
+    })
+    if (cartoesComFatura.length === 0) {
+      itens.push({
+        key: 'cartoes',
+        Icon: CreditCard,
+        titulo: 'Cartões',
+        valor: cartoes.length > 0 ? `${cartoes.length} cadastrado${cartoes.length > 1 ? 's' : ''}` : 'nenhum cadastrado',
+        detalhe: cartoes.length > 0 ? 'sem fatura em aberto' : 'para lançar compras no crédito',
+        alerta: false,
+        pendente: false,
+        painel: 'cartoes' as const,
+      })
+    }
+
+    // Conta corrente: sem ela não dá pra pagar fatura nem comparar saldo, e até
+    // pouco tempo atrás não havia como criar uma pelo app.
+    const contaCorrente = contas.find((c: any) => c.tipo === 'corrente')
+    itens.push({
+      key: 'conta',
+      Icon: Wallet,
+      titulo: 'Conta corrente',
+      valor: contaCorrente ? fmt(Number(contaCorrente.saldo_inicial) || 0) : 'não cadastrada',
+      detalhe: contaCorrente ? 'saldo informado' : 'informe o saldo para começar',
+      alerta: !contaCorrente,
+      pendente: false,
+      acao: abrirModalSaldoConta,
+      rotulo: contaCorrente ? 'Alterar' : 'Criar',
     })
     return itens
   })()
@@ -1548,73 +1592,45 @@ export default function MovimentosPage() {
     </div>
   )
 
-  // Pendências: substitui as três seções que antes ficavam sempre abertas
-  // acima da lista. Só o que exige ação aparece, e o painel abre no clique.
+  // Card único: é a pendência E o caminho para os painéis. Ter uma barra de
+  // atalhos embaixo duplicava a mesma linha ("Despesas fixas em aberto" e um
+  // botão "Despesas fixas" logo abaixo, apontando para o mesmo painel).
   const cardPendencias = (isMob: boolean) => {
-    if (pendencias.length === 0) return null
+    const qtdPendentes = pendencias.filter((p: any) => p.pendente || p.alerta).length
     return (
       <div style={{ backgroundColor: '#fff', border: '1px solid #ECEFF3', borderRadius: '20px', overflow: 'hidden', boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 12px 40px rgba(0,0,0,0.07)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '16px 20px 13px' }}>
-          <h2 style={{ margin: 0, fontSize: '14.5px', fontWeight: 700, color: '#0B3B2E', letterSpacing: '-0.2px' }}>Precisa de você</h2>
-          <span style={{ minWidth: '20px', height: '20px', padding: '0 6px', boxSizing: 'border-box', borderRadius: '999px', backgroundColor: '#F1F4F7', color: '#374151', fontSize: '11px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {pendencias.length}
-          </span>
+          <h2 style={{ margin: 0, fontSize: '14.5px', fontWeight: 700, color: '#0B3B2E', letterSpacing: '-0.2px' }}>
+            {qtdPendentes > 0 ? 'Precisa de você' : 'Tudo em dia'}
+          </h2>
+          {qtdPendentes > 0 ? (
+            <span style={{ minWidth: '20px', height: '20px', padding: '0 6px', boxSizing: 'border-box', borderRadius: '999px', backgroundColor: '#F1F4F7', color: '#374151', fontSize: '11px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {qtdPendentes}
+            </span>
+          ) : (
+            <Check size={16} color="#2FB36A" strokeWidth={2.5} />
+          )}
         </div>
-        {pendencias.map((p: any) => (
-          <div key={p.key} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '13px 20px', borderTop: '1px solid #F7F8FA' }}>
-            <span style={{ width: '34px', height: '34px', borderRadius: '10px', backgroundColor: p.alerta ? '#FEF2F2' : '#F7F8FA', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <p.Icon size={16} color={p.alerta ? '#DC2626' : '#6B7280'} strokeWidth={1.75} />
-            </span>
-            <span style={{ flex: '1 1 auto', minWidth: 0 }}>
-              <span style={{ display: 'block', fontSize: '13.5px', fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.titulo}</span>
-              <span style={{ display: 'block', marginTop: '2px', fontSize: '12px', fontWeight: p.alerta ? 600 : 400, color: p.alerta ? '#DC2626' : '#6B7280', fontVariantNumeric: 'tabular-nums' }}>
-                {p.valor} · {p.detalhe}
+        {pendencias.map((p: any) => {
+          const esteAberto = p.painel ? painelAberto === p.painel : false
+          return (
+            <div key={p.key} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '13px 20px', borderTop: '1px solid #F7F8FA', backgroundColor: p.alerta ? '#FFFBEB' : 'transparent' }}>
+              <span style={{ width: '34px', height: '34px', borderRadius: '10px', backgroundColor: p.alerta ? (p.pendente ? '#FEF2F2' : '#FEF3C7') : '#F7F8FA', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <p.Icon size={16} color={p.alerta ? (p.pendente ? '#DC2626' : '#B45309') : '#6B7280'} strokeWidth={1.75} />
               </span>
-            </span>
-            <button onClick={() => setPainelAberto(painelAberto === p.painel ? null : p.painel)} className="df-new-btn"
-              style={{ padding: '7px 13px', border: '1.5px solid #E5E7EB', borderRadius: '10px', backgroundColor: '#fff', cursor: 'pointer', fontSize: '12px', fontWeight: 600, color: '#374151', flexShrink: 0 }}>
-              {painelAberto === p.painel ? 'Fechar' : 'Ver'}
-            </button>
-          </div>
-        ))}
-      </div>
-    )
-  }
-
-  // Acesso PERMANENTE aos painéis de fixas e cartões.
-  //
-  // Sem esta barra, o único jeito de abrir esses painéis era pelo card
-  // "Precisa de você" — que some quando não há nada a pagar. Como o botão
-  // "+ Nova" das despesas fixas vive DENTRO do painel, isso criava um beco:
-  // quem não tinha nenhuma fixa cadastrada não conseguia cadastrar a
-  // primeira, e quem pagava tudo no mês perdia o acesso ao painel, inclusive
-  // para desfazer um pagamento marcado por engano.
-  const barraGerenciar = (isMob: boolean) => {
-    const temConta = contas.some((c: any) => c.tipo === 'corrente')
-    const itens = [
-      { key: 'fixas' as const, Icon: Repeat, label: isMob ? 'Fixas' : 'Despesas fixas', qtd: fixasDoMes.length, acao: () => setPainelAberto(painelAberto === 'fixas' ? null : 'fixas'), ativo: painelAberto === 'fixas', alerta: false },
-      { key: 'cartoes' as const, Icon: CreditCard, label: 'Cartões', qtd: cartoes.length, acao: () => setPainelAberto(painelAberto === 'cartoes' ? null : 'cartoes'), ativo: painelAberto === 'cartoes', alerta: false },
-      // Sem conta corrente não dá pra pagar fatura nem comparar saldo, e não havia
-      // caminho nenhum no app pra criar uma. Fica marcada até existir.
-      { key: 'conta' as const, Icon: Wallet, label: 'Conta', qtd: 0, acao: abrirModalSaldoConta, ativo: modalSaldoContaOpen, alerta: !temConta },
-    ]
-    return (
-      <div style={{ display: 'flex', gap: '8px' }}>
-        {itens.map(b => (
-          <button key={b.key} onClick={b.acao} className="df-new-btn"
-            style={{ flex: '1 1 0', minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px', padding: isMob ? '11px 8px' : '12px 10px', border: `1.5px solid ${b.ativo ? '#2FB36A' : b.alerta ? '#FDBA74' : '#E5E7EB'}`, backgroundColor: b.ativo ? 'rgba(47,179,106,0.08)' : b.alerta ? '#FFFBEB' : '#fff', borderRadius: '13px', cursor: 'pointer', fontSize: '12.5px', fontWeight: 600, color: b.ativo ? '#0B3B2E' : b.alerta ? '#92400E' : '#374151' }}>
-            <b.Icon size={15} color={b.ativo ? '#0B3B2E' : b.alerta ? '#B45309' : '#9CA3AF'} strokeWidth={1.75} style={{ flexShrink: 0 }} />
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.label}</span>
-            {b.qtd > 0 && (
-              <span style={{ minWidth: '19px', height: '19px', padding: '0 5px', boxSizing: 'border-box', borderRadius: '999px', backgroundColor: b.ativo ? 'rgba(47,179,106,0.18)' : '#F1F4F7', color: b.ativo ? '#0B3B2E' : '#6B7280', fontSize: '10.5px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
-                {b.qtd}
+              <span style={{ flex: '1 1 auto', minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: '13.5px', fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.titulo}</span>
+                <span style={{ display: 'block', marginTop: '2px', fontSize: '12px', fontWeight: p.alerta || p.pendente ? 600 : 400, color: p.alerta ? (p.pendente ? '#DC2626' : '#B45309') : '#6B7280', fontVariantNumeric: 'tabular-nums', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {p.valor} · {p.detalhe}
+                </span>
               </span>
-            )}
-            {b.alerta && (
-              <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#F59E0B', flexShrink: 0 }} />
-            )}
-          </button>
-        ))}
+              <button onClick={p.acao ? p.acao : () => setPainelAberto(esteAberto ? null : p.painel)} className="df-new-btn"
+                style={{ padding: '7px 13px', border: `1.5px solid ${p.alerta ? '#FDBA74' : '#E5E7EB'}`, borderRadius: '10px', backgroundColor: '#fff', cursor: 'pointer', fontSize: '12px', fontWeight: 600, color: p.alerta ? '#92400E' : '#374151', flexShrink: 0 }}>
+                {p.rotulo ? p.rotulo : esteAberto ? 'Fechar' : 'Ver'}
+              </button>
+            </div>
+          )
+        })}
       </div>
     )
   }
@@ -2522,7 +2538,6 @@ export default function MovimentosPage() {
             justamente quando NÃO há pendência, que é quando o card some. */}
         <div style={{ padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {cardPendencias(true)}
-          {barraGerenciar(true)}
           {painelExpandido(true)}
         </div>
 
@@ -2616,7 +2631,6 @@ export default function MovimentosPage() {
           <div style={{ flex: '1 1 340px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {blocoPosicao(false)}
             {cardPendencias(false)}
-            {barraGerenciar(false)}
 
             {contextoAtivo.tipo === 'pessoal' && !loading && familiaId && (
               <OrcamentosSection
